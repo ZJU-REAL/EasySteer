@@ -111,6 +111,7 @@ vllm/steer_vectors/
     ├── factory.py             # Algorithm factory (for creating algorithm instances)
     ├── direct.py              # Direct intervention algorithm
     ├── loreft.py              # LoReFT algorithm implementation
+    ├── xxx.py                 # Other algorithms
     ├── multi_vector.py        # Multi-vector combination algorithm
     └── template.py            # New algorithm template example
 ```
@@ -308,9 +309,9 @@ all_hidden_states, outputs = hs.get_all_hidden_states(llm, prompts)
 </details>
 
 
-### steer
+### steer (Analysis-based Steering)
 
-The steer module implements various algorithms for extracting meaningful intervention vectors from hidden states, including DiffMean, PCA, LAT, Linear probe, and SAE. Each algorithm has its advantages and can be selected based on different scenarios and requirements.
+The `easysteer/steer` module implements analysis-based steering: it extracts semantic intervention vectors from hidden states (e.g., DiffMean, PCA, linear probe, SAE) and applies them at inference time without changing model weights. Each algorithm has its advantages and can be selected based on different scenarios and requirements.
 
 <details>
 <summary><b>Steering vector generation</b></summary>
@@ -337,9 +338,9 @@ control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
 
 </details>
 
-### reft
+### reft (Learning-based Steering)
 
-Steering is an analytical intervention approach that extracts control vectors by analyzing hidden states. In contrast, ReFT is a learning-based intervention that learns specific behavioral representations through language modeling objectives. This module is a reimplementation of the pyreft project.
+Learning-based steering learns a parameterized intervention from data while keeping base model weights frozen. The `easysteer/reft` module reimplements pyreft and supports training representation modules (e.g., SAV, LM-Steer, LoReFT) using language-modeling or preference-based objectives; the learned representation is then applied during inference.
 
 <details>
 <summary><b>ReFT example</b></summary>
@@ -438,7 +439,20 @@ The following table lists important papers that have been reproduced using EasyS
 
 | Paper Title | Category | Link |
 |------------|----------|------|
-| SEAL: Steerable Reasoning Calibration of Large Language Models for Free | thinking pattern | [Replication Code](replications/seal/) |
+| Activation Steering for Chain-of-Thought Compression | Reasoning | [Replication Code](replications/asc/) |
+| Controlling Thinking Speed in Reasoning Models | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
+| Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute | Reasoning | [Replication Code](replications/fractreason/) |
+| Improving Reasoning Performance in Large Language Models via Representation Engineering | reasoning | [Replication Code](replications/improve_reasoning/) |
+| SEAL: Steerable Reasoning Calibration of Large Language Models for Free | Reasoning | [Replication Code](replications/seal/) |
+| Steering Large Language Models to Evaluate and Amplify Creativity | Style | [Replication Code](replications/creative_writing/) |
+| Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering | Style | [Replication Code](replications/steerable_chatbot/) |
+| Personalized Steering of Large Language Models: Versatile Steering Vectors Through Bi-directional Preference Optimization | Personal | [Replication Code](replications/bipo/) |
+| Word Embeddings Are Steers for Language Models | General | [Replication Code](replications/lm_steer/) |
+| ReFT: Representation Finetuning for Language Models | General | [Replication Code](replications/loreft/) |
+| SAKE: Steering Activations for Knowledge Editing | Knowledge | [Replication Code](replications/sake/) |
+| Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models | Reality | [Replication Code](replications/sae_entities/) |
+| Refusal in Language Models Is Mediated by a Single Direction | Safety | [Replication Code](replications/refusal_direction/) |
+| Programming Refusal with Conditional Activation Steering | Safety | [Replication Code](replications/cast/) |
 | _More replications coming soon..._ | | |
 
 ## License
@@ -459,7 +473,7 @@ We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing 
 
 ## Citation
 
-If you find EasySteer useful in your research, please consider citing:
+If you use EasySteer for your research, please cite our paper:
 
 ```bibtex
 @misc{easysteer2024,
