@@ -86,12 +86,7 @@ print(happy_output[0].outputs[0].text)
 
 ### vllm-steer
 
-The core inference engine of EasySteer, extending vLLM to enable the application of steering vectors during generation. This module has the following features:
-
-- **High-Performance Vector Application**: Leverages vLLM's efficient inference capabilities
-- **Complex Multi-Vector Control Strategies**: Supports applying multiple steering vectors simultaneously for complex combined intervention effects
-- **Precise Intervention Control**: Accurately specifies target positions, application layers, and intervention strengths
-- **Extensible Interface Design**: Provides standardized interfaces for researchers to easily implement and integrate custom intervention algorithms
+The core inference engine of EasySteer, extending vLLM to enable the application of steering vectors during generation.
 
 <details>
     <summary><b>Internal Structure</b></summary>
@@ -426,12 +421,9 @@ cd frontend
 bash start.sh
 ```
 
-## Examples
+## Resources
 
-EasySteer provides two types of resources to help users get started:
-
-1. **[examples](examples)** folder contains various simple usage examples
-2. **[replications](replications)** folder contains academic paper experiments reproduced using EasySteer
+**[replications](replications)** folder contains academic paper experiments reproduced using EasySteer
 
 ### Paper Replications
 
