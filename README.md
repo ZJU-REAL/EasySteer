@@ -1,8 +1,8 @@
 <div align="center">
-<h1>
-    <img src="figures/logo.png" width="50%"><br>
-    A Unified Framework for High-Performance and Extensible LLM Steering
-</h1>
+<p>
+    <img src="figures/logo.png" width="40%"><br>
+    <b><font size="5">A Unified Framework for High-Performance and Extensible LLM Steering</font></b>
+</p>
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/ZJU-REAL/EasySteer?style=social)](https://github.com/ZJU-REAL/EasySteer/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
@@ -14,7 +14,8 @@
 
 ## News 🔥
 
-[2025/09] We’ve open-sourced the code of EasySteer  — feel free to try it out!
+[2025/09/28] We’ve released our paper.
+[2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
 ## About
 
