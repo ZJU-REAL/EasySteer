@@ -278,7 +278,7 @@ multi_vector_request = SteerVectorRequest(
 
 ### hidden_states
 
-This module extracts and manages hidden states from language models, forming the foundation for steering vector generation.
+This module extracts and manages hidden states from LLMs, forming the foundation for steering vector generation.
 
 <details>
     <summary><b>Hidden states extraction</b></summary>
@@ -442,7 +442,7 @@ The following table lists important papers that have been reproduced using EasyS
 | Activation Steering for Chain-of-Thought Compression | Reasoning | [Replication Code](replications/asc/) |
 | Controlling Thinking Speed in Reasoning Models | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
 | Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute | Reasoning | [Replication Code](replications/fractreason/) |
-| Improving Reasoning Performance in Large Language Models via Representation Engineering | reasoning | [Replication Code](replications/improve_reasoning/) |
+| Improving Reasoning Performance in Large Language Models via Representation Engineering | Reasoning | [Replication Code](replications/improve_reasoning/) |
 | SEAL: Steerable Reasoning Calibration of Large Language Models for Free | Reasoning | [Replication Code](replications/seal/) |
 | Steering Large Language Models to Evaluate and Amplify Creativity | Style | [Replication Code](replications/creative_writing/) |
 | Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering | Style | [Replication Code](replications/steerable_chatbot/) |
