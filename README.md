@@ -1,11 +1,8 @@
 <div align="center">
-  <h1>
-    <img src="figures/logo.png" width="25%"><br>
+<h1>
+    <img src="figures/logo.png" width="40%"><br>
     A Unified Framework for High-Performance and Extensible LLM Steering
-  </h1>
-</div>
-
-<div align="center">
+</h1>
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/ZJU-REAL/EasySteer?style=social)](https://github.com/ZJU-REAL/EasySteer/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
