@@ -7,7 +7,7 @@
 [![GitHub Repo stars](https://img.shields.io/github/stars/ZJU-REAL/EasySteer?style=social)](https://github.com/ZJU-REAL/EasySteer/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
-[![arXiv](https://img.shields.io/badge/arXiv-TBD-b31b1b.svg)](https://arxiv.org/abs/TBD)
+[![arXiv](https://img.shields.io/badge/arXiv-TBD-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 
 \[ [English](README.md) | 中文 \]
 </div>
@@ -467,13 +467,14 @@ LLM 干预技术具有双重用途：既能提升安全与可控性，也可能�
 如果您在研究中使用 EasySteer，请引用我们的论文：
 
 ```bibtex
-@misc{easysteer2024,
-  author = {Your Name and Other Authors},
-  title = {EasySteer: A High-Performance Framework for LLM Steering},
-  year = {2024},
-  publisher = {GitHub},
-  journal = {GitHub Repository},
-  howpublished = {\url{https://github.com/ZJU-REAL/EasySteer}}
+@misc{xu2025easysteerunifiedframeworkhighperformance,
+      title={EasySteer: A Unified Framework for High-Performance and Extensible LLM Steering}, 
+      author={Haolei Xu and Xinyu Mei and Yuchen Yan and Rui Zhou and Wenqi Zhang and Weiming Lu and Yueting Zhuang and Yongliang Shen},
+      year={2025},
+      eprint={2509.25175},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2509.25175}, 
 }
 ```
 
