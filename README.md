@@ -27,6 +27,13 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 - **Ready-to-Use**: Pre-computed steering vectors for 8 domains (safety, reasoning, knowledge, etc.)
 - **Interactive Demo**: Web interface for testing vectors, training models, and multi-turn chat
 
+## How to Contribute
+
+- We warmly welcome contributions through PRs.
+- If you have work related to LLM steering, we’d love to see your replication added to the `replications/` folder.
+  - Ideally, please include either a minimal vector extraction script or precomputed vectors (e.g., GGUF), along with a simple steer script for inference and comparison.
+- To integrate a new algorithm into EasySteer, please check out the section “Example of Extending with a New Algorithm” for guidance.
+
 ## Getting Started
 
 ### Installation
