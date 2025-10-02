@@ -475,14 +475,11 @@ We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing 
 If you use EasySteer for your research, please cite our paper:
 
 ```bibtex
-@misc{xu2025easysteerunifiedframeworkhighperformance,
-      title={EasySteer: A Unified Framework for High-Performance and Extensible LLM Steering}, 
-      author={Haolei Xu and Xinyu Mei and Yuchen Yan and Rui Zhou and Wenqi Zhang and Weiming Lu and Yueting Zhuang and Yongliang Shen},
-      year={2025},
-      eprint={2509.25175},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2509.25175}, 
+@article{xu2025easysteer,
+  title={EasySteer: A Unified Framework for High-Performance and Extensible LLM Steering},
+  author={Xu, Haolei and Mei, Xinyu and Yan, Yuchen and Zhou, Rui and Zhang, Wenqi and Lu, Weiming and Zhuang, Yueting and Shen, Yongliang},
+  journal={arXiv preprint arXiv:2509.25175},
+  year={2025}
 }
 ```
 
