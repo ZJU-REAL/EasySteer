@@ -12,6 +12,8 @@
 \[ English | [中文](README_zh.md) \]
 </div>
 
+👋 Join our [WeChat](figures/wechat.jpg) user group.
+
 ## News 🔥
 
 - [2025/09/29] We’ve released our paper.
