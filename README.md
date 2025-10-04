@@ -46,7 +46,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
-VLLM_USE_PRECOMPILED=1 pip install --editable .
+export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/cede942b87b5d8baa0b95447f3e87e3c600ff5f5/vllm-0.9.2rc2.dev34%2Bgcede942b8-cp38-abi3-manylinux1_x86_64.whl
+pip install --editable .
+pip install transformers=4.53.1
 
 # Install EasySteer
 cd ..
@@ -63,6 +65,9 @@ import os
 # Set to use vLLM v0, as steering functionality doesn't support v1 yet
 os.environ["VLLM_USE_V1"]="0"
 
+# Set your GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+
 # Initialize the LLM model
 # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
 # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
@@ -75,10 +80,10 @@ sampling_params = SamplingParams(
 text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
 target_layers = list(range(10,26))
 
-baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
+baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
 baseline_output = llm.generate(text, steer_vector_request=baseline_request, sampling_params=sampling_params)
 
-happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
+happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
 happy_output = llm.generate(text, steer_vector_request=happy_request, sampling_params=sampling_params)
 
 print(baseline_output[0].outputs[0].text)

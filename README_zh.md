@@ -46,7 +46,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # 使用预编译版本安装（推荐）
-VLLM_USE_PRECOMPILED=1 pip install --editable .
+export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/cede942b87b5d8baa0b95447f3e87e3c600ff5f5/vllm-0.9.2rc2.dev34%2Bgcede942b8-cp38-abi3-manylinux1_x86_64.whl
+pip install --editable .
+pip install transformers=4.53.1
 
 # 安装 EasySteer
 cd ..
@@ -63,6 +65,9 @@ import os
 # 由于当前干预功能暂不支持 v1，需设置使用 vLLM v0
 os.environ["VLLM_USE_V1"]="0"
 
+# 设置你的GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+
 # 初始化 LLM 模型
 # enable_steer_vector=True: 启用向量干预（不设置则与普通 vLLM 一致）
 # enforce_eager=True: 确保干预时的可靠性与稳定性（强烈建议）
@@ -75,10 +80,10 @@ sampling_params = SamplingParams(
 text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
 target_layers = list(range(10,26))
 
-baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
+baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
 baseline_output = llm.generate(text, steer_vector_request=baseline_request, sampling_params=sampling_params)
 
-happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
+happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
 happy_output = llm.generate(text, steer_vector_request=happy_request, sampling_params=sampling_params)
 
 print(baseline_output[0].outputs[0].text)
