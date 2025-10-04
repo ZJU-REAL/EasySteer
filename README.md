@@ -48,7 +48,7 @@ cd EasySteer/vllm-steer
 # Install with pre-compiled version (recommended)
 export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/cede942b87b5d8baa0b95447f3e87e3c600ff5f5/vllm-0.9.2rc2.dev34%2Bgcede942b8-cp38-abi3-manylinux1_x86_64.whl
 pip install --editable .
-pip install transformers=4.53.1
+pip install transformers==4.53.1
 
 # Install EasySteer
 cd ..
