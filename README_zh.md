@@ -41,6 +41,10 @@
 ### 安装
 
 ```bash
+# 创建一个新的conda环境
+conda create -n easysteer python=3.10 -y
+conda activate easysteer
+
 # 克隆仓库（包含子模块）
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
