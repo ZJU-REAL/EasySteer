@@ -59,6 +59,35 @@ cd ..
 pip install --editable .
 ```
 
+### Build on ARM (aarch64) + NVIDIA CUDA (A100/SM80)
+
+If you are on ARM (SBSA/aarch64) hosts with NVIDIA GPUs, please **build vLLM from source** inside the `vllm-steer` submodule. The precompiled wheel in the example is x86_64-only.
+
+```bash
+# 1) Create env and install PyTorch
+
+# 2) Clone with submodules and build vLLM on ARM
+git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
+cd EasySteer/vllm-steer
+
+python use_existing_torch.py
+
+# Compile only for A100 (SM80) to speed up build
+export TORCH_CUDA_ARCH_LIST="8.0"
+export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
+export VLLM_TARGET_DEVICE="cuda"
+
+pip install -r requirements/build.txt
+pip install -e . --no-build-isolation -v
+
+# 3) Install EasySteer
+cd ..
+pip install -e .
+pip install transformers==4.53.1
+
+```
+
+
 ### Quick Example
 
 ```python
