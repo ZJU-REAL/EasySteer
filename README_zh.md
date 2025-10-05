@@ -40,8 +40,10 @@
 
 ### 安装
 
+#### 针对 x86_64 架构
+
 ```bash
-# 创建一个新的conda环境
+# 创建一个新的 conda 环境
 conda create -n easysteer python=3.10 -y
 conda activate easysteer
 
@@ -57,6 +59,37 @@ pip install transformers==4.53.1
 # 安装 EasySteer
 cd ..
 pip install --editable .
+```
+
+#### 针对 ARM (aarch64) 架构
+
+需要从源码构建 vLLM（因为预编译只支持 x86_64）。
+
+```bash
+# 创建一个新的 conda 环境
+conda create -n easysteer python=3.10 -y
+conda activate easysteer
+
+# 克隆仓库（包含子模块）
+git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
+cd EasySteer/vllm-steer
+
+python use_existing_torch.py
+
+# 为你的 GPU 设置 CUDA 架构以加速构建
+# 例如：A100 使用 "8.0"（SM80）
+# 注意：这一过程可能耗时数小时
+export TORCH_CUDA_ARCH_LIST="8.0"
+export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
+export VLLM_TARGET_DEVICE="cuda"
+
+pip install -r requirements/build.txt
+pip install -e . --no-build-isolation -v
+
+# 安装 EasySteer
+cd ..
+pip install -e .
+pip install transformers==4.53.1
 ```
 
 ### 快速示例

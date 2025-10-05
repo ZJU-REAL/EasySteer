@@ -40,6 +40,8 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 
 ### Installation
 
+#### For x86_64 Architecture
+
 ```bash
 # Create a new conda environment
 conda create -n easysteer python=3.10 -y
@@ -59,20 +61,24 @@ cd ..
 pip install --editable .
 ```
 
-### Build on ARM (aarch64) + NVIDIA CUDA (A100/SM80)
+#### For ARM (aarch64) Architecture
 
-If you are on ARM (SBSA/aarch64) hosts with NVIDIA GPUs, please **build vLLM from source** inside the `vllm-steer` submodule. The precompiled wheel in the example is x86_64-only.
+You need to **build vLLM from source** as the precompiled wheel is x86_64-only.
 
 ```bash
-# 1) Create env and install PyTorch
+# Create a new conda environment
+conda create -n easysteer python=3.10 -y
+conda activate easysteer
 
-# 2) Clone with submodules and build vLLM on ARM
+# Clone the repository (with submodules)
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 python use_existing_torch.py
 
-# Compile only for A100 (SM80) to speed up build
+# Set CUDA architecture for your GPU to speed up build
+# Examples: "8.0" for A100 (SM80)
+# It may take several hours to build
 export TORCH_CUDA_ARCH_LIST="8.0"
 export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
 export VLLM_TARGET_DEVICE="cuda"
@@ -80,11 +86,10 @@ export VLLM_TARGET_DEVICE="cuda"
 pip install -r requirements/build.txt
 pip install -e . --no-build-isolation -v
 
-# 3) Install EasySteer
+# Install EasySteer
 cd ..
 pip install -e .
 pip install transformers==4.53.1
-
 ```
 
 
