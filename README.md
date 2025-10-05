@@ -12,7 +12,7 @@
 \[ English | [中文](README_zh.md) \]
 </div>
 
-👋 Join our [WeChat](figures/wechat.jpg) user group.
+👋 Join our [WeChat](figures/wechat.png) user group.
 
 ## News 🔥
 

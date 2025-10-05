@@ -12,7 +12,7 @@
 \[ [English](README.md) | 中文 \]
 </div>
 
-👋 加入我们的 [微信群](figures/wechat.jpg).
+👋 加入我们的 [微信群](figures/wechat.png).
 
 ## 新闻 🔥
 
