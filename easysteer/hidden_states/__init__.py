@@ -30,7 +30,11 @@ def get_all_hidden_states(llm, texts, adapter=None, split_by_samples=True):
     if adapter is None:
         adapter = _auto_detect_adapter(llm)
     
-    capture = HiddenStatesCapture(adapter=adapter)
+    # Use global store to ensure consistency across multiple calls
+    from .core.storage import get_global_store
+    store = get_global_store()
+    
+    capture = HiddenStatesCapture(adapter=adapter, store=store)
     return capture.get_all_hidden_states(llm, texts, split_by_samples=split_by_samples)
 
 def _auto_detect_adapter(llm):

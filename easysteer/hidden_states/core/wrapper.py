@@ -113,6 +113,10 @@ def wrap_transformer_layers(model: nn.Module, layer_pattern: str = "layers",
     Returns:
         包装后的模型
     """
+    # Use global store if not provided
+    if store is None:
+        store = get_global_store()
+    
     layer_id = 0
     wrapped_count = 0
 
