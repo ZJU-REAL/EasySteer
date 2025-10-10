@@ -16,6 +16,7 @@
 
 ## News 🔥
 
+- [2025/10/10] We’ve adapted EasySteer for the VLMs.
 - [2025/09/29] We’ve released our paper.
 - [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
