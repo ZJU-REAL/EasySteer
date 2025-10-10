@@ -513,6 +513,13 @@ LLM 干预技术具有双重用途：既能提升安全与可控性，也可能�
 
 感谢 [vLLM](https://github.com/vllm-project/vllm) 项目提供高性能推理框架，以及 [pyreft](https://github.com/stanfordnlp/pyreft) 等项目对表示学习领域的贡献。
 
+### 相关项目
+
+- [EasyEdit](https://github.com/zjunlp/EasyEdit)
+- [pyreft](https://github.com/stanfordnlp/pyreft)
+- [repeng](https://github.com/vgel/repeng)
+- [vLLM](https://github.com/vllm-project/vllm)
+
 ## 引用
 
 如果您在研究中使用 EasySteer，请引用我们的论文：

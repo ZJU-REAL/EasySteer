@@ -515,6 +515,13 @@ LLM steering technology presents dual-use challenges: while enabling enhanced sa
 
 We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing the high-performance inference framework, and projects like [pyreft](https://github.com/stanfordnlp/pyreft) for their contributions to the field of representation learning.
 
+### Related Projects
+
+- [EasyEdit](https://github.com/zjunlp/EasyEdit)
+- [pyreft](https://github.com/stanfordnlp/pyreft)
+- [repeng](https://github.com/vgel/repeng)
+- [vLLM](https://github.com/vllm-project/vllm)
+
 ## Citation
 
 If you use EasySteer for your research, please cite our paper:
