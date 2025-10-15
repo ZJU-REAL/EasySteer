@@ -20,6 +20,16 @@
 - [2025/09/29] We’ve released our paper.
 - [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
+## Roadmap / Upcoming Updates 🗺️
+
+We are planning a **major update** in the near future, which will include the following changes:
+
+- **Migration to the v1 Engine**: Since the latest version of **vLLM** has completely deprecated the *v0 engine*, `EasySteer` will also discontinue support for v0 and fully migrate to the **v1 engine** to ensure compatibility with the latest vLLM releases. The `vllm-steer` repository based on v0 **will be replaced with a new one and no longer be maintained**.
+
+- **Support for Newly Released Models**: After completing the v1 integration, we will **add support for several recently released models**.
+
+Stay tuned for more updates 🚀
+
 ## About
 
 Built on vLLM, EasySteer is a unified framework for high-performance LLM steering. EasySteer is fast, flexible and easy to use with:
