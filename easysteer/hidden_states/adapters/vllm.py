@@ -14,8 +14,15 @@ class VLLMAdapter(LLMAdapter):
     """
     
     def extract_model(self, llm: Any) -> nn.Module:
-        """Extract PyTorch model from vLLM LLM instance"""
+        """Extract PyTorch model from vLLM LLM instance
+        
+        For vision-language models (e.g., Qwen2.5-VL, LLaVA, etc.), 
+        this method extracts the language model component where transformer 
+        layers are located, rather than the top-level wrapper.
+        """
         try:
+            model = None
+            
             # Try vLLM v1 structure first
             if hasattr(llm, 'llm_engine') and hasattr(llm.llm_engine, 'model_executor'):
                 model_executor = llm.llm_engine.model_executor
@@ -23,15 +30,28 @@ class VLLMAdapter(LLMAdapter):
                     model = model_executor.driver_worker.model_runner.model
                 else:
                     model = getattr(model_executor, 'model', None)
-                
-                if model is not None:
-                    return model
             
             # Try direct model access
-            if hasattr(llm, 'model'):
-                return llm.model
-                
-            raise ValueError("Could not extract model from vLLM instance")
+            elif hasattr(llm, 'model'):
+                model = llm.model
+            
+            if model is None:
+                raise ValueError("Could not extract model from vLLM instance")
+            
+            # Check if this is a vision-language model with nested language_model
+            # Common patterns:
+            # - Qwen2.5-VL: model.language_model
+            # - LLaVA: model.language_model or model.llm
+            # - InternVL: model.language_model
+            if hasattr(model, 'language_model') and hasattr(model.language_model, 'model'):
+                # This is a VL model, extract the language model component
+                return model.language_model
+            elif hasattr(model, 'llm') and hasattr(model.llm, 'model'):
+                # Alternative naming convention (e.g., some LLaVA variants)
+                return model.llm
+            
+            # Not a VL model or language model is at top level
+            return model
             
         except Exception as e:
             raise RuntimeError(f"Failed to extract model from vLLM instance: {str(e)}")

@@ -34,6 +34,13 @@ def get_layer_patterns_for_model(model_name: str) -> str:
         "qwen1.5": "model.layers",
         "qwen2": "model.layers",
         "qwen2.5": "model.layers",
+        "qwen2-vl": "model.layers",
+        "qwen2.5-vl": "model.layers",
+        "qwen-vl": "transformer.h",
+        
+        # Vision-Language models (language model components)
+        "llava": "model.layers",
+        "internvl": "model.layers",
 
         # Mistral系列模型
         "mistral": "model.layers",

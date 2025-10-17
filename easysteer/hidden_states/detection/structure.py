@@ -66,6 +66,10 @@ def get_optimal_layer_pattern(model: nn.Module, model_name: str = "") -> str:
     Returns:
         最优的层模式字符串
     """
+    # Check if this is a vision-language model that has already been extracted
+    # In this case, the model should already be the language_model part
+    # VL models will have already been unwrapped by the adapter
+    
     # 首先尝试基于模型名称的模式
     if model_name:
         pattern_from_name = get_layer_patterns_for_model(model_name)
