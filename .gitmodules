@@ -1,3 +1,3 @@
 [submodule "vllm-steer"]
 	path = vllm-steer
-	url = https://github.com/ZJU-REAL/EasySteer-vllm.git
+	url = https://github.com/ZJU-REAL/EasySteer-vllm-v1
