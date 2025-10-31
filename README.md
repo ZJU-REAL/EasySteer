@@ -16,19 +16,20 @@
 
 ## News 🔥
 
+- [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
 - [2025/10/10] We’ve adapted EasySteer for the VLMs.
 - [2025/09/29] We’ve released our paper.
 - [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
-## Roadmap / Upcoming Updates 🗺️
+## EasySteer × vLLM v1 Engine Adaptation 🔥🔥🔥
 
-We are planning a **major update** in the near future, which will include the following changes:
-
-- **Migration to the v1 Engine**: Since the latest version of **vLLM** has completely deprecated the *v0 engine*, `EasySteer` will also discontinue support for v0 and fully migrate to the **v1 engine** to ensure compatibility with the latest vLLM releases. The `vllm-steer` repository based on v0 **will be replaced with a new one and no longer be maintained**.
-
-- **Support for Newly Released Models**: After completing the v1 integration, we will **add support for several recently released models**.
-
-Stay tuned for more updates 🚀
+- Continuous batching support for v1 to ensure reliable steering
+- Vector application supports prefix KV cache
+- Refactored and decoupled parameter control module
+- GPU optimizations in parameter control modules
+- Throughput nearly doubled compared to the previous version
+- API remains largely consistent
+- Support for the latest released models
 
 ## About
 
@@ -51,8 +52,6 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 
 ### Installation
 
-#### For x86_64 Architecture
-
 ```bash
 # Create a new conda environment
 conda create -n easysteer python=3.10 -y
@@ -63,18 +62,14 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
-export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/cede942b87b5d8baa0b95447f3e87e3c600ff5f5/vllm-0.9.2rc2.dev34%2Bgcede942b8-cp38-abi3-manylinux1_x86_64.whl
-pip install --editable .
-pip install transformers==4.53.1
+VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # Install EasySteer
 cd ..
 pip install --editable .
 ```
 
-#### For ARM (aarch64) Architecture
-
-You need to **build vLLM from source** as the precompiled wheel is x86_64-only.
+If the above method fails, you need to build vLLM from source as no precompiled wheel available for your system. Here’s an example for ARM architecture:
 
 ```bash
 # Create a new conda environment
@@ -100,7 +95,6 @@ pip install -e . --no-build-isolation -v
 # Install EasySteer
 cd ..
 pip install -e .
-pip install transformers==4.53.1
 ```
 
 
@@ -110,9 +104,6 @@ pip install transformers==4.53.1
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors.request import SteerVectorRequest
 import os
-
-# Set to use vLLM v0, as steering functionality doesn't support v1 yet
-os.environ["VLLM_USE_V1"]="0"
 
 # Set your GPU
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
@@ -142,7 +133,7 @@ print(happy_output[0].outputs[0].text)
 # I'm sorry to hear about the loss of your dog. Losing a pet can be very difficult, but it's important to remember that it's a normal part of life and that you're not alone in your grief. It's okay to feel sad, angry, or confused. Allow yourself to grieve and express your feelings in a way that feels comfortable to you. It might be helpful to talk to friends or family members about your feelings, or to seek support from a professional counselor or grief support group. Remember that healing takes time, and it's okay to take things one day at a time.
 
 # ======happy steer======
-# I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are plenty of exciting things to do!
+# I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are lots of exciting things to do!
 ```
 
 ## Modules
@@ -279,7 +270,7 @@ from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
 # Example 1: Single-vector steering configuration
 single_vector_request = SteerVectorRequest(
     steer_vector_name="sentiment_control",       # Vector name (for logs and debugging)
-    steer_vector_id=1,                           # Vector ID (for internal identification)
+    steer_vector_int_id=1,                       # Vector ID (for internal identification)
     steer_vector_local_path="vectors/happy.gguf",# Vector file path
     scale=2.0,                                   # Application strength (positive enhances, negative suppresses)
     target_layers=[10, 11, 12],                  # Target layers (specify which model layers to apply to)
@@ -291,7 +282,7 @@ single_vector_request = SteerVectorRequest(
 multi_vector_request = SteerVectorRequest(
     # Basic information for the vector request
     steer_vector_name="multi_direction_control",  # Combined vector name
-    steer_vector_id=2,                            # Combined vector ID
+    steer_vector_int_id=2,                        # Combined vector ID
     
     # Configure multiple steering vectors in different directions
     vector_configs=[
@@ -345,12 +336,15 @@ This module extracts and manages hidden states from LLMs, forming the foundation
 # Import hidden states module to extract model activations
 import easysteer.hidden_states as hs
 
-# Create a new LLM instance in reward mode
+# Create a new LLM instance in embed mode
 # Note: This allows us to extract hidden states rather than generating text
+
 llm = LLM(
-    model="path/to/your/model",  # Model path
-    task="reward",               # Use reward task to get hidden states
-    tensor_parallel_size=1
+    model="path/to/your/model", # Model path
+    task="embed",               # Use embed task to get hidden states
+    tensor_parallel_size=1,
+    enforce_eager=True,
+    enable_prefix_caching=False # Hidden states extraction doesn't support prefix caching yet
 )
 
 # Prepare some example prompts
