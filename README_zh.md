@@ -12,7 +12,7 @@
 \[ [English](README.md) | 中文 \]
 </div>
 
-👋 加入我们的 [微信群](figures/wechat.png).
+👋 加入我们的 [微信群](figures/wechat.png)。
 
 <a id="news"></a>
 ## 新闻 🔥
@@ -24,17 +24,17 @@
 
 ## EasySteer × vLLM v1 引擎适配 🔥🔥🔥
 
-- 支持 v1 的连续批处理，确保干预稳定可靠
-- 向量应用支持前缀 KV 缓存
+- 支持 v1 的连续批处理机制，确保干预稳定可靠
+- 向量应用支持前缀 KV Cache缓存
 - 参数控制模块重构并解耦
 - 参数控制模块增加 GPU 优化
 - 吞吐量较上一版本接近翻倍
 - API 基本保持一致
 - 支持最新发布的模型
 
-## 关于
+## 关于EasySteer
 
-基于 vLLM 构建，EasySteer 是一个高性能 LLM 干预的统一框架。它具有以下特点：
+EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预统一框架。它具有以下特点：
 
 - **高性能**: 通过对接 vLLM，实现 5.5-11.4× 的速度提升
 - **模块化设计**: 插拔式接口，便于在不改动核心代码的情况下扩展自定义算法  
@@ -267,69 +267,7 @@ multi_vector_request = SteerVectorRequest(
 
 </details>
 
-<details>
-    <summary><b>向量配置示例</b></summary>
-
-```python
-from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
-
-# 示例 1：单向量干预配置
-single_vector_request = SteerVectorRequest(
-    steer_vector_name="sentiment_control",        # 向量名称（用于日志与调试）
-    steer_vector_id=1,                            # 向量 ID（内部标识）
-    steer_vector_local_path="vectors/happy.gguf", # 向量文件路径
-    scale=2.0,                                    # 应用强度（正增强，负抑制）
-    target_layers=[10, 11, 12],                   # 目标层（指定作用的模型层）
-    prefill_trigger_tokens=[-1],                  # 预填阶段干预 token（-1 表示全部）
-    generate_trigger_tokens=[-1]                  # 生成阶段干预 token（-1 表示全部）
-)
-
-# 示例 2：多向量干预配置
-multi_vector_request = SteerVectorRequest(
-    # 向量请求基本信息
-    steer_vector_name="multi_direction_control",   # 组合向量名称
-    steer_vector_id=2,                             # 组合向量 ID
-    
-    # 多个方向的干预向量
-    vector_configs=[
-        # 第一个向量配置
-        VectorConfig(
-            path="vector_direction1.gguf",          # 向量文件路径
-            scale=1.5,                              # 正向强度（增强）
-            target_layers=[20],                     # 作用于第 20 层
-            prefill_trigger_positions=[-2],         # 干预 prompt 倒数第 2 个位置
-            algorithm="direct",                     # 应用算法
-            normalize=False                         # 是否归一化
-        ),
-        
-        # 第二个向量配置
-        VectorConfig(
-            path="vector_direction2.gguf",          # 向量文件路径
-            scale=-0.8,                             # 负向强度（抑制）
-            target_layers=[20],                     # 作用于第 20 层
-            prefill_trigger_positions=[-2],         # 干预 prompt 倒数第 2 个位置
-            algorithm="direct",                     # 应用算法
-            normalize=False                         # 是否归一化
-        ),
-        
-        # 第三个向量配置
-        VectorConfig(
-            path="vector_direction3.gguf",          # 向量文件路径
-            scale=-1.0,                             # 负向强度（抑制）
-            target_layers=[20],                     # 作用于第 20 层
-            prefill_trigger_positions=[-2],         # 干预 prompt 倒数第 2 个位置
-            algorithm="direct",                     # 应用算法
-            normalize=False                         # 是否归一化
-        ),
-    ],
-    
-    # 多向量干预附加参数
-    debug=False,                                    # 是否输出调试信息
-    conflict_resolution="sequential"                # 冲突处理策略：顺序应用
-)
-```
-
-</details>
+ 
 
 ### hidden_states
 
@@ -397,7 +335,7 @@ control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
 
 ### reft（基于学习的干预）
 
-学习式干预在冻结基座模型权重的同时，从数据中学习参数化的干预；[`easysteer/reft`](easysteer/reft) 重实现了 pyreft，支持通过语言建模或偏好目标训练表征模块（如 SAV、LM-Steer、LoReFT），并在推理时应用。
+学习式干预在冻结基座模型权重的同时，从数据中学习参数化的干预；[`easysteer/reft`](easysteer/reft) 重构了 pyreft，支持通过语言建模目标训练表征模块（如 SAV、LM-Steer、LoReFT），并在推理时应用。
 
 <details>
 <summary><b>ReFT 示例</b></summary>
