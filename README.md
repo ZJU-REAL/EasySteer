@@ -13,7 +13,7 @@
 </div>
 
 👋 Join our [WeChat](figures/wechat.png) user group.
-
+<a id="news"></a>
 ## News 🔥
 
 - [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
@@ -41,12 +41,11 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 - **Ready-to-Use**: Pre-computed steering vectors for 8 domains (safety, reasoning, knowledge, etc.)
 - **Interactive Demo**: Web interface for testing vectors, training models, and multi-turn chat
 
-## How to Contribute
+## Welcome Contributions
 
-- We warmly welcome contributions through PRs.
-- If you have work related to LLM steering, we’d love to see your replication added to the `replications/` folder.
-  - Ideally, please include either a minimal vector extraction script or precomputed vectors (e.g., GGUF), along with a simple steer script for inference and comparison.
-- To integrate a new algorithm into EasySteer, please check out the section “Example of Extending with a New Algorithm” for guidance.
+- If you have used EasySteer in your research or projects, feel free to reach out to us — we’d be happy to feature your work in [News](#news).  
+- We welcome PRs that add examples or replication cases of your work to [replications](replications).  
+- We also encourage PRs contributing new algorithms (see [Example of Extending with a New Algorithm](#example-of-extending-with-a-new-algorithm) for guidance). In addition, contributions of new component-level steers (e.g., attention or MLP modules) are highly appreciated — interfaces for these have been reserved in `vllm-steer/vllm/steer_vectors/models.py`, and they will be one of the key focuses of future EasySteer updates.
 
 ## Getting Started
 
@@ -213,6 +212,7 @@ vllm/steer_vectors/
 </details>
 
 <details>
+<a id="example-of-extending-with-a-new-algorithm"></a>
     <summary><b>Example of Extending with a New Algorithm</b></summary>
 
 To add a new intervention algorithm, just follow these steps:
