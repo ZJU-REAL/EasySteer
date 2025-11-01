@@ -194,14 +194,13 @@ class MyAlgorithm(AlgorithmTemplate):
     
     @classmethod
     def load_from_path(cls, path: str, device: str, **kwargs):
-        """Load parameters from file (.gguf/.pt/.bin/directory).
+        """Load parameters from a file (.gguf, .pt, etc.).
         
         Returns: {"layer_payloads": {layer_id: payload}}
         
         Example loading patterns:
             .pt file:       {"layer_payloads": {0: torch.load(path)}}
             .gguf file:     {"layer_payloads": {L: tensor for L, tensor in gguf}}
-            directory:      {"layer_payloads": {L: state_dict from config}}
         """
         vector = torch.load(path, map_location=device, weights_only=False)
         target_layers = kwargs.get("target_layers", [0])
@@ -210,7 +209,7 @@ class MyAlgorithm(AlgorithmTemplate):
 
 Then register it in `algorithms/__init__.py`:
 ```python
-from .my_algorithm import MyAlgorithm  # Import triggers registration
+from .my_algorithm import MyAlgorithm
 ```
 
 </details>
