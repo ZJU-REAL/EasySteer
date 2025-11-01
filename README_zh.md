@@ -14,21 +14,23 @@
 
 👋 加入我们的 [微信群](figures/wechat.png).
 
+<a id="news"></a>
 ## 新闻 🔥
 
-- [2025/10/10] EasySteer已适配VLMs.
-- [2025/09/29] 论文已发布。
-- [2025/09/28] 开源 EasySteer 代码 —— 欢迎试用！
+- [2025/10/31] 我们已将 EasySteer 适配至 vLLM v1 引擎。
+- [2025/10/10] 我们已适配 VLMs。
+- [2025/09/29] 我们发布了论文。
+- [2025/09/28] 我们开源了 EasySteer 代码，欢迎试用！
 
-## 路线图 / 即将更新 🗺️
+## EasySteer × vLLM v1 引擎适配 🔥🔥🔥
 
-我们计划最近进行一次**重大更新**，主要包括以下变化：
-
-- **迁移至 v1 引擎**：由于最新版本的 **vLLM** 已彻底废弃 *v0 引擎*，`EasySteer` 也将停止对 v0 的支持，并全面迁移至 **v1 引擎**，以确保与最新的 vLLM 版本兼容。基于 v0 的 `vllm-steer` 仓库将 **被新的仓库取代并停止维护**。
-
-- **支持最新发布的模型**：在完成对 v1 的适配后，我们将 **陆续支持多款近期发布的新模型**。
-
-敬请期待更多更新 🚀
+- 支持 v1 的连续批处理，确保干预稳定可靠
+- 向量应用支持前缀 KV 缓存
+- 参数控制模块重构并解耦
+- 参数控制模块增加 GPU 优化
+- 吞吐量较上一版本接近翻倍
+- API 基本保持一致
+- 支持最新发布的模型
 
 ## 关于
 
@@ -42,16 +44,13 @@
 
 ## 如何贡献
 
-- 我们非常欢迎通过 PR 的方式进行贡献。
-- 如果您有与 LLM steering 相关的工作，我们很期待您将复现结果添加到 `replications/` 文件夹中。
-  - 理想情况下，请附带一个简易的向量提取脚本或预计算好的向量（例如 GGUF），并提供一个用于推理和对比的简易 steer 脚本。
-- 如果您希望在 EasySteer 中集成新的算法，请参考 “新算法扩展示例” 部分的说明。
+- 如果你在研究或项目中使用了 EasySteer，欢迎联系我们，我们很乐意在 [新闻](#news) 中展示你的工作。
+- 欢迎通过 PR 将你的示例或论文复现添加到 [replications](replications) 目录。
+- 也欢迎贡献新的算法（参考[添加新算法](#example-of-extending-with-a-new-algorithm)）。此外，我们也非常欢迎贡献新的组件级干预（例如 attention 或 MLP 模块）——这些接口已在 `vllm-steer/vllm/steer_vectors/models.py` 预留，并将作为 EasySteer 后续更新的重点之一。
 
 ## 快速上手
 
 ### 安装
-
-#### 针对 x86_64 架构
 
 ```bash
 # 创建一个新的 conda 环境
@@ -63,18 +62,14 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # 使用预编译版本安装（推荐）
-export VLLM_PRECOMPILED_WHEEL_LOCATION=https://wheels.vllm.ai/cede942b87b5d8baa0b95447f3e87e3c600ff5f5/vllm-0.9.2rc2.dev34%2Bgcede942b8-cp38-abi3-manylinux1_x86_64.whl
-pip install --editable .
-pip install transformers==4.53.1
+VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # 安装 EasySteer
 cd ..
 pip install --editable .
 ```
 
-#### 针对 ARM (aarch64) 架构
-
-需要从源码构建 vLLM（因为预编译只支持 x86_64）。
+如果上述方法失败（例如你的系统没有可用的预编译 wheel），需要从源码构建 vLLM。以下以 ARM 架构为例：
 
 ```bash
 # 创建一个新的 conda 环境
@@ -88,8 +83,8 @@ cd EasySteer/vllm-steer
 python use_existing_torch.py
 
 # 为你的 GPU 设置 CUDA 架构以加速构建
-# 例如：A100 使用 "8.0"（SM80）
-# 注意：这一过程可能耗时数小时
+# 示例：A100 使用 "8.0"（SM80）
+# 注意：构建可能需要几个小时
 export TORCH_CUDA_ARCH_LIST="8.0"
 export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
 export VLLM_TARGET_DEVICE="cuda"
@@ -100,7 +95,6 @@ pip install -e . --no-build-isolation -v
 # 安装 EasySteer
 cd ..
 pip install -e .
-pip install transformers==4.53.1
 ```
 
 ### 快速示例
@@ -109,9 +103,6 @@ pip install transformers==4.53.1
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors.request import SteerVectorRequest
 import os
-
-# 由于当前干预功能暂不支持 v1，需设置使用 vLLM v0
-os.environ["VLLM_USE_V1"]="0"
 
 # 设置你的GPU
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
@@ -151,121 +142,128 @@ print(happy_output[0].outputs[0].text)
 EasySteer 的核心推理引擎，扩展 vLLM 以在生成过程中应用干预向量。
 
 <details>
-    <summary><b>内部结构</b></summary>
-
-`vllm-steer` 的核心功能位于 `vllm/steer_vectors` 目录，文件结构如下：
+    <summary><b>模块结构</b></summary>
 
 ```plaintext
 vllm/steer_vectors/
-├── __init__.py                # 模块入口
-├── request.py                 # 请求与配置定义
-├── models.py                  # 模型集成与向量注册
-├── layers.py                  # 自定义层实现
-├── worker_manager.py          # 工作线程管理
-└── algorithms/                # 各类干预算法实现
-    ├── __init__.py            # 算法注册
-    ├── base.py                # 算法基类与接口定义
-    ├── factory.py             # 算法工厂（创建算法实例）
-    ├── direct.py              # 直接干预算法
-    ├── loreft.py              # LoReFT 算法实现
-    ├── xxx.py                 # 其他算法
-    ├── multi_vector.py        # 多向量组合算法
-    └── template.py            # 新算法模板示例
+├── request.py                 # 请求定义
+├── worker_manager.py          # Worker 侧适配器管理
+├── models.py                  # 模型管理与向量加载
+├── layers.py                  # 层封装
+├── config.py                  # 包装器配置
+└── algorithms/                # 算法框架与实现
+    ├── base.py                # 算法基类
+    ├── template.py            # 模板（通用逻辑）
+    ├── factory.py             # 算法注册与工厂
+    ├── parameter_control.py   # 参数管理
+    ├── utils.py               # 工具
+    ├── direct.py              # 直接相加
+    ├── linear.py              # 线性变换
+    ├── loreft.py              # LoReFT
+    ├── lm_steer.py            # LM-Steer
+    └── multi_vector.py        # 多向量组合
 ```
 
 </details>
 
 <details>
-    <summary><b>核心组件</b></summary>
+<a id="example-of-extending-with-a-new-algorithm"></a>
+    <summary><b>添加新算法</b></summary>
 
-1. **请求与配置系统**（`request.py`）:
-   - `SteerVectorRequest`: 定义干预向量请求格式，支持单向量与多向量模式
-   - `VectorConfig`: 多向量模式下的单向量配置定义
-
-2. **算法框架**（`algorithms/base.py`）:
-   - `BaseSteerVectorAlgorithm`: 所有干预算法的抽象基类，定义标准接口
-   - 提供位置解析、触发条件检查等通用功能
-
-3. **算法工厂**（`algorithms/factory.py`）:
-   - 根据配置动态创建合适的算法实例
-   - 支持算法注册机制，便于扩展
-
-4. **向量应用实现**:
-   - `direct.py`: 直接加性干预
-   - `loreft.py`: LoReFT 低秩适配干预方法
-   - `multi_vector.py`: 多向量组合策略
-
-</details>
-
-<details>
-    <summary><b>扩展机制</b></summary>
-
-`vllm-steer` 提供灵活扩展机制，便于研究者实现并集成自定义干预算法：
-
-1. **基于接口的插件架构**:
-   - 所有算法继承自 `BaseSteerVectorAlgorithm`
-   - 实现标准接口方法即可新增算法，无需修改核心代码
-
-2. **算法注册系统**:
-   - 在 `algorithms/__init__.py` 中注册新算法
-   - 工厂模式自动加载并实例化算法
-
-3. **模板示例**:
-   - `template.py` 提供开发模板与注释说明
-   - 按模板实现可与框架无缝集成
-
-4. **多层级干预点**:
-   - 支持在不同模型层级（注意力、FFN 等）应用干预
-   - 通过 `forward_decoder_layer`、`forward_mlp_layer` 等钩子实现
-
-</details>
-
-<details>
-    <summary><b>新算法扩展示例</b></summary>
-
-要添加新的干预算法，只需：
-
-1. 创建继承 `BaseSteerVectorAlgorithm` 的新类
-2. 实现必要的接口方法（如 `load_from_path`、`apply_intervention` 等）
-3. 在算法注册系统中登记
-4. 通过配置使用新算法
+实现新算法时，继承 `AlgorithmTemplate` ，仅需实现 2 个方法：
 
 ```python
-# 示例：实现一个新的干预算法
-from vllm.steer_vectors.algorithms.base import BaseSteerVectorAlgorithm
 import torch
+from vllm.steer_vectors.algorithms.template import AlgorithmTemplate
+from vllm.steer_vectors.algorithms.factory import register_algorithm
 
-class MyCustomAlgorithm(BaseSteerVectorAlgorithm):
-    """自定义干预算法实现"""
+@register_algorithm("my_algorithm")
+class MyAlgorithm(AlgorithmTemplate):
+    """只需实现 2 个方法"""
+    
+    def _transform(self, hidden_states: torch.Tensor, params) -> torch.Tensor:
+        """由 load_from_path 返回的 params 可为 Tensor 或 dict。
+        
+        Tensor: h + params                                      (direct)
+        dict:   h @ params["weight"].T + params["bias"]         (linear)
+        dict:   h + (h @ params["P1"]) @ params["P2"].T         (lm_steer)
+        dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
+        """
+        return hidden_states + params
     
     @classmethod
-    def load_from_path(cls, path, device, **kwargs):
-        # 向量文件加载实现
-        vector_data = torch.load(path, map_location=device)
-        return {"vector": vector_data, "other_params": ...}
-    
-    def __init__(self, layer_id=None):
-        super().__init__(layer_id)
-        self.vector = None
-        self.scale = 1.0
+    def load_from_path(cls, path: str, device: str, **kwargs):
+        """从文件加载参数（.gguf/.pt 等）。
         
-    def set_steer_vector(self, index, vector, scale=1.0, **kwargs):
-        self.vector = vector
-        self.scale = scale
-    
-    def apply_intervention(self, hidden_states):
-        # 自定义干预逻辑
-        if self.vector is not None:
-            return hidden_states + self.scale * self.vector
-        return hidden_states
-    
-    # 实现其他必要接口方法...
-
-# 在 algorithms/__init__.py 中注册：
-# ALGORITHM_CLASSES["my_custom"] = MyCustomAlgorithm
+        返回: {"layer_payloads": {layer_id: payload}}
+        
+        示例：
+            .pt:   {"layer_payloads": {0: torch.load(path)}}
+            .gguf: {"layer_payloads": {L: tensor for L, tensor in gguf}}
+        """
+        vector = torch.load(path, map_location=device, weights_only=False)
+        target_layers = kwargs.get("target_layers", [0])
+        return {"layer_payloads": {layer: vector for layer in target_layers}}
 ```
 
-通过模块化设计，研究者可聚焦于干预算法的核心逻辑，而无需深入底层推理引擎细节。
+随后在 `algorithms/__init__.py` 中注册：
+```python
+from .my_algorithm import MyAlgorithm
+```
+
+</details>
+
+<details>
+    <summary><b>向量配置示例</b></summary>
+
+```python
+from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
+
+# 示例 1：单向量干预配置
+single_vector_request = SteerVectorRequest(
+    steer_vector_name="sentiment_control",
+    steer_vector_int_id=1,
+    steer_vector_local_path="vectors/happy.gguf",
+    scale=2.0,
+    target_layers=[10, 11, 12],
+    prefill_trigger_tokens=[-1],
+    generate_trigger_tokens=[-1]
+)
+
+# 示例 2：多向量干预配置
+multi_vector_request = SteerVectorRequest(
+    steer_vector_name="multi_direction_control",
+    steer_vector_int_id=2,
+    vector_configs=[
+        VectorConfig(
+            path="vector_direction1.gguf",
+            scale=1.5,
+            target_layers=[20],
+            prefill_trigger_positions=[-2],
+            algorithm="direct",
+            normalize=False
+        ),
+        VectorConfig(
+            path="vector_direction2.gguf",
+            scale=-0.8,
+            target_layers=[20],
+            prefill_trigger_positions=[-2],
+            algorithm="direct",
+            normalize=False
+        ),
+        VectorConfig(
+            path="vector_direction3.gguf",
+            scale=-1.0,
+            target_layers=[20],
+            prefill_trigger_positions=[-2],
+            algorithm="direct",
+            normalize=False
+        ),
+    ],
+    debug=False,
+    conflict_resolution="sequential"
+)
+```
 
 </details>
 
@@ -347,9 +345,11 @@ import easysteer.hidden_states as hs
 # 以 reward 模式创建 LLM 实例
 # 注意：这允许我们提取隐藏状态而非生成文本
 llm = LLM(
-    model="path/to/your/model",  # 模型路径
-    task="reward",               # 使用 reward 任务获取隐藏状态
-    tensor_parallel_size=1
+    model="path/to/your/model", # 模型路径
+    task="embed",               # 使用 embed 任务获取隐藏状态
+    tensor_parallel_size=1,
+    enforce_eager=True,
+    enable_prefix_caching=False  # 隐藏态提取暂不支持前缀缓存
 )
 
 # 示例 prompts
@@ -368,7 +368,7 @@ all_hidden_states, outputs = hs.get_all_hidden_states(llm, prompts)
 
 ### steer（基于分析的干预）
 
-`easysteer/steer` 实现了分析式干预：从隐藏状态中提取语义干预向量（如 DiffMean、PCA、linear probe、SAE），并在推理时应用，无需改动模型权重。可根据场景选择不同算法。
+[`easysteer/steer`](easysteer/steer) 实现了分析式干预：从隐藏状态中提取语义干预向量（如 DiffMean、PCA、linear probe、SAE），并在推理时应用，无需改动模型权重。可根据场景选择不同算法。
 
 <details>
 <summary><b>干预向量构建</b></summary>
@@ -397,7 +397,7 @@ control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
 
 ### reft（基于学习的干预）
 
-学习式干预在冻结基座模型权重的同时，从数据中学习参数化的干预；`easysteer/reft` 重实现了 pyreft，支持通过语言建模或偏好目标训练表征模块（如 SAV、LM-Steer、LoReFT），并在推理时应用。
+学习式干预在冻结基座模型权重的同时，从数据中学习参数化的干预；[`easysteer/reft`](easysteer/reft) 重实现了 pyreft，支持通过语言建模或偏好目标训练表征模块（如 SAV、LM-Steer、LoReFT），并在推理时应用。
 
 <details>
 <summary><b>ReFT 示例</b></summary>
@@ -484,7 +484,7 @@ bash start.sh
 
 ## 资源
 
-**`replications`** 文件夹包含基于 EasySteer 复现的论文实验。
+**[replications](replications)** 文件夹包含基于 EasySteer 复现的论文实验。
 
 ### 论文复现
 
