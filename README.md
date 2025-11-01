@@ -45,7 +45,7 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 
 - If you have used EasySteer in your research or projects, feel free to reach out to us — we’d be happy to feature your work in [News](#news).  
 - We welcome PRs that add examples or replication cases of your work to [replications](replications).  
-- We also encourage PRs contributing new algorithms (see [Example of Extending with a New Algorithm](#example-of-extending-with-a-new-algorithm) for guidance). In addition, contributions of new component-level steers (e.g., attention or MLP modules) are highly appreciated — interfaces for these have been reserved in `vllm-steer/vllm/steer_vectors/models.py`, and they will be one of the key focuses of future EasySteer updates.
+- We also encourage PRs contributing new algorithms (see [Adding a New Algorithm](#example-of-extending-with-a-new-algorithm) for guidance). In addition, contributions of new component-level steers (e.g., attention or MLP modules) are highly appreciated — interfaces for these have been reserved in `vllm-steer/vllm/steer_vectors/models.py`, and they will be one of the key focuses of future EasySteer updates.
 
 ## Getting Started
 
@@ -142,122 +142,76 @@ print(happy_output[0].outputs[0].text)
 The core inference engine of EasySteer, extending vLLM to enable the application of steering vectors during generation.
 
 <details>
-    <summary><b>Internal Structure</b></summary>
-
-The core functionality of `vllm-steer` is implemented in the `vllm/steer_vectors` directory, with the following file structure:
+    <summary><b>Module Structure</b></summary>
 
 ```plaintext
 vllm/steer_vectors/
-├── __init__.py                # Module entry point
-├── request.py                 # Request and configuration definitions
-├── models.py                  # Model integration and vector registration
-├── layers.py                  # Custom layer implementations
-├── worker_manager.py          # Worker thread management
-└── algorithms/                # Various intervention algorithm implementations
-    ├── __init__.py            # Algorithm registration
-    ├── base.py                # Algorithm base class and interface definition
-    ├── factory.py             # Algorithm factory (for creating algorithm instances)
-    ├── direct.py              # Direct intervention algorithm
-    ├── loreft.py              # LoReFT algorithm implementation
-    ├── xxx.py                 # Other algorithms
-    ├── multi_vector.py        # Multi-vector combination algorithm
-    └── template.py            # New algorithm template example
+├── request.py                 # Request definitions
+├── worker_manager.py          # Worker-level adapter management
+├── models.py                  # Model management & vector loading
+├── layers.py                  # Layer wrappers
+├── config.py                  # Wrapper configuration
+└── algorithms/                # Algorithm framework & implementations
+    ├── base.py                # Algorithm base class
+    ├── template.py            # Algorithm template with common logic
+    ├── factory.py             # Algorithm registry & factory
+    ├── parameter_control.py   # Parameter management
+    ├── utils.py               # Utilities
+    ├── direct.py              # Direct addition
+    ├── linear.py              # Linear transformation
+    ├── loreft.py              # LoReFT
+    ├── lm_steer.py            # LM steering
+    └── multi_vector.py        # Multi-vector combination
 ```
-
-</details>
-
-<details>
-    <summary><b>Core Components</b></summary>
-
-1. **Request and Configuration System** (`request.py`):
-   - `SteerVectorRequest`: Defines the steering vector request format, supporting both single-vector and multi-vector modes
-   - `VectorConfig`: Configuration definition for individual vectors in multi-vector mode
-
-2. **Algorithm Framework** (`algorithms/base.py`):
-   - `BaseSteerVectorAlgorithm`: Abstract base class for all intervention algorithms, defining standard interfaces
-   - Provides common functionality like position resolution and trigger condition checking
-
-3. **Algorithm Factory** (`algorithms/factory.py`):
-   - Responsible for dynamically creating appropriate algorithm instances based on configuration
-   - Supports algorithm registration mechanism for extension
-
-4. **Vector Application Implementations**:
-   - `direct.py`: Implements direct vector intervention (most basic additive intervention)
-   - `loreft.py`: Implements LoReFT low-rank adaptation intervention method
-   - `multi_vector.py`: Implements multi-vector combination strategies
-
-</details>
-
-<details>
-    <summary><b>Extension Mechanisms</b></summary>
-
-`vllm-steer` is designed with flexible extension mechanisms that allow researchers to easily implement and integrate their own intervention algorithms:
-
-1. **Interface-Based Plugin Architecture**:
-   - All algorithms inherit from the `BaseSteerVectorAlgorithm` base class
-   - New algorithms can be added by implementing standard interface methods without modifying core framework code
-
-2. **Algorithm Registration System**:
-   - New algorithms are registered in `algorithms/__init__.py`
-   - Factory pattern automatically loads and instantiates algorithms
-
-3. **Template Examples**:
-   - `template.py` provides a template for developing new algorithms, with detailed comments
-   - Following the template ensures seamless integration with the framework
-
-4. **Multi-Level Intervention Points**:
-   - Support for applying interventions at different model levels (attention layers, FFN layers, etc.)
-   - Implemented via hooks like `forward_decoder_layer` and `forward_mlp_layer`
 
 </details>
 
 <details>
 <a id="example-of-extending-with-a-new-algorithm"></a>
-    <summary><b>Example of Extending with a New Algorithm</b></summary>
+    <summary><b>Adding a New Algorithm</b></summary>
 
-To add a new intervention algorithm, just follow these steps:
-
-1. Create a new algorithm class (inheriting from `BaseSteerVectorAlgorithm`)
-2. Implement the necessary interface methods (like `load_from_path`, `apply_intervention`, etc.)
-3. Register the new algorithm in the algorithm registration system
-4. Use the new algorithm through configuration
+To implement a new algorithm, inherit from `AlgorithmTemplate` and implement just 2 methods:
 
 ```python
-# Example: Implementing a new intervention algorithm
-from vllm.steer_vectors.algorithms.base import BaseSteerVectorAlgorithm
 import torch
+from vllm.steer_vectors.algorithms.template import AlgorithmTemplate
+from vllm.steer_vectors.algorithms.factory import register_algorithm
 
-class MyCustomAlgorithm(BaseSteerVectorAlgorithm):
-    """Custom intervention algorithm implementation"""
+@register_algorithm("my_algorithm")
+class MyAlgorithm(AlgorithmTemplate):
+    """Custom algorithm - only 2 methods needed!"""
+    
+    def _transform(self, hidden_states: torch.Tensor, params) -> torch.Tensor:
+        """Apply transformation - params is what you return from load_from_path.
+        
+        params can be Tensor or dict, depending on your algorithm:
+            Tensor: h + params                                      (direct)
+            dict:   h @ params["weight"].T + params["bias"]         (linear)
+            dict:   h + (h @ params["P1"]) @ params["P2"].T         (lm_steer)
+            dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
+        """
+        return hidden_states + params
     
     @classmethod
-    def load_from_path(cls, path, device, **kwargs):
-        # Implementation of vector file loading
-        vector_data = torch.load(path, map_location=device)
-        return {"vector": vector_data, "other_params": ...}
-    
-    def __init__(self, layer_id=None):
-        super().__init__(layer_id)
-        self.vector = None
-        self.scale = 1.0
+    def load_from_path(cls, path: str, device: str, **kwargs):
+        """Load parameters from file (.gguf/.pt/.bin/directory).
         
-    def set_steer_vector(self, index, vector, scale=1.0, **kwargs):
-        self.vector = vector
-        self.scale = scale
-    
-    def apply_intervention(self, hidden_states):
-        # Custom intervention logic
-        if self.vector is not None:
-            return hidden_states + self.scale * self.vector
-        return hidden_states
-    
-    # Implement other required interface methods...
-
-# In algorithms/__init__.py, register:
-# ALGORITHM_CLASSES["my_custom"] = MyCustomAlgorithm
+        Returns: {"layer_payloads": {layer_id: payload}}
+        
+        Example loading patterns:
+            .pt file:       {"layer_payloads": {0: torch.load(path)}}
+            .gguf file:     {"layer_payloads": {L: tensor for L, tensor in gguf}}
+            directory:      {"layer_payloads": {L: state_dict from config}}
+        """
+        vector = torch.load(path, map_location=device, weights_only=False)
+        target_layers = kwargs.get("target_layers", [0])
+        return {"layer_payloads": {layer: vector for layer in target_layers}}
 ```
 
-With this modular design, researchers can focus on implementing the core logic of their intervention algorithms without needing to understand the complex details of the underlying inference engine.
+Then register it in `algorithms/__init__.py`:
+```python
+from .my_algorithm import MyAlgorithm  # Import triggers registration
+```
 
 </details>
 
@@ -363,7 +317,7 @@ all_hidden_states, outputs = hs.get_all_hidden_states(llm, prompts)
 
 ### steer (Analysis-based Steering)
 
-The `easysteer/steer` module implements analysis-based steering: it extracts semantic intervention vectors from hidden states (e.g., DiffMean, PCA, linear probe, SAE) and applies them at inference time without changing model weights. Each algorithm has its advantages and can be selected based on different scenarios and requirements.
+The [easysteer/steer](easysteer/steer) module implements analysis-based steering: it extracts semantic intervention vectors from hidden states (e.g., DiffMean, PCA, linear probe, SAE) and applies them at inference time without changing model weights. Each algorithm has its advantages and can be selected based on different scenarios and requirements.
 
 <details>
 <summary><b>Steering vector generation</b></summary>
@@ -392,7 +346,7 @@ control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
 
 ### reft (Learning-based Steering)
 
-Learning-based steering learns a parameterized intervention from data while keeping base model weights frozen. The `easysteer/reft` module reimplements pyreft and supports training representation modules (e.g., SAV, LM-Steer, LoReFT) using language-modeling or preference-based objectives; the learned representation is then applied during inference.
+Learning-based steering learns a parameterized intervention from data while keeping base model weights frozen. The [easysteer/reft](easysteer/reft) module reimplements pyreft and supports training representation modules (e.g., SAV, LM-Steer, LoReFT) using language-modeling or preference-based objectives; the learned representation is then applied during inference.
 
 <details>
 <summary><b>ReFT example</b></summary>
