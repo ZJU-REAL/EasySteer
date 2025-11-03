@@ -110,7 +110,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 # 初始化 LLM 模型
 # enable_steer_vector=True: 启用向量干预（不设置则与普通 vLLM 一致）
 # enforce_eager=True: 确保干预时的可靠性与稳定性（强烈建议）
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
+# enable_chunked_prefill=False: 避免潜在的一些问题
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1, enable_chunked_prefill=False)
 
 sampling_params = SamplingParams(
     temperature=0.0,
@@ -283,11 +284,12 @@ import easysteer.hidden_states as hs
 # 以 reward 模式创建 LLM 实例
 # 注意：这允许我们提取隐藏状态而非生成文本
 llm = LLM(
-    model="path/to/your/model", # 模型路径
-    task="embed",               # 使用 embed 任务获取隐藏状态
+    model="path/to/your/model",     # 模型路径
+    task="embed",                   # 使用 embed 任务获取隐藏状态
     tensor_parallel_size=1,
     enforce_eager=True,
-    enable_prefix_caching=False  # 隐藏态提取暂不支持前缀缓存
+    enable_chunked_prefill=False,   # 隐藏态提取暂不支持分块预填充
+    enable_prefix_caching=False     # 隐藏态提取暂不支持前缀缓存
 )
 
 # 示例 prompts
@@ -430,7 +432,6 @@ bash start.sh
 
 | 论文标题 | 分类 | 链接 |
 |------------|----------|------|
-| Activation Steering for Chain-of-Thought Compression | Reasoning | [复现代码](replications/asc/) |
 | Controlling Thinking Speed in Reasoning Models | Reasoning | [复现代码](replications/controlingthinkingspeed/) |
 | Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute | Reasoning | [复现代码](replications/fractreason/) |
 | Improving Reasoning Performance in Large Language Models via Representation Engineering | Reasoning | [复现代码](replications/improve_reasoning/) |

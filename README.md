@@ -110,7 +110,8 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 # Initialize the LLM model
 # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
 # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
+# enable_chunked_prefill=False: To avoid potential issues
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1, enable_chunked_prefill=False)
 
 sampling_params = SamplingParams(
     temperature=0.0,
@@ -293,11 +294,12 @@ import easysteer.hidden_states as hs
 # Note: This allows us to extract hidden states rather than generating text
 
 llm = LLM(
-    model="path/to/your/model", # Model path
-    task="embed",               # Use embed task to get hidden states
+    model="path/to/your/model",   # Model path
+    task="embed",                 # Use embed task to get hidden states
     tensor_parallel_size=1,
     enforce_eager=True,
-    enable_prefix_caching=False # Hidden states extraction doesn't support prefix caching yet
+    enable_chunked_prefill=False, # Hidden states extraction doesn't support prefix caching yet
+    enable_prefix_caching=False   # Hidden states extraction doesn't support chunked prefill yet
 )
 
 # Prepare some example prompts
@@ -441,7 +443,6 @@ The following table lists important papers that have been reproduced using EasyS
 
 | Paper Title | Category | Link |
 |------------|----------|------|
-| Activation Steering for Chain-of-Thought Compression | Reasoning | [Replication Code](replications/asc/) |
 | Controlling Thinking Speed in Reasoning Models | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
 | Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute | Reasoning | [Replication Code](replications/fractreason/) |
 | Improving Reasoning Performance in Large Language Models via Representation Engineering | Reasoning | [Replication Code](replications/improve_reasoning/) |
