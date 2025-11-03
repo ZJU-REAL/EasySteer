@@ -68,7 +68,7 @@ cd ..
 pip install --editable .
 ```
 
-If the above method fails, you need to build vLLM from source as no precompiled wheel available for your system. Here’s an example for ARM architecture:
+If the above method fails, you need to build vLLM from source as no precompiled wheel available for your system. Here’s an example:
 
 ```bash
 # Create a new conda environment
@@ -79,14 +79,19 @@ conda activate easysteer
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
+# Known compatibility issues between torch 2.9.0 and xformers
+pip install torch==2.8.0 torchvision xformers
 python use_existing_torch.py
 
 # Set CUDA architecture for your GPU to speed up build
 # Examples: "8.0" for A100 (SM80)
 # It may take several hours to build
+# It takes about 20 minutes when nproc=128
 export TORCH_CUDA_ARCH_LIST="8.0"
 export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
 export VLLM_TARGET_DEVICE="cuda"
+export MAX_JOBS=$(nproc)
+export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
 
 pip install -r requirements/build.txt
 pip install -e . --no-build-isolation -v

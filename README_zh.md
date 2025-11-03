@@ -69,7 +69,7 @@ cd ..
 pip install --editable .
 ```
 
-如果上述方法失败（例如你的系统没有可用的预编译 wheel），需要从源码构建 vLLM。以下以 ARM 架构为例：
+如果上述方法失败（例如你的系统没有可用的预编译 wheel），需要从源码构建 vLLM。以下是一个例子：
 
 ```bash
 # 创建一个新的 conda 环境
@@ -80,14 +80,19 @@ conda activate easysteer
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
+# 已知 torch 2.9.0 和 xformers 存在兼容性问题
+pip install torch==2.8.0 torchvision xformers
 python use_existing_torch.py
 
 # 为你的 GPU 设置 CUDA 架构以加速构建
 # 示例：A100 使用 "8.0"（SM80）
 # 注意：构建可能需要几个小时
+# 当 nproc=128 时大约需要20分钟
 export TORCH_CUDA_ARCH_LIST="8.0"
 export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
 export VLLM_TARGET_DEVICE="cuda"
+export MAX_JOBS=$(nproc)
+export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
 
 pip install -r requirements/build.txt
 pip install -e . --no-build-isolation -v
