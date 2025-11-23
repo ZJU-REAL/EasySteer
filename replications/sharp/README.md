@@ -1,0 +1,7 @@
+# SHARP: Steering Hallucination in LVLMs via Representation Engineering
+
+[Paper Link](https://aclanthology.org/2025.emnlp-main.725/)
+
+## Abstract
+
+Despite their impressive capabilities, Large Vision-Language Models (LVLMs) frequently generate responses that are plausible but incorrect or unsupported—commonly referred to as hallucinations. In this study, we investigate whether different types of hallucinations are reflected in the model’s internal representations by probing their encoded features. We focus on two key causes of hallucination in multimodal reasoning:(1) over-reliance on textual priors and (2) preference for user prompts over conflicting visual evidence—factors identified in prior work as frequent and impactful. Our probing results reveal that hallucinations exhibit distinguishable representational patterns, suggesting the potential for a representation-level approach to characterize and mitigate them. Motivated by these findings, we propose Steering HAllucination via RePresentation Engineering (SHARP), a representation-level intervention framework that modulates hallucination-related features during inference. SHARP identifies functional representations responsible for prior-driven biases and visual-context conflicts, and jointly adjusts the model’s internal activations in real time. We evaluate our approach extensively on three large vision-language models across multiple benchmarks. Experimental results demonstrate that SHARP effectively reduces hallucinations while preserving the performance and generalization capabilities of LVLMs.
