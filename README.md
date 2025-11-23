@@ -21,6 +21,10 @@
 - [2025/09/29] We’ve released our paper.
 - [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
+## Awesome PRs
+- [2025/11/23] SHARP: Steering Hallucination in LVLMs via Representation Engineering (EMNLP2025 Main)
+[Replication Code](replications/sharp/)
+
 ## EasySteer × vLLM v1 Engine Adaptation 🔥🔥🔥
 
 - Continuous batching support for v1 to ensure reliable steering
@@ -446,22 +450,23 @@ bash start.sh
 
 The following table lists important papers that have been reproduced using EasySteer:
 
-| Paper Title | Category | Link |
-|------------|----------|------|
-| Controlling Thinking Speed in Reasoning Models | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
-| Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute | Reasoning | [Replication Code](replications/fractreason/) |
-| Improving Reasoning Performance in Large Language Models via Representation Engineering | Reasoning | [Replication Code](replications/improve_reasoning/) |
-| SEAL: Steerable Reasoning Calibration of Large Language Models for Free | Reasoning | [Replication Code](replications/seal/) |
-| Steering Large Language Models to Evaluate and Amplify Creativity | Style | [Replication Code](replications/creative_writing/) |
-| Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering | Style | [Replication Code](replications/steerable_chatbot/) |
-| Personalized Steering of Large Language Models: Versatile Steering Vectors Through Bi-directional Preference Optimization | Personal | [Replication Code](replications/bipo/) |
-| Word Embeddings Are Steers for Language Models | General | [Replication Code](replications/lm_steer/) |
-| ReFT: Representation Finetuning for Language Models | General | [Replication Code](replications/loreft/) |
-| SAKE: Steering Activations for Knowledge Editing | Knowledge | [Replication Code](replications/sake/) |
-| Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models | Reality | [Replication Code](replications/sae_entities/) |
-| Refusal in Language Models Is Mediated by a Single Direction | Safety | [Replication Code](replications/refusal_direction/) |
-| Programming Refusal with Conditional Activation Steering | Safety | [Replication Code](replications/cast/) |
-| _More replications coming soon..._ | | |
+| Paper Title                                                                                                               | Category  | Link                                                      |
+|---------------------------------------------------------------------------------------------------------------------------|-----------|-----------------------------------------------------------|
+| Controlling Thinking Speed in Reasoning Models                                                                            | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
+| Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute                                          | Reasoning | [Replication Code](replications/fractreason/)             |
+| Improving Reasoning Performance in Large Language Models via Representation Engineering                                   | Reasoning | [Replication Code](replications/improve_reasoning/)       |
+| SEAL: Steerable Reasoning Calibration of Large Language Models for Free                                                   | Reasoning | [Replication Code](replications/seal/)                    |
+| Steering Large Language Models to Evaluate and Amplify Creativity                                                         | Style     | [Replication Code](replications/creative_writing/)        |
+| Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering                                          | Style     | [Replication Code](replications/steerable_chatbot/)       |
+| Personalized Steering of Large Language Models: Versatile Steering Vectors Through Bi-directional Preference Optimization | Personal  | [Replication Code](replications/bipo/)                    |
+| Word Embeddings Are Steers for Language Models                                                                            | General   | [Replication Code](replications/lm_steer/)                |
+| ReFT: Representation Finetuning for Language Models                                                                       | General   | [Replication Code](replications/loreft/)                  |
+| SAKE: Steering Activations for Knowledge Editing                                                                          | Knowledge | [Replication Code](replications/sake/)                    |
+| Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models                                          | Reality   | [Replication Code](replications/sae_entities/)            |
+| Refusal in Language Models Is Mediated by a Single Direction                                                              | Safety    | [Replication Code](replications/refusal_direction/)       |
+| Programming Refusal with Conditional Activation Steering                                                                  | Safety    | [Replication Code](replications/cast/)                    |
+| SHARP: Steering Hallucination in LVLMs via Representation Engineering                                                     | Reality | [Replication Code](replications/sharp/)                   |
+| _More replications coming soon..._                                                                                        |           |                                                           |
 
 ## License
 

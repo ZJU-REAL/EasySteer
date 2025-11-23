@@ -22,6 +22,10 @@
 - [2025/09/29] 我们发布了论文。
 - [2025/09/28] 我们开源了 EasySteer 代码，欢迎试用！
 
+## 很棒的PRs
+- [2025/11/23] SHARP: Steering Hallucination in LVLMs via Representation Engineering (EMNLP2025 Main)
+[复现代码](replications/sharp/)
+
 ## EasySteer × vLLM v1 引擎适配 🔥🔥🔥
 
 - 支持 v1 的连续批处理机制，确保干预稳定可靠
@@ -450,6 +454,7 @@ bash start.sh
 | Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models | Reality | [复现代码](replications/sae_entities/) |
 | Refusal in Language Models Is Mediated by a Single Direction | Safety | [复现代码](replications/refusal_direction/) |
 | Programming Refusal with Conditional Activation Steering | Safety | [复现代码](replications/cast/) |
+| SHARP: Steering Hallucination in LVLMs via Representation Engineering | Reality | [复现代码](replications/sharp/) |
 | _更多复现即将推出..._ | | |
 
 ## 许可证
