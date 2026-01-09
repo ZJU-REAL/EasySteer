@@ -13,6 +13,9 @@
 </div>
 
 👋 Join our [WeChat](figures/wechat.png) user group.
+
+🔥 I just finished another work. I will come back to update soon.
+
 <a id="news"></a>
 ## News 🔥
 
