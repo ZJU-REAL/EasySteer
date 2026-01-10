@@ -14,9 +14,12 @@
 
 👋 加入我们的 [微信群](figures/wechat.png)。
 
+🔥 我刚刚做完了另一项工作。我很快就会回来更新。
+
 <a id="news"></a>
 ## 新闻 🔥
 
+- [2026/01/11] 我们已将 EasySteer 适配至 vLLM v0.13.0
 - [2025/10/31] 我们已将 EasySteer 适配至 vLLM v1 引擎。
 - [2025/10/10] 我们已适配 VLMs。
 - [2025/09/29] 我们发布了论文。
@@ -66,6 +69,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # 使用预编译版本安装（推荐）
+# 注意：我们适配的版本为 vLLM v0.13.0 发布时的 commit。
+# 请指定以下 commit 号以获取适配的预编译版本。
+export VLLM_PRECOMPILED_WHEEL_COMMIT=72506c98349d6bcd32b4e33eec7b5513453c1502
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # 安装 EasySteer
@@ -84,8 +90,6 @@ conda activate easysteer
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
-# 已知 torch 2.9.0 和 xformers 存在兼容性问题
-pip install torch==2.8.0 torchvision xformers
 python use_existing_torch.py
 
 # 为你的 GPU 设置 CUDA 架构以加速构建

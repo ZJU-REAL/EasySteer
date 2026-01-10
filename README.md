@@ -19,6 +19,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
 - [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
 - [2025/10/10] We’ve adapted EasySteer for the VLMs.
 - [2025/09/29] We’ve released our paper.
@@ -68,6 +69,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
+# Note: We adapted EasySteer for the commit when vLLM v0.13.0 was released.
+# Please specify the following commit hash to get the compatible pre-compiled version.
+export VLLM_PRECOMPILED_WHEEL_COMMIT=72506c98349d6bcd32b4e33eec7b5513453c1502
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # Install EasySteer
@@ -86,8 +90,6 @@ conda activate easysteer
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
-# Known compatibility issues between torch 2.9.0 and xformers
-pip install torch==2.8.0 torchvision xformers
 python use_existing_torch.py
 
 # Set CUDA architecture for your GPU to speed up build
