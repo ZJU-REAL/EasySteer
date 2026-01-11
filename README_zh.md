@@ -294,11 +294,11 @@ multi_vector_request = SteerVectorRequest(
 # 导入 hidden_states 模块以提取模型激活
 import easysteer.hidden_states as hs
 
-# 以 reward 模式创建 LLM 实例
-# 注意：这允许我们提取隐藏状态而非生成文本
+# 很多用户反馈很多模型不支持embed任务导致无法提取hidden
+# 目前EasySteer已经支持直接使用generate task提取hidden （get_all_hidden_states_generate）
+# 我们后续将废弃并移除使用embed任务的get_all_hidden_states
 llm = LLM(
     model="path/to/your/model",     # 模型路径
-    task="embed",                   # 使用 embed 任务获取隐藏状态
     tensor_parallel_size=1,
     enforce_eager=True,
     enable_chunked_prefill=False,   # 隐藏态提取暂不支持分块预填充
@@ -313,7 +313,7 @@ prompts = [
 ]
 
 # 提取所有 token 的隐藏状态
-all_hidden_states, outputs = hs.get_all_hidden_states(llm, prompts)
+all_hidden_states, outputs = hs.get_all_hidden_states_generate(llm, prompts)
 ```
 
 </details>

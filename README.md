@@ -304,12 +304,12 @@ This module extracts and manages hidden states from LLMs, forming the foundation
 # Import hidden states module to extract model activations
 import easysteer.hidden_states as hs
 
-# Create a new LLM instance in embed mode
-# Note: This allows us to extract hidden states rather than generating text
+# Many users have reported that many models do not support embed task, making it impossible to extract hidden states
+# EasySteer now supports directly using generate task to extract hidden states (get_all_hidden_states_generate)
+# We will deprecate and remove get_all_hidden_states which uses embed task in the future
 
 llm = LLM(
     model="path/to/your/model",   # Model path
-    task="embed",                 # Use embed task to get hidden states
     tensor_parallel_size=1,
     enforce_eager=True,
     enable_chunked_prefill=False, # Hidden states extraction doesn't support prefix caching yet
@@ -324,7 +324,7 @@ prompts = [
 ]
 
 # Extract hidden states for all tokens in the prompts
-all_hidden_states, outputs = hs.get_all_hidden_states(llm, prompts)
+all_hidden_states, outputs = hs.get_all_hidden_states_generate(llm, prompts)
 ```
 
 </details>
