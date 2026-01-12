@@ -17,6 +17,49 @@ from vllm.steer_vectors.request import SteerVectorRequest
 # Create blueprint
 chat_bp = Blueprint('chat', __name__)
 
+# Import the shared ID generation functions from inference_api
+# This ensures all APIs use the same counter and avoid ID collisions
+import sys
+import os
+# Add the frontend directory to the path if not already there
+frontend_dir = os.path.dirname(os.path.abspath(__file__))
+if frontend_dir not in sys.path:
+    sys.path.insert(0, frontend_dir)
+
+# Try to import from inference_api, if it fails, define locally
+try:
+    from inference_api import generate_unique_id, generate_unique_name
+    logger.info("Successfully imported shared ID generation functions from inference_api")
+except ImportError:
+    logger.warning("Could not import from inference_api, defining local ID generation functions")
+    # Fallback: define local functions
+    _chat_id_counter = 1  # Start from 1 (not 0)
+    
+    def generate_unique_id():
+        """
+        Generate a unique positive integer ID using a simple global counter.
+        
+        Returns:
+            int: A unique positive integer ID (1 to 2,147,483,647)
+        """
+        global _chat_id_counter
+        
+        # Get current ID and increment
+        unique_id = _chat_id_counter
+        _chat_id_counter += 1
+        
+        # Safety check: wrap around if we exceed int32 max
+        if _chat_id_counter > 2147483647:
+            logger.warning("Chat ID counter reached int32 limit, wrapping around to 1")
+            _chat_id_counter = 1
+        
+        return unique_id
+    
+    def generate_unique_name(prefix="steer_vector"):
+        """Generate a unique name based on current timestamp"""
+        timestamp = int(time.time() * 1000000)  # Use microseconds for more precision
+        return f"{prefix}_{timestamp}"
+
 # Store LLM instances (to avoid reloading)
 chat_llm_instances = {}
 
@@ -70,19 +113,22 @@ def get_or_create_llm(model_path, gpu_devices="0"):
     
     if key not in chat_llm_instances:
         try:
-            # Set environment variables - ensure V0 is used to support steer vectors
+            # Set GPU devices environment variable
             os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
-            os.environ["VLLM_USE_V1"] = "0"
             
             # Calculate tensor_parallel_size
             gpu_count = len(gpu_devices.split(','))
             
-            # Create LLM instance
+            # Create LLM instance following the new vLLM API pattern
+            # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
+            # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
+            # enable_chunked_prefill=False: To avoid potential issues with steering
             chat_llm_instances[key] = LLM(
                 model=model_path,
                 enable_steer_vector=True,
                 enforce_eager=True,
-                tensor_parallel_size=gpu_count
+                tensor_parallel_size=gpu_count,
+                enable_chunked_prefill=False
             )
             logger.info(f"Created LLM instance for chat model: {model_path}")
         except Exception as e:
@@ -190,20 +236,29 @@ def chat():
             repetition_penalty=repetition_penalty
         )
         
+        # Generate unique IDs and names for this chat request
+        baseline_id = generate_unique_id()
+        baseline_name = generate_unique_name("chat_baseline")
+        steer_id = generate_unique_id()
+        steer_name = generate_unique_name(f"chat_{preset}")
+        
+        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
+        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} for preset: {preset}")
+        
         # Create baseline (non-steered) request with scale=0
         baseline_request = SteerVectorRequest(
-            steer_vector_name="baseline",
-            steer_vector_id=1,
+            steer_vector_name=baseline_name,
+            steer_vector_int_id=baseline_id,
             steer_vector_local_path=config["vector_path"],  # We still need a valid path
             scale=0.0,  # Zero scale = no steering
             target_layers=[0],
             algorithm="direct"  # Simple algorithm for baseline
         )
         
-        # Create the actual steering vector request
+        # Create the actual steering vector request with unique ID and name
         steer_vector_request = SteerVectorRequest(
-            steer_vector_name=f"{preset}_vector",
-            steer_vector_id=2,
+            steer_vector_name=steer_name,
+            steer_vector_int_id=steer_id,
             steer_vector_local_path=config["vector_path"],
             scale=config["scale"],
             target_layers=config["target_layers"],
@@ -217,16 +272,16 @@ def chat():
             # First, generate baseline (non-steered) output
             baseline_output = llm.generate(
                 prompt,
-                sampling_params,
-                steer_vector_request=baseline_request
+                steer_vector_request=baseline_request,
+                sampling_params=sampling_params
             )
             normal_response = baseline_output[0].outputs[0].text.strip()
             
             # Then generate steered output
             steered_output = llm.generate(
                 steered_prompt,  # 使用带有steered历史的提示
-                sampling_params,
-                steer_vector_request=steer_vector_request
+                steer_vector_request=steer_vector_request,
+                sampling_params=sampling_params
             )
             steered_response = steered_output[0].outputs[0].text.strip()
             

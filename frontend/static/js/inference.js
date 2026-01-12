@@ -73,7 +73,7 @@ export async function submitConfiguration() {
         
         // Steer Vector configuration
         steer_vector_name: document.getElementById('steerVectorName').value,
-        steer_vector_id: parseInt(document.getElementById('steerVectorId').value),
+        steer_vector_int_id: parseInt(document.getElementById('steerVectorId').value),
         steer_vector_local_path: document.getElementById('localPath').value,
         scale: parseFloat(document.getElementById('scale').value),
         algorithm: document.getElementById('algorithm').value,
@@ -84,7 +84,7 @@ export async function submitConfiguration() {
     };
 
     // Validate required fields
-    if (!config.steer_vector_name || !config.steer_vector_id || !config.steer_vector_local_path || !config.model_path || !config.instruction) {
+    if (!config.steer_vector_name || !config.steer_vector_int_id || !config.steer_vector_local_path || !config.model_path || !config.instruction) {
         showError(window.t('required_fields_error'));
         return;
     }

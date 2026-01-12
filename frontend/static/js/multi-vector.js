@@ -384,7 +384,7 @@ export async function submitMultiConfiguration() {
         
         // Steer Vector请求配置
         steer_vector_name: document.getElementById('multiSteerVectorName').value,
-        steer_vector_id: parseInt(document.getElementById('multiSteerVectorId').value),
+        steer_vector_int_id: parseInt(document.getElementById('multiSteerVectorId').value),
         
         // 冲突解决方法
         conflict_resolution: document.getElementById('conflictResolution').value,
@@ -403,7 +403,7 @@ export async function submitMultiConfiguration() {
     };
 
     // 验证必填字段
-    if (!config.steer_vector_name || !config.steer_vector_id || !config.model_path || !config.instruction) {
+    if (!config.steer_vector_name || !config.steer_vector_int_id || !config.model_path || !config.instruction) {
         showMultiError(window.t('required_fields_error'));
         return;
     }

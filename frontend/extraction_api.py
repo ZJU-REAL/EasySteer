@@ -21,14 +21,14 @@ def import_local_modules():
             sys.path.insert(0, project_root)
         
         # Import local modules with updated paths
-        from easysteer.hidden_states import get_all_hidden_states
+        from easysteer.hidden_states import get_all_hidden_states_generate
         
         # Import extraction methods
         from easysteer.steer.lat import LATExtractor
         from easysteer.steer.pca import PCAExtractor
         from easysteer.steer.diffmean import DiffMeanExtractor
         
-        return get_all_hidden_states, LATExtractor, PCAExtractor, DiffMeanExtractor
+        return get_all_hidden_states_generate, LATExtractor, PCAExtractor, DiffMeanExtractor
         
     except ImportError as e:
         print(f"Warning: Failed to import extraction methods: {e}")
@@ -38,7 +38,7 @@ def import_local_modules():
         sys.path[:] = original_path
 
 # Import the local modules
-get_all_hidden_states, LATExtractor, PCAExtractor, DiffMeanExtractor = import_local_modules()
+get_all_hidden_states_generate, LATExtractor, PCAExtractor, DiffMeanExtractor = import_local_modules()
 
 # Create blueprint
 extraction_bp = Blueprint('extraction', __name__)
@@ -131,9 +131,10 @@ def run_extraction(config):
         
         llm = LLM(
             model=model_path,
-            task="reward",
             tensor_parallel_size=gpu_count,
-            enforce_eager=True
+            enforce_eager=True,
+            enable_chunked_prefill=False,  # Hidden states extraction doesn't support chunked prefill yet
+            enable_prefix_caching=False    # Hidden states extraction doesn't support prefix caching yet
         )
         
         update_extraction_status(f"VLLM model loaded: {model_path}")
@@ -150,8 +151,8 @@ def run_extraction(config):
         positive_indices = list(range(len(positive_samples)))
         negative_indices = list(range(len(positive_samples), len(all_samples)))
         
-        # Use the get_all_hidden_states function from vllm
-        all_hidden_states, outputs = get_all_hidden_states(llm, all_samples)
+        # Use the get_all_hidden_states_generate function from vllm (supports more models than embed task)
+        all_hidden_states, outputs = get_all_hidden_states_generate(llm, all_samples)
         
         update_extraction_status(f"Hidden states extracted, layers: {len(all_hidden_states[0])}")
         

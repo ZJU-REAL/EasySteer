@@ -633,7 +633,7 @@ window.applyVectors = async function() {
         
         // Steer Vector配置
         steer_vector_name: document.getElementById('saeSVName').value,
-        steer_vector_id: parseInt(document.getElementById('saeSVId').value),
+        steer_vector_int_id: parseInt(document.getElementById('saeSVId').value),
         
         // 冲突解决方法
         conflict_resolution: document.getElementById('saeConflictResolution').value,

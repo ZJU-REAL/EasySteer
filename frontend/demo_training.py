@@ -163,7 +163,7 @@ def test_inference(model_path, steer_vector_path, test_inputs):
                 "repetition_penalty": 1.1
             },
             "steer_vector_name": "demo_trained_model",
-            "steer_vector_id": 1,
+            "steer_vector_int_id": 1,
             "steer_vector_local_path": steer_vector_path,
             "scale": 1.0,
             "algorithm": "loreft",

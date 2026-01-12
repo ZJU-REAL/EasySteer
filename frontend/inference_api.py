@@ -5,6 +5,7 @@ import logging
 import json
 from transformers import AutoTokenizer
 import re
+import time
 
 # Import vllm related modules (using pip-installed vllm)
 from vllm import LLM, SamplingParams
@@ -15,6 +16,43 @@ inference_bp = Blueprint('inference', __name__)
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Global shared counter to ensure uniqueness across all APIs
+# This counter is incremented atomically to prevent ID collisions
+# between inference_api and chat_api
+# Note: Starts at 1 (not 0) as some systems require positive non-zero IDs
+# Max value: 2,147,483,647 (int32 limit for vLLM)
+_global_id_counter = 1
+
+def generate_unique_id():
+    """
+    Generate a unique positive integer ID using a simple global counter.
+    
+    Returns:
+        int: A unique positive integer ID (1 to 2,147,483,647)
+        
+    Note:
+        - IDs start from 1 (not 0) as required by vLLM steer vectors
+        - Counter resets on process restart
+        - For production use with persistence, consider adding a database-backed counter
+    """
+    global _global_id_counter
+    
+    # Get current ID and increment
+    unique_id = _global_id_counter
+    _global_id_counter += 1
+    
+    # Safety check: wrap around if we exceed int32 max (very unlikely in practice)
+    if _global_id_counter > 2147483647:
+        logger.warning("Global ID counter reached int32 limit, wrapping around to 1")
+        _global_id_counter = 1
+    
+    return unique_id
+
+def generate_unique_name(prefix="steer_vector"):
+    """Generate a unique name based on current timestamp"""
+    timestamp = int(time.time() * 1000000)  # Use microseconds for more precision
+    return f"{prefix}_{timestamp}"
 
 # Store active steer vector configurations
 active_steer_vectors = {}
@@ -60,19 +98,22 @@ def get_or_create_llm(model_path, gpu_devices):
     
     if key not in llm_instances:
         try:
-            # Set environment variables - ensure V0 is used to support steer vectors
+            # Set GPU devices environment variable
             os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
-            os.environ["VLLM_USE_V1"] = "0"
             
             # Calculate tensor_parallel_size
             gpu_count = len(gpu_devices.split(','))
             
-            # Create LLM instance
+            # Create LLM instance following the new vLLM API pattern
+            # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
+            # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
+            # enable_chunked_prefill=False: To avoid potential issues with steering
             llm_instances[key] = LLM(
                 model=model_path,
                 enable_steer_vector=True,
                 enforce_eager=True,
-                tensor_parallel_size=gpu_count
+                tensor_parallel_size=gpu_count,
+                enable_chunked_prefill=False
             )
             logger.info(f"Created LLM instance for model: {model_path}")
         except Exception as e:
@@ -149,7 +190,7 @@ def generate():
         lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
         
         # Validate required fields
-        required_fields = ['model_path', 'instruction', 'steer_vector_name', 'steer_vector_id', 'steer_vector_local_path']
+        required_fields = ['model_path', 'instruction', 'steer_vector_name', 'steer_vector_int_id', 'steer_vector_local_path']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': get_message('missing_field', lang, field=field)}), 400
@@ -173,20 +214,29 @@ def generate():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
+        # Generate unique IDs and names for this request
+        baseline_id = generate_unique_id()
+        baseline_name = generate_unique_name("baseline")
+        steer_id = generate_unique_id()
+        steer_name = generate_unique_name(data.get('steer_vector_name', 'steer_vector'))
+        
+        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
+        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} (user provided: {data.get('steer_vector_name')}, {data.get('steer_vector_int_id')})")
+        
         # Create baseline (non-steered) request with scale=0
         baseline_request = SteerVectorRequest(
-            steer_vector_name="baseline",
-            steer_vector_id=0,
-            steer_vector_local_path="/home/xhl/my_lab/EasySteerTest/diffmean_control_vector.gguf",  # We still need a valid path
+            steer_vector_name=baseline_name,
+            steer_vector_int_id=baseline_id,
+            steer_vector_local_path=data['steer_vector_local_path'],  # Use the same path as the steer vector
             scale=0.0,  # Zero scale = no steering
             target_layers=[0],
             algorithm="direct"  # Simple algorithm for baseline
         )
         
-        # Create the actual steering vector request
+        # Create the actual steering vector request with unique ID and name
         steer_vector_request = SteerVectorRequest(
-            steer_vector_name=data['steer_vector_name'],
-            steer_vector_id=data['steer_vector_id'],
+            steer_vector_name=steer_name,
+            steer_vector_int_id=steer_id,
             steer_vector_local_path=data['steer_vector_local_path'],
             scale=data.get('scale', 1.0),
             target_layers=data.get('target_layers'),
@@ -201,16 +251,16 @@ def generate():
             # First, generate baseline (non-steered) output
             baseline_output = llm.generate(
                 prompt,
-                sampling_params,
-                steer_vector_request=baseline_request
+                steer_vector_request=baseline_request,
+                sampling_params=sampling_params
             )
             baseline_text = baseline_output[0].outputs[0].text
             
             # Then generate steered output
             steered_output = llm.generate(
                 prompt,
-                sampling_params,
-                steer_vector_request=steer_vector_request
+                steer_vector_request=steer_vector_request,
+                sampling_params=sampling_params
             )
             steered_text = steered_output[0].outputs[0].text
             
@@ -250,7 +300,7 @@ def generate_multi():
         lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
         
         # Validate required fields
-        required_fields = ['model_path', 'instruction', 'steer_vector_name', 'steer_vector_id', 'vector_configs']
+        required_fields = ['model_path', 'instruction', 'steer_vector_name', 'steer_vector_int_id', 'vector_configs']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': get_message('missing_field', lang, field=field)}), 400
@@ -278,11 +328,23 @@ def generate_multi():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
+        # Generate unique IDs and names for this request
+        baseline_id = generate_unique_id()
+        baseline_name = generate_unique_name("baseline_multi")
+        steer_id = generate_unique_id()
+        steer_name = generate_unique_name(data.get('steer_vector_name', 'multi_vector'))
+        
+        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
+        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} (user provided: {data.get('steer_vector_name')}, {data.get('steer_vector_int_id')})")
+        
+        # Get the first vector path for baseline
+        first_vector_path = data['vector_configs'][0]['path'] if data['vector_configs'] else "/dummy/path.gguf"
+        
         # Create baseline (non-steered) request with scale=0
         baseline_request = SteerVectorRequest(
-            steer_vector_name="baseline",
-            steer_vector_id=0,
-            steer_vector_local_path="/home/xhl/my_lab/EasySteerTest/diffmean_control_vector.gguf",  # We still need a valid path
+            steer_vector_name=baseline_name,
+            steer_vector_int_id=baseline_id,
+            steer_vector_local_path=first_vector_path,  # Use the first vector path
             scale=0.0,  # Zero scale = no steering
             target_layers=[0],
             algorithm="direct"  # Simple algorithm for baseline
@@ -309,10 +371,10 @@ def generate_multi():
             )
             vector_configs.append(vector_config)
         
-        # Create the multi-vector steering request
+        # Create the multi-vector steering request with unique ID and name
         steer_vector_request = SteerVectorRequest(
-            steer_vector_name=data['steer_vector_name'],
-            steer_vector_id=data['steer_vector_id'],
+            steer_vector_name=steer_name,
+            steer_vector_int_id=steer_id,
             vector_configs=vector_configs,
             debug=data.get('debug', False),
             conflict_resolution=data.get('conflict_resolution', 'sequential')
@@ -322,7 +384,7 @@ def generate_multi():
         logger.info(f"Multi-vector request details:")
         logger.info(f"- Model path: {data['model_path']}")
         logger.info(f"- Vector name: {data['steer_vector_name']}")
-        logger.info(f"- Vector ID: {data['steer_vector_id']}")
+        logger.info(f"- Vector ID: {data['steer_vector_int_id']}")
         logger.info(f"- Conflict resolution: {data.get('conflict_resolution', 'sequential')}")
         logger.info(f"- Number of vectors: {len(vector_configs)}")
         
@@ -341,16 +403,16 @@ def generate_multi():
             # First, generate baseline (non-steered) output
             baseline_output = llm.generate(
                 prompt,
-                sampling_params,
-                steer_vector_request=baseline_request
+                steer_vector_request=baseline_request,
+                sampling_params=sampling_params
             )
             baseline_text = baseline_output[0].outputs[0].text
             
             # Then generate steered output with multiple vectors
             steered_output = llm.generate(
                 prompt,
-                sampling_params,
-                steer_vector_request=steer_vector_request
+                steer_vector_request=steer_vector_request,
+                sampling_params=sampling_params
             )
             steered_text = steered_output[0].outputs[0].text
             
@@ -481,16 +543,22 @@ def create_steer_vector():
         data = request.json
         lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
         
-        # Validate required fields
-        required_fields = ['steer_vector_name', 'steer_vector_id', 'steer_vector_local_path']
+        # Validate required fields (user still needs to provide these, but they will be replaced)
+        required_fields = ['steer_vector_name', 'steer_vector_int_id', 'steer_vector_local_path']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': get_message('missing_field', lang, field=field)}), 400
         
-        # Create SteerVectorRequest object
+        # Generate unique ID and name (replace user-provided values)
+        unique_id = generate_unique_id()
+        unique_name = generate_unique_name(data['steer_vector_name'])
+        
+        logger.info(f"Generated unique ID: {unique_id}, name: {unique_name} (user provided: {data['steer_vector_name']}, {data['steer_vector_int_id']})")
+        
+        # Create SteerVectorRequest object with unique ID and name
         steer_vector_request = SteerVectorRequest(
-            steer_vector_name=data['steer_vector_name'],
-            steer_vector_id=data['steer_vector_id'],
+            steer_vector_name=unique_name,
+            steer_vector_int_id=unique_id,
             steer_vector_local_path=data['steer_vector_local_path'],
             scale=data.get('scale', 1.0),
             target_layers=data.get('target_layers'),
@@ -506,16 +574,16 @@ def create_steer_vector():
             return jsonify({'error': get_message('file_not_found', lang, path=steer_vector_request.steer_vector_local_path)}), 400
         
         # Store configuration
-        active_steer_vectors[steer_vector_request.steer_vector_id] = steer_vector_request
+        active_steer_vectors[steer_vector_request.steer_vector_int_id] = steer_vector_request
         
         # Return success response
         response = {
             'success': True,
             'message': get_message('created', lang),
-            'steer_vector_id': steer_vector_request.steer_vector_id,
+            'steer_vector_int_id': steer_vector_request.steer_vector_int_id,
             'config': {
                 'name': steer_vector_request.steer_vector_name,
-                'id': steer_vector_request.steer_vector_id,
+                'id': steer_vector_request.steer_vector_int_id,
                 'path': steer_vector_request.steer_vector_local_path,
                 'scale': steer_vector_request.scale,
                 'algorithm': steer_vector_request.algorithm,
@@ -527,7 +595,7 @@ def create_steer_vector():
             }
         }
         
-        logger.info(f"Created steer vector: {steer_vector_request.steer_vector_name} (ID: {steer_vector_request.steer_vector_id})")
+        logger.info(f"Created steer vector: {steer_vector_request.steer_vector_name} (ID: {steer_vector_request.steer_vector_int_id})")
         
         return jsonify(response), 200
         
@@ -536,18 +604,18 @@ def create_steer_vector():
         lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
         return jsonify({'error': get_message('server_error', lang, error=str(e))}), 500
 
-@inference_bp.route('/api/steer-vector/<int:steer_vector_id>', methods=['GET'])
-def get_steer_vector(steer_vector_id):
+@inference_bp.route('/api/steer-vector/<int:steer_vector_int_id>', methods=['GET'])
+def get_steer_vector(steer_vector_int_id):
     """Get a specific Steer Vector configuration"""
     lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
     
-    if steer_vector_id in active_steer_vectors:
-        sv = active_steer_vectors[steer_vector_id]
+    if steer_vector_int_id in active_steer_vectors:
+        sv = active_steer_vectors[steer_vector_int_id]
         return jsonify({
             'success': True,
             'config': {
                 'name': sv.steer_vector_name,
-                'id': sv.steer_vector_id,
+                'id': sv.steer_vector_int_id,
                 'path': sv.steer_vector_local_path,
                 'scale': sv.scale,
                 'algorithm': sv.algorithm,
@@ -559,7 +627,7 @@ def get_steer_vector(steer_vector_id):
             }
         }), 200
     else:
-        return jsonify({'error': get_message('not_found', lang, id=steer_vector_id)}), 404
+        return jsonify({'error': get_message('not_found', lang, id=steer_vector_int_id)}), 404
 
 @inference_bp.route('/api/steer-vectors', methods=['GET'])
 def list_steer_vectors():
@@ -567,7 +635,7 @@ def list_steer_vectors():
     vectors = []
     for sv_id, sv in active_steer_vectors.items():
         vectors.append({
-            'id': sv.steer_vector_id,
+            'id': sv.steer_vector_int_id,
             'name': sv.steer_vector_name,
             'algorithm': sv.algorithm,
             'scale': sv.scale
@@ -579,29 +647,30 @@ def list_steer_vectors():
         'steer_vectors': vectors
     }), 200
 
-@inference_bp.route('/api/steer-vector/<int:steer_vector_id>', methods=['DELETE'])
-def delete_steer_vector(steer_vector_id):
+@inference_bp.route('/api/steer-vector/<int:steer_vector_int_id>', methods=['DELETE'])
+def delete_steer_vector(steer_vector_int_id):
     """Delete a Steer Vector configuration"""
     lang = request.headers.get('Accept-Language', 'zh').split(',')[0].split('-')[0]
     
-    if steer_vector_id in active_steer_vectors:
-        sv_name = active_steer_vectors[steer_vector_id].steer_vector_name
-        del active_steer_vectors[steer_vector_id]
-        logger.info(f"Deleted steer vector: {sv_name} (ID: {steer_vector_id})")
+    if steer_vector_int_id in active_steer_vectors:
+        sv_name = active_steer_vectors[steer_vector_int_id].steer_vector_name
+        del active_steer_vectors[steer_vector_int_id]
+        logger.info(f"Deleted steer vector: {sv_name} (ID: {steer_vector_int_id})")
         return jsonify({
             'success': True,
             'message': get_message('deleted', lang, name=sv_name)
         }), 200
     else:
-        return jsonify({'error': get_message('not_found', lang, id=steer_vector_id)}), 404
+        return jsonify({'error': get_message('not_found', lang, id=steer_vector_int_id)}), 404
 
 @inference_bp.route('/api/restart', methods=['POST'])
 def restart_backend():
-    """Fully restart the backend process"""
+    """Fully restart the backend process with proper GPU memory cleanup"""
     try:
         import sys
         import threading
         import time
+        import gc
         
         logger.info("Preparing to fully restart the backend process...")
         
@@ -610,11 +679,65 @@ def restart_backend():
             time.sleep(1)  # Wait 1 second for the response to be sent
             logger.info("Restarting backend process...")
             
-            # Get current Python executable and script arguments
+            # Step 1: Clear all LLM instances from inference_api
+            logger.info("Cleaning up inference LLM instances...")
+            global llm_instances
+            for key in list(llm_instances.keys()):
+                try:
+                    logger.info(f"Deleting LLM instance: {key}")
+                    del llm_instances[key]
+                except Exception as e:
+                    logger.error(f"Failed to delete LLM instance {key}: {str(e)}")
+            llm_instances.clear()
+            
+            # Step 2: Clear LLM instances from chat_api if available
+            try:
+                from chat_api import chat_llm_instances
+                logger.info("Cleaning up chat LLM instances...")
+                for key in list(chat_llm_instances.keys()):
+                    try:
+                        logger.info(f"Deleting chat LLM instance: {key}")
+                        del chat_llm_instances[key]
+                    except Exception as e:
+                        logger.error(f"Failed to delete chat LLM instance {key}: {str(e)}")
+                chat_llm_instances.clear()
+            except ImportError:
+                logger.info("chat_api module not available, skipping chat LLM cleanup")
+            except Exception as e:
+                logger.error(f"Error cleaning up chat LLM instances: {str(e)}")
+            
+            # Step 3: Clear tokenizer cache
+            logger.info("Cleaning up tokenizer cache...")
+            global tokenizer_cache
+            tokenizer_cache.clear()
+            
+            # Step 4: Force garbage collection
+            logger.info("Running garbage collection...")
+            gc.collect()
+            
+            # Step 5: Clear GPU memory cache (if torch is available)
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    logger.info("Clearing CUDA cache...")
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    # Log GPU memory status
+                    for i in range(torch.cuda.device_count()):
+                        allocated = torch.cuda.memory_allocated(i) / 1024**3
+                        reserved = torch.cuda.memory_reserved(i) / 1024**3
+                        logger.info(f"GPU {i} - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB")
+            except ImportError:
+                logger.info("PyTorch not available, skipping CUDA cache cleanup")
+            except Exception as e:
+                logger.error(f"Error clearing CUDA cache: {str(e)}")
+            
+            # Step 6: Get current Python executable and script arguments
             python_executable = sys.executable
             script_args = sys.argv
             
-            # Use os.execv to restart the process
+            # Step 7: Use os.execv to restart the process
+            logger.info("Executing process restart...")
             import os
             os.execv(python_executable, [python_executable] + script_args)
         
@@ -625,7 +748,7 @@ def restart_backend():
         
         return jsonify({
             "success": True,
-            "message": "Backend is restarting, please try again in a few seconds..."
+            "message": "Backend is restarting and cleaning up GPU memory, please try again in a few seconds..."
         })
     
     except Exception as e:
