@@ -8,8 +8,8 @@ import numpy as np
 from datetime import datetime
 from safetensors.torch import save_file
 
-# Import vllm related modules (using pip-installed vllm)
-from vllm import LLM
+# Import core modules for unified management
+from core import llm_manager, resource_manager
 
 # Temporarily add project root to Python path for local modules only
 def import_local_modules():
@@ -122,16 +122,16 @@ def run_extraction(config):
         # Set vllm environment variables
         os.environ["VLLM_USE_V1"] = "0"
         
-        # Load vllm model
+        # Load vllm model using unified LLM manager
         update_extraction_status("Loading VLLM model...")
         model_path = config['model_path']
+        gpu_devices = config.get('gpu_devices', '0')
         
-        # Calculate tensor_parallel_size
-        gpu_count = len(config.get('gpu_devices', '0').split(','))
-        
-        llm = LLM(
-            model=model_path,
-            tensor_parallel_size=gpu_count,
+        # Use LLM manager with extraction-specific configuration
+        # Note: enable_steer_vector defaults to False (extraction doesn't need steering)
+        llm = llm_manager.get_or_create_llm(
+            model_path=model_path,
+            gpu_devices=gpu_devices,
             enforce_eager=True,
             enable_chunked_prefill=False,  # Hidden states extraction doesn't support chunked prefill yet
             enable_prefix_caching=False    # Hidden states extraction doesn't support prefix caching yet
@@ -305,37 +305,15 @@ def get_extract_config(config_name):
 
 @extraction_bp.route('/api/extract-restart', methods=['POST'])
 def restart_extraction_backend():
-    """Fully restart the extraction backend process"""
-    try:
-        import sys
-        import threading
-        import time
-        
-        update_extraction_status("Preparing to fully restart the backend process...")
-        
-        def delayed_restart():
-            """Delayed restart to allow response to be sent"""
-            time.sleep(1)  # Wait 1 second for the response to be sent
-            update_extraction_status("Restarting backend process...")
-            
-            # Get current Python executable and script arguments
-            python_executable = sys.executable
-            script_args = sys.argv
-            
-            # Use os.execv to restart the process
-            import os
-            os.execv(python_executable, [python_executable] + script_args)
-        
-        # Execute restart in a new thread to avoid blocking the response
-        restart_thread = threading.Thread(target=delayed_restart)
-        restart_thread.daemon = True
-        restart_thread.start()
-        
-        return jsonify({
-            "success": True,
-            "message": "Backend is restarting, please try again in a few seconds..."
-        })
+    """
+    Fully restart the extraction backend process with proper GPU memory cleanup.
     
+    This endpoint uses the unified ResourceManager for cleanup and restart.
+    """
+    try:
+        update_extraction_status("Preparing to fully restart the backend process...")
+        result = resource_manager.restart_backend(delay=1.0)
+        return jsonify(result)
     except Exception as e:
         update_extraction_status(f"Failed to restart backend: {str(e)}", is_error=True)
         return jsonify({

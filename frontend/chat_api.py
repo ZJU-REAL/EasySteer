@@ -11,57 +11,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import vllm related modules
-from vllm import LLM, SamplingParams
+from vllm import SamplingParams
 from vllm.steer_vectors.request import SteerVectorRequest
+
+# Import core modules for unified management
+from core import (
+    generate_unique_id,
+    generate_unique_name,
+    llm_manager,
+    prompt_formatter,
+    SteerRequestBuilder
+)
 
 # Create blueprint
 chat_bp = Blueprint('chat', __name__)
 
-# Import the shared ID generation functions from inference_api
-# This ensures all APIs use the same counter and avoid ID collisions
-import sys
-import os
-# Add the frontend directory to the path if not already there
-frontend_dir = os.path.dirname(os.path.abspath(__file__))
-if frontend_dir not in sys.path:
-    sys.path.insert(0, frontend_dir)
-
-# Try to import from inference_api, if it fails, define locally
-try:
-    from inference_api import generate_unique_id, generate_unique_name
-    logger.info("Successfully imported shared ID generation functions from inference_api")
-except ImportError:
-    logger.warning("Could not import from inference_api, defining local ID generation functions")
-    # Fallback: define local functions
-    _chat_id_counter = 1  # Start from 1 (not 0)
-    
-    def generate_unique_id():
-        """
-        Generate a unique positive integer ID using a simple global counter.
-        
-        Returns:
-            int: A unique positive integer ID (1 to 2,147,483,647)
-        """
-        global _chat_id_counter
-        
-        # Get current ID and increment
-        unique_id = _chat_id_counter
-        _chat_id_counter += 1
-        
-        # Safety check: wrap around if we exceed int32 max
-        if _chat_id_counter > 2147483647:
-            logger.warning("Chat ID counter reached int32 limit, wrapping around to 1")
-            _chat_id_counter = 1
-        
-        return unique_id
-    
-    def generate_unique_name(prefix="steer_vector"):
-        """Generate a unique name based on current timestamp"""
-        timestamp = int(time.time() * 1000000)  # Use microseconds for more precision
-        return f"{prefix}_{timestamp}"
-
-# Store LLM instances (to avoid reloading)
-chat_llm_instances = {}
+# Keep backward compatibility: create reference to LLM manager's internal cache
+# This will be accessed by resource_manager for cleanup
+chat_llm_instances = llm_manager._instances  # Reference to LLM manager's internal cache
 
 # Placeholder for models/vectors/etc.
 presets = {
@@ -107,70 +74,26 @@ def load_preset_configs():
             logger.error(f"Failed to load config file {config_path_str} for preset {preset_name}: {str(e)}")
 
 def get_or_create_llm(model_path, gpu_devices="0"):
-    """Get or create an LLM instance"""
-    # Create a unique key
-    key = f"{model_path}_{gpu_devices}"
+    """
+    Get or create an LLM instance (wrapper for backward compatibility).
     
-    if key not in chat_llm_instances:
-        try:
-            # Set GPU devices environment variable
-            os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
-            
-            # Calculate tensor_parallel_size
-            gpu_count = len(gpu_devices.split(','))
-            
-            # Create LLM instance following the new vLLM API pattern
-            # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-            # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
-            # enable_chunked_prefill=False: To avoid potential issues with steering
-            chat_llm_instances[key] = LLM(
-                model=model_path,
-                enable_steer_vector=True,
-                enforce_eager=True,
-                tensor_parallel_size=gpu_count,
-                enable_chunked_prefill=False
-            )
-            logger.info(f"Created LLM instance for chat model: {model_path}")
-        except Exception as e:
-            logger.error(f"Failed to create LLM instance: {str(e)}")
-            raise e
-    
-    return chat_llm_instances[key]
+    This function wraps the core LLMManager to maintain API compatibility.
+    """
+    return llm_manager.get_or_create_llm(
+        model_path=model_path,
+        gpu_devices=gpu_devices,
+        enable_steer_vector=True,
+        enforce_eager=True,
+        enable_chunked_prefill=False
+    )
 
 def get_model_prompt(model_path, message, history=None):
-    """Generate appropriate prompt based on model type and include conversation history"""
-    model_path_lower = model_path.lower()
-    prompt = ""
+    """
+    Generate appropriate prompt based on model type and include conversation history.
     
-    # 处理历史对话
-    if history and len(history) > 0:
-        for turn in history:
-            if "gemma" in model_path_lower:
-                if turn.get("role") == "user":
-                    prompt += f"<start_of_turn>user\n{turn.get('content')}<end_of_turn>\n"
-                else:
-                    prompt += f"<start_of_turn>model\n{turn.get('content')}<end_of_turn>\n"
-            elif "qwen" in model_path_lower:
-                if turn.get("role") == "user":
-                    prompt += f"<|im_start|>user\n{turn.get('content')}<|im_end|>\n"
-                else:
-                    prompt += f"<|im_start|>assistant\n{turn.get('content')}<|im_end|>\n"
-            else:
-                # 通用格式
-                if turn.get("role") == "user":
-                    prompt += f"User: {turn.get('content')}\n"
-                else:
-                    prompt += f"Assistant: {turn.get('content')}\n"
-    
-    # 添加当前消息
-    if "gemma" in model_path_lower:
-        prompt += f"<start_of_turn>user\n{message}<end_of_turn>\n<start_of_turn>model"
-    elif "qwen" in model_path_lower:
-        prompt += f"<|im_start|>user\n{message}<|im_end|>\n<|im_start|>assistant"
-    else:
-        prompt += f"User: {message}\nAssistant:"
-    
-    return prompt
+    This function wraps the core PromptFormatter to maintain API compatibility.
+    """
+    return prompt_formatter.format_multi_turn(model_path, message, history)
 
 @chat_bp.route('/api/chat', methods=['POST'])
 def chat():
@@ -236,36 +159,21 @@ def chat():
             repetition_penalty=repetition_penalty
         )
         
-        # Generate unique IDs and names for this chat request
-        baseline_id = generate_unique_id()
-        baseline_name = generate_unique_name("chat_baseline")
-        steer_id = generate_unique_id()
-        steer_name = generate_unique_name(f"chat_{preset}")
-        
-        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
-        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} for preset: {preset}")
-        
-        # Create baseline (non-steered) request with scale=0
-        baseline_request = SteerVectorRequest(
-            steer_vector_name=baseline_name,
-            steer_vector_int_id=baseline_id,
-            steer_vector_local_path=config["vector_path"],  # We still need a valid path
-            scale=0.0,  # Zero scale = no steering
-            target_layers=[0],
-            algorithm="direct"  # Simple algorithm for baseline
+        # Create baseline (non-steered) request using builder
+        baseline_request = SteerRequestBuilder.build_baseline_request(
+            vector_path=config["vector_path"]
         )
         
-        # Create the actual steering vector request with unique ID and name
-        steer_vector_request = SteerVectorRequest(
-            steer_vector_name=steer_name,
-            steer_vector_int_id=steer_id,
-            steer_vector_local_path=config["vector_path"],
+        # Create the actual steering vector request using builder
+        steer_vector_request = SteerRequestBuilder.build_single_vector_request(
+            vector_path=config["vector_path"],
             scale=config["scale"],
             target_layers=config["target_layers"],
+            algorithm=config["algorithm"],
+            steer_name=f"chat_{preset}",
             prefill_trigger_tokens=config.get("prefill_trigger_token_ids"),
             generate_trigger_tokens=config.get("generate_trigger_token_ids"),
-            algorithm=config["algorithm"],
-            normalize=config.get("normalize", False)  # Pass the normalize parameter
+            normalize=config.get("normalize", False)
         )
         
         try:

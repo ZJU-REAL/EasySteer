@@ -3,13 +3,22 @@ import os
 import sys
 import logging
 import json
-from transformers import AutoTokenizer
 import re
 import time
 
 # Import vllm related modules (using pip-installed vllm)
-from vllm import LLM, SamplingParams
+from vllm import SamplingParams
 from vllm.steer_vectors.request import SteerVectorRequest
+
+# Import core modules for unified management
+from core import (
+    generate_unique_id, 
+    generate_unique_name, 
+    llm_manager, 
+    resource_manager,
+    prompt_formatter,
+    SteerRequestBuilder
+)
 
 # Create a blueprint for inference-related endpoints
 inference_bp = Blueprint('inference', __name__)
@@ -17,51 +26,13 @@ inference_bp = Blueprint('inference', __name__)
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Global shared counter to ensure uniqueness across all APIs
-# This counter is incremented atomically to prevent ID collisions
-# between inference_api and chat_api
-# Note: Starts at 1 (not 0) as some systems require positive non-zero IDs
-# Max value: 2,147,483,647 (int32 limit for vLLM)
-_global_id_counter = 1
-
-def generate_unique_id():
-    """
-    Generate a unique positive integer ID using a simple global counter.
-    
-    Returns:
-        int: A unique positive integer ID (1 to 2,147,483,647)
-        
-    Note:
-        - IDs start from 1 (not 0) as required by vLLM steer vectors
-        - Counter resets on process restart
-        - For production use with persistence, consider adding a database-backed counter
-    """
-    global _global_id_counter
-    
-    # Get current ID and increment
-    unique_id = _global_id_counter
-    _global_id_counter += 1
-    
-    # Safety check: wrap around if we exceed int32 max (very unlikely in practice)
-    if _global_id_counter > 2147483647:
-        logger.warning("Global ID counter reached int32 limit, wrapping around to 1")
-        _global_id_counter = 1
-    
-    return unique_id
-
-def generate_unique_name(prefix="steer_vector"):
-    """Generate a unique name based on current timestamp"""
-    timestamp = int(time.time() * 1000000)  # Use microseconds for more precision
-    return f"{prefix}_{timestamp}"
-
 # Store active steer vector configurations
 active_steer_vectors = {}
 
-# Store LLM instances (to avoid reloading)
-llm_instances = {}
-
-# Store tokenizers (to avoid reloading)
-tokenizer_cache = {}
+# Keep backward compatibility: create references to old global variables
+# These will be accessed by resource_manager for cleanup
+llm_instances = llm_manager._instances  # Reference to LLM manager's internal cache
+tokenizer_cache = prompt_formatter._tokenizer_cache  # Reference to prompt formatter's cache
 
 def get_message(key, lang='zh', **kwargs):
     """Get a message in the specified language"""
@@ -92,95 +63,26 @@ def get_message(key, lang='zh', **kwargs):
     return message.format(**kwargs)
 
 def get_or_create_llm(model_path, gpu_devices):
-    """Get or create an LLM instance"""
-    # Create a unique key
-    key = f"{model_path}_{gpu_devices}"
+    """
+    Get or create an LLM instance (wrapper for backward compatibility).
     
-    if key not in llm_instances:
-        try:
-            # Set GPU devices environment variable
-            os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
-            
-            # Calculate tensor_parallel_size
-            gpu_count = len(gpu_devices.split(','))
-            
-            # Create LLM instance following the new vLLM API pattern
-            # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-            # enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
-            # enable_chunked_prefill=False: To avoid potential issues with steering
-            llm_instances[key] = LLM(
-                model=model_path,
-                enable_steer_vector=True,
-                enforce_eager=True,
-                tensor_parallel_size=gpu_count,
-                enable_chunked_prefill=False
-            )
-            logger.info(f"Created LLM instance for model: {model_path}")
-        except Exception as e:
-            logger.error(f"Failed to create LLM instance: {str(e)}")
-            raise e
-    
-    return llm_instances[key]
+    This function wraps the core LLMManager to maintain API compatibility.
+    """
+    return llm_manager.get_or_create_llm(
+        model_path=model_path,
+        gpu_devices=gpu_devices,
+        enable_steer_vector=True,
+        enforce_eager=True,
+        enable_chunked_prefill=False
+    )
 
 def get_model_prompt(model_path, instruction):
-    """Generate appropriate prompt based on model type"""
-    # Check if model path contains any identifiers to determine model type
-    model_path_lower = model_path.lower()
+    """
+    Generate appropriate prompt based on model type (wrapper for backward compatibility).
     
-    # Get or create tokenizer
-    if model_path not in tokenizer_cache:
-        try:
-            tokenizer_cache[model_path] = AutoTokenizer.from_pretrained(model_path)
-            logger.info(f"Loaded tokenizer for model: {model_path}")
-        except Exception as e:
-            logger.warning(f"Failed to load tokenizer for {model_path}, using fallback template: {str(e)}")
-            # If tokenizer loading fails, we'll use fallback templates
-            tokenizer_cache[model_path] = None
-    
-    tokenizer = tokenizer_cache[model_path]
-    
-    # For Gemma models, use apply_chat_template
-    if 'gemma' in model_path_lower:
-        if tokenizer:
-            messages = [
-                {"role": "user", "content": instruction}
-            ]
-            try:
-                return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            except Exception as e:
-                logger.warning(f"Failed to apply Gemma chat template: {str(e)}")
-                # Fallback for Gemma models
-                return f"<start_of_turn>user\n{instruction}<end_of_turn>\n<start_of_turn>model\n"
-        else:
-            # Fallback for Gemma models without tokenizer
-            return f"<start_of_turn>user\n{instruction}<end_of_turn>\n<start_of_turn>model\n"
-    
-    # For Qwen models
-    elif 'qwen' in model_path_lower:
-        return f"<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n"
-    
-    # For Llama models
-    elif 'llama' in model_path_lower:
-        return f"<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n"
-    
-    # For Mistral models
-    elif 'mistral' in model_path_lower:
-        return f"[INST] {instruction} [/INST]"
-    
-    # Default fallback (generic chat template)
-    else:
-        if tokenizer and hasattr(tokenizer, 'apply_chat_template'):
-            messages = [
-                {"role": "user", "content": instruction}
-            ]
-            try:
-                return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            except:
-                # Last resort fallback
-                return f"User: {instruction}\nAssistant:"
-        else:
-            # Simple fallback for unknown models
-            return f"User: {instruction}\nAssistant:"
+    This function wraps the core PromptFormatter to maintain API compatibility.
+    """
+    return prompt_formatter.format_single_turn(model_path, instruction)
 
 @inference_bp.route('/api/generate', methods=['POST'])
 def generate():
@@ -214,37 +116,22 @@ def generate():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
-        # Generate unique IDs and names for this request
-        baseline_id = generate_unique_id()
-        baseline_name = generate_unique_name("baseline")
-        steer_id = generate_unique_id()
-        steer_name = generate_unique_name(data.get('steer_vector_name', 'steer_vector'))
-        
-        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
-        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} (user provided: {data.get('steer_vector_name')}, {data.get('steer_vector_int_id')})")
-        
-        # Create baseline (non-steered) request with scale=0
-        baseline_request = SteerVectorRequest(
-            steer_vector_name=baseline_name,
-            steer_vector_int_id=baseline_id,
-            steer_vector_local_path=data['steer_vector_local_path'],  # Use the same path as the steer vector
-            scale=0.0,  # Zero scale = no steering
-            target_layers=[0],
-            algorithm="direct"  # Simple algorithm for baseline
+        # Create baseline (non-steered) request using builder
+        baseline_request = SteerRequestBuilder.build_baseline_request(
+            vector_path=data['steer_vector_local_path']
         )
         
-        # Create the actual steering vector request with unique ID and name
-        steer_vector_request = SteerVectorRequest(
-            steer_vector_name=steer_name,
-            steer_vector_int_id=steer_id,
-            steer_vector_local_path=data['steer_vector_local_path'],
+        # Create the actual steering vector request using builder
+        steer_vector_request = SteerRequestBuilder.build_single_vector_request(
+            vector_path=data['steer_vector_local_path'],
             scale=data.get('scale', 1.0),
             target_layers=data.get('target_layers'),
+            algorithm=data.get('algorithm', 'direct'),
+            steer_name=data.get('steer_vector_name'),
             prefill_trigger_tokens=data.get('prefill_trigger_tokens'),
             prefill_trigger_positions=data.get('prefill_trigger_positions'),
             generate_trigger_tokens=data.get('generate_trigger_tokens'),
-            debug=data.get('debug', False),
-            algorithm=data.get('algorithm', 'direct')
+            debug=data.get('debug', False)
         )
         
         try:
@@ -328,76 +215,21 @@ def generate_multi():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
-        # Generate unique IDs and names for this request
-        baseline_id = generate_unique_id()
-        baseline_name = generate_unique_name("baseline_multi")
-        steer_id = generate_unique_id()
-        steer_name = generate_unique_name(data.get('steer_vector_name', 'multi_vector'))
-        
-        logger.info(f"Generated unique baseline ID: {baseline_id}, name: {baseline_name}")
-        logger.info(f"Generated unique steer ID: {steer_id}, name: {steer_name} (user provided: {data.get('steer_vector_name')}, {data.get('steer_vector_int_id')})")
-        
         # Get the first vector path for baseline
         first_vector_path = data['vector_configs'][0]['path'] if data['vector_configs'] else "/dummy/path.gguf"
         
-        # Create baseline (non-steered) request with scale=0
-        baseline_request = SteerVectorRequest(
-            steer_vector_name=baseline_name,
-            steer_vector_int_id=baseline_id,
-            steer_vector_local_path=first_vector_path,  # Use the first vector path
-            scale=0.0,  # Zero scale = no steering
-            target_layers=[0],
-            algorithm="direct"  # Simple algorithm for baseline
+        # Create baseline (non-steered) request using builder
+        baseline_request = SteerRequestBuilder.build_baseline_request(
+            vector_path=first_vector_path
         )
         
-        # Create multi-vector steer request
-        vector_configs = []
-        for i, vec_config in enumerate(data['vector_configs']):
-            # Validate required fields
-            if 'path' not in vec_config or not vec_config['path']:
-                return jsonify({'error': f'Vector config {i+1} is missing path field'}), 400
-                
-            # Create VectorConfig object
-            from vllm.steer_vectors.request import VectorConfig
-            vector_config = VectorConfig(
-                path=vec_config['path'],
-                scale=vec_config.get('scale', 1.0),
-                target_layers=vec_config.get('target_layers'),
-                prefill_trigger_positions=vec_config.get('prefill_trigger_positions', [-1]),
-                prefill_trigger_tokens=vec_config.get('prefill_trigger_tokens', [-1]),  # 添加这个重要参数
-                generate_trigger_tokens=vec_config.get('generate_trigger_tokens', [-1]),  # 添加这个重要参数
-                algorithm=vec_config.get('algorithm', 'direct'),
-                normalize=vec_config.get('normalize', False)
-            )
-            vector_configs.append(vector_config)
-        
-        # Create the multi-vector steering request with unique ID and name
-        steer_vector_request = SteerVectorRequest(
-            steer_vector_name=steer_name,
-            steer_vector_int_id=steer_id,
-            vector_configs=vector_configs,
-            debug=data.get('debug', False),
-            conflict_resolution=data.get('conflict_resolution', 'sequential')
+        # Create multi-vector steer request using builder
+        steer_vector_request = SteerRequestBuilder.build_multi_vector_request(
+            vector_configs=data['vector_configs'],
+            conflict_resolution=data.get('conflict_resolution', 'sequential'),
+            steer_name=data.get('steer_vector_name'),
+            debug=data.get('debug', False)
         )
-        
-        # 记录详细的向量配置信息，用于调试
-        logger.info(f"Multi-vector request details:")
-        logger.info(f"- Model path: {data['model_path']}")
-        logger.info(f"- Vector name: {data['steer_vector_name']}")
-        logger.info(f"- Vector ID: {data['steer_vector_int_id']}")
-        logger.info(f"- Conflict resolution: {data.get('conflict_resolution', 'sequential')}")
-        logger.info(f"- Number of vectors: {len(vector_configs)}")
-        
-        for i, vec_config in enumerate(vector_configs):
-            logger.info(f"Vector {i+1} details:")
-            logger.info(f"- Path: {vec_config.path}")
-            logger.info(f"- Scale: {vec_config.scale}")
-            logger.info(f"- Algorithm: {vec_config.algorithm}")
-            logger.info(f"- Target layers: {vec_config.target_layers}")
-            logger.info(f"- Prefill trigger tokens: {vec_config.prefill_trigger_tokens}")
-            logger.info(f"- Prefill trigger positions: {vec_config.prefill_trigger_positions}")
-            logger.info(f"- Generate trigger tokens: {vec_config.generate_trigger_tokens}")
-            logger.info(f"- Normalize: {vec_config.normalize}")
         
         try:
             # First, generate baseline (non-steered) output
@@ -665,92 +497,14 @@ def delete_steer_vector(steer_vector_int_id):
 
 @inference_bp.route('/api/restart', methods=['POST'])
 def restart_backend():
-    """Fully restart the backend process with proper GPU memory cleanup"""
-    try:
-        import sys
-        import threading
-        import time
-        import gc
-        
-        logger.info("Preparing to fully restart the backend process...")
-        
-        def delayed_restart():
-            """Delayed restart to allow response to be sent"""
-            time.sleep(1)  # Wait 1 second for the response to be sent
-            logger.info("Restarting backend process...")
-            
-            # Step 1: Clear all LLM instances from inference_api
-            logger.info("Cleaning up inference LLM instances...")
-            global llm_instances
-            for key in list(llm_instances.keys()):
-                try:
-                    logger.info(f"Deleting LLM instance: {key}")
-                    del llm_instances[key]
-                except Exception as e:
-                    logger.error(f"Failed to delete LLM instance {key}: {str(e)}")
-            llm_instances.clear()
-            
-            # Step 2: Clear LLM instances from chat_api if available
-            try:
-                from chat_api import chat_llm_instances
-                logger.info("Cleaning up chat LLM instances...")
-                for key in list(chat_llm_instances.keys()):
-                    try:
-                        logger.info(f"Deleting chat LLM instance: {key}")
-                        del chat_llm_instances[key]
-                    except Exception as e:
-                        logger.error(f"Failed to delete chat LLM instance {key}: {str(e)}")
-                chat_llm_instances.clear()
-            except ImportError:
-                logger.info("chat_api module not available, skipping chat LLM cleanup")
-            except Exception as e:
-                logger.error(f"Error cleaning up chat LLM instances: {str(e)}")
-            
-            # Step 3: Clear tokenizer cache
-            logger.info("Cleaning up tokenizer cache...")
-            global tokenizer_cache
-            tokenizer_cache.clear()
-            
-            # Step 4: Force garbage collection
-            logger.info("Running garbage collection...")
-            gc.collect()
-            
-            # Step 5: Clear GPU memory cache (if torch is available)
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    logger.info("Clearing CUDA cache...")
-                    torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
-                    # Log GPU memory status
-                    for i in range(torch.cuda.device_count()):
-                        allocated = torch.cuda.memory_allocated(i) / 1024**3
-                        reserved = torch.cuda.memory_reserved(i) / 1024**3
-                        logger.info(f"GPU {i} - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB")
-            except ImportError:
-                logger.info("PyTorch not available, skipping CUDA cache cleanup")
-            except Exception as e:
-                logger.error(f"Error clearing CUDA cache: {str(e)}")
-            
-            # Step 6: Get current Python executable and script arguments
-            python_executable = sys.executable
-            script_args = sys.argv
-            
-            # Step 7: Use os.execv to restart the process
-            logger.info("Executing process restart...")
-            import os
-            os.execv(python_executable, [python_executable] + script_args)
-        
-        # Execute restart in a new thread to avoid blocking the response
-        restart_thread = threading.Thread(target=delayed_restart)
-        restart_thread.daemon = True
-        restart_thread.start()
-        
-        return jsonify({
-            "success": True,
-            "message": "Backend is restarting and cleaning up GPU memory, please try again in a few seconds..."
-        })
+    """
+    Fully restart the backend process with proper GPU memory cleanup.
     
+    This endpoint uses the unified ResourceManager for cleanup and restart.
+    """
+    try:
+        result = resource_manager.restart_backend(delay=1.0)
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Failed to restart backend: {str(e)}")
         return jsonify({
