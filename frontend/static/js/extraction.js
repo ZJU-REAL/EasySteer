@@ -231,7 +231,7 @@ export async function startExtraction() {
 
     try {
         // Send request to backend
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/extract`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/extract');
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -292,7 +292,7 @@ function stopExtractionStatusPolling() {
 // Update extraction status
 async function updateExtractionStatus() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/extract-status`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/extract-status'));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -419,7 +419,7 @@ export function resetExtractForm() {
 // Dynamically load extraction configuration options
 export async function loadExtractConfigOptions() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/extract-configs`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/extract-configs'));
         if (response.ok) {
             const data = await response.json();
             const extractConfigSelect = document.getElementById('extractConfigSelect');
@@ -456,7 +456,7 @@ export async function importSelectedExtractConfig() {
         showExtractResponse({ message: window.t('importing_extract_config', { configName: extractConfigSelect.options[extractConfigSelect.selectedIndex].text }) });
         
         // Get extraction config file from the backend
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/extract-config/${selectedConfig}`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl(`/api/extract-config/${selectedConfig}`));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

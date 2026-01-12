@@ -44,7 +44,7 @@ export function initChat() {
  */
 async function loadPresets() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/chat/presets`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/chat/presets'));
         const data = await response.json();
         
         if (data.success && data.presets) {
@@ -192,7 +192,7 @@ export async function sendChatMessage() {
             };
             
             // 调用API获取响应
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/chat`, {
+            const response = await fetch(window.EasySteerConfig.getApiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

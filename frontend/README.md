@@ -33,6 +33,8 @@ EasySteer 是一个美观易用的前端界面，用于配置和管理 VLLM 的 
 
 ## 快速开始
 
+> **注意**: EasySteer 仅支持在 Linux 和 macOS 系统上运行，不支持 Windows。
+
 ### 1. 安装依赖
 
 ```bash
@@ -45,27 +47,34 @@ pip install -r requirements.txt
 pip install vllm
 ```
 
-### 2. 启动后端服务器
+### 2. 使用启动脚本（推荐）
+
+最简单的方式是使用提供的启动脚本：
 
 ```bash
+chmod +x start.sh
+./start.sh
+```
+
+启动脚本会自动：
+- 检查并安装依赖
+- 启动后端服务器（默认端口 5000）
+- 启动前端静态服务器（默认端口 8111）
+- 自动打开浏览器
+
+### 3. 手动启动（可选）
+
+如果需要手动启动，可以分别运行：
+
+```bash
+# 终端1: 启动后端服务器
 python app.py
+
+# 终端2: 启动前端服务器
+python -m http.server 8111
 ```
 
-服务器将在 `http://localhost:5000` 启动
-
-### 3. 打开前端界面
-
-在浏览器中打开 `frontend/index.html` 文件，或使用本地服务器：
-
-```bash
-# 使用 Python 内置服务器
-python -m http.server 8000
-
-# 或使用 Node.js 的 http-server
-npx http-server
-```
-
-然后访问 `http://localhost:8000/frontend/`
+然后在浏览器中访问 `http://localhost:8111/index.html`
 
 ## 使用说明
 
@@ -123,6 +132,13 @@ npx http-server
 
 点击"Import"按钮可以快速加载预定义配置，然后根据需要进行调整。
 
+## 系统要求
+
+- **操作系统**: Linux 或 macOS
+- **Python**: 3.8+
+- **CUDA**: 推荐 CUDA 11.8+（用于 GPU 加速）
+- **注意**: 本项目不支持在 Windows 上部署
+
 ## 文件结构
 
 ```
@@ -133,8 +149,9 @@ frontend/
 ├── i18n.js         # 多语言支持
 ├── app.py          # Flask 后端服务器（包含 VLLM 集成）
 ├── requirements.txt # Python 依赖
-├── start.bat       # Windows 启动脚本
-├── start.sh        # Linux/Mac 启动脚本
+├── start.sh        # Linux/macOS 启动脚本
+├── config.py       # 后端配置文件
+├── core/           # 核心模块
 └── README.md       # 本文档
 ```
 

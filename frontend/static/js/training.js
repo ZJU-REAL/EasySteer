@@ -214,7 +214,7 @@ export async function startTraining() {
 
     try {
         // Send request to the backend
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/train`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/train');
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -275,7 +275,7 @@ function stopTrainingStatusPolling() {
 // Update training status
 async function updateTrainingStatus() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/train-status`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/train-status'));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -410,7 +410,7 @@ export function resetTrainForm() {
 // Dynamically load training configuration options
 export async function loadTrainConfigOptions() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/train-configs`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/train-configs'));
         if (response.ok) {
             const data = await response.json();
             const trainConfigSelect = document.getElementById('trainConfigSelect');
@@ -447,7 +447,7 @@ export async function importSelectedTrainConfig() {
         showTrainResponse({ message: window.t('importing_train_config', { configName: trainConfigSelect.options[trainConfigSelect.selectedIndex].text }) });
         
         // Get training config file from the backend
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/train-config/${selectedConfig}`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl(`/api/train-config/${selectedConfig}`));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

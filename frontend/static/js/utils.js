@@ -38,7 +38,7 @@ export async function restartBackend() {
     try {
         showStatus(window.t('restarting_backend'), 'info');
         
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/restart`, {
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/restart'), {
             method: 'POST'
         });
         

@@ -74,7 +74,7 @@ export async function searchSaeFeatures() {
     // Call the API
     try {
         // 使用完整的URL地址替代相对路径
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/search`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/sae/search');
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -121,7 +121,7 @@ export async function getFeatureDetailsByIndex() {
     document.getElementById('indexErrorIndicator').style.display = 'none';
     
     try {
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/feature/${modelId}/${saeId}/${featureIndex}`;
+        const apiUrl = window.EasySteerConfig.getApiUrl(`/api/sae/feature/${modelId}/${saeId}/${featureIndex}`);
         const response = await fetch(apiUrl);
         const data = await response.json();
         
@@ -196,7 +196,7 @@ window.createVectorFromFeature = async function(featureIndex) {
     
     try {
         // 调用API创建向量
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/extract-vector`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/sae/extract-vector');
         
         // 获取相应的按钮并添加加载状态
         const addButton = [...document.querySelectorAll('.btn-add-vector')].find(btn => 
@@ -312,7 +312,7 @@ window.createVectorFromFeatureIndex = async function() {
         const vectorScale = 1.0;
         
         // 1. 首先调用API生成和保存PT文件
-        const extractApiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/extract-vector`;
+        const extractApiUrl = window.EasySteerConfig.getApiUrl('/api/sae/extract-vector');
         const extractResponse = await fetch(extractApiUrl, {
             method: 'POST',
             headers: {
@@ -336,7 +336,7 @@ window.createVectorFromFeatureIndex = async function() {
         let featureData = null;
         
         // 获取特征详情的API调用
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/feature/${document.getElementById('saeModelId').value}/${document.getElementById('saeId').value}/${featureIndex}`;
+        const apiUrl = window.EasySteerConfig.getApiUrl(`/api/sae/feature/${document.getElementById('saeModelId').value}/${document.getElementById('saeId').value}/${featureIndex}`);
         
         const response = await fetch(apiUrl);
         const data = await response.json();
@@ -665,7 +665,7 @@ window.applyVectors = async function() {
     
     try {
         // 发送请求到后端API
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/generate-multi`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/generate-multi');
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -753,7 +753,7 @@ window.getFeatureDetails = async function(modelId, saeId, featureIndex) {
     
     try {
         // 使用完整的URL地址替代相对路径
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/sae/feature/${modelId}/${saeId}/${featureIndex}`;
+        const apiUrl = window.EasySteerConfig.getApiUrl(`/api/sae/feature/${modelId}/${saeId}/${featureIndex}`);
         const response = await fetch(apiUrl);
         const data = await response.json();
         

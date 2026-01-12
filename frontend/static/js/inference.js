@@ -96,9 +96,8 @@ export async function submitConfiguration() {
     submitButton.disabled = true;
 
     try {
-        // Send request to the backend - auto-detect current host
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/generate`;
-        const response = await fetch(apiUrl, {
+        // Send request to the backend using config
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/generate'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -159,7 +158,7 @@ export function resetForm() {
 // Dynamically load configuration options
 export async function loadConfigOptions() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/configs`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/configs'));
         if (response.ok) {
             const data = await response.json();
             const configSelect = document.getElementById('configSelect');
@@ -198,7 +197,7 @@ export async function importSelectedConfig() {
         window.showStatus(window.t('importing_config', { configName: configSelect.options[configSelect.selectedIndex].text }), 'info');
         
         // Get config file from the backend
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/config/${selectedConfig}`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl(`/api/config/${selectedConfig}`));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

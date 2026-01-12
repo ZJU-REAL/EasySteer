@@ -416,7 +416,7 @@ export async function submitMultiConfiguration() {
 
     try {
         // 发送请求到后端
-        const apiUrl = `${window.location.protocol}//${window.location.hostname}:5000/api/generate-multi`;
+        const apiUrl = window.EasySteerConfig.getApiUrl('/api/generate-multi');
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -478,7 +478,7 @@ export function resetMultiForm() {
 // 加载多向量配置选项
 export async function loadMultiConfigOptions() {
     try {
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/configs`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl('/api/configs'));
         if (response.ok) {
             const data = await response.json();
             const configSelect = document.getElementById('multiConfigSelect');
@@ -517,7 +517,7 @@ export async function importSelectedMultiConfig() {
         showMultiResponse({ message: window.t('importing_config', { configName: configSelect.options[configSelect.selectedIndex].text }) });
         
         // 从后端获取配置文件
-        const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/config/${selectedConfig}`);
+        const response = await fetch(window.EasySteerConfig.getApiUrl(`/api/config/${selectedConfig}`));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

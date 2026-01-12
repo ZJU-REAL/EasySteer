@@ -5,58 +5,62 @@ echo "EasySteer - Steer Vector Control Panel"
 echo "========================================"
 echo ""
 
-# 检查Python是否安装
+# Configuration (can be overridden by environment variables)
+BACKEND_PORT=${EASYSTEER_BACKEND_PORT:-5000}
+FRONTEND_PORT=${EASYSTEER_FRONTEND_PORT:-8111}
+
+# Check if Python3 is installed
 if ! command -v python3 &> /dev/null; then
-    echo "[错误] 未检测到Python3，请先安装Python3"
+    echo "[ERROR] Python3 not detected. Please install Python3 first."
     exit 1
 fi
 
-# 安装依赖
-echo "[1/3] 检查并安装依赖..."
+# Install dependencies
+echo "[1/3] Checking and installing dependencies..."
 pip3 install -r requirements.txt
 
 echo ""
-echo "[2/3] 启动后端服务器..."
+echo "[2/3] Starting backend server..."
 python3 app.py &
 BACKEND_PID=$!
 
-# 等待服务器启动
-echo "[*] 等待服务器启动..."
+# Wait for server to start
+echo "[*] Waiting for server to start..."
 sleep 3
 
 echo ""
-echo "[3/3] 启动前端服务器..."
-python3 -m http.server 8111 &
+echo "[3/3] Starting frontend server..."
+python3 -m http.server $FRONTEND_PORT &
 FRONTEND_PID=$!
 
-# 等待前端服务器启动
+# Wait for frontend server to start
 sleep 2
 
 echo ""
 echo "========================================"
-echo "启动成功！"
+echo "Startup Complete!"
 echo ""
-echo "后端API: http://localhost:5000"
-echo "前端界面: http://localhost:8000/"
+echo "Backend API:   http://localhost:$BACKEND_PORT"
+echo "Frontend UI:   http://localhost:$FRONTEND_PORT/"
 echo ""
-echo "正在打开浏览器..."
+echo "Opening browser..."
 echo "========================================"
 
-# 根据操作系统打开浏览器
+# Open browser based on OS
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
-    open http://localhost:8000/index.html
+    open http://localhost:$FRONTEND_PORT/index.html
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Linux
-    xdg-open http://localhost:8000/index.html 2>/dev/null || \
-    sensible-browser http://localhost:8000/index.html 2>/dev/null || \
-    echo "请手动打开浏览器访问: http://localhost:8000/index.html"
+    xdg-open http://localhost:$FRONTEND_PORT/index.html 2>/dev/null || \
+    sensible-browser http://localhost:$FRONTEND_PORT/index.html 2>/dev/null || \
+    echo "Please manually open browser and visit: http://localhost:$FRONTEND_PORT/index.html"
 fi
 
 echo ""
-echo "按 Ctrl+C 停止所有服务"
+echo "Press Ctrl+C to stop all services"
 echo ""
 
-# 等待用户中断
-trap "echo '正在停止服务...'; kill $BACKEND_PID $FRONTEND_PID; exit" INT TERM
+# Wait for user interrupt
+trap "echo 'Stopping services...'; kill $BACKEND_PID $FRONTEND_PID; exit" INT TERM
 wait 
