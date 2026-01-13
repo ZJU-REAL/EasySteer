@@ -58,15 +58,15 @@ def load_preset_configs():
             with open(config_path, 'r') as f:
                 config = json.load(f)
             
-            # Store the loaded config
+            # Store the loaded config - unified field names
             preset_configs[preset_name] = {
                 "vector_path": config["vector"]["path"],
                 "scale": config["vector"]["scale"],
                 "target_layers": config["vector"]["target_layers"],
                 "algorithm": config["vector"]["algorithm"],
-                "prefill_trigger_token_ids": config["vector"]["prefill_trigger_token_ids"],
-                "generate_trigger_token_ids": config["vector"].get("generate_trigger_token_ids", None),  # Safely get this key
-                "normalize": config["vector"].get("normalize", False),  # Safely get this key, default to False
+                "prefill_trigger_tokens": config["vector"]["prefill_trigger_tokens"],
+                "generate_trigger_tokens": config["vector"].get("generate_trigger_tokens", None),
+                "normalize": config["vector"].get("normalize", False),
                 "model_path": config["model"]["path"]
             }
             logger.info(f"Successfully loaded config for preset: {preset_name} from {config_path_str}")
@@ -160,8 +160,11 @@ def chat():
         )
         
         # Create baseline (non-steered) request using builder
+        # Must use same algorithm and target_layers as the actual vector to load it correctly
         baseline_request = SteerRequestBuilder.build_baseline_request(
-            vector_path=config["vector_path"]
+            vector_path=config["vector_path"],
+            algorithm=config["algorithm"],
+            target_layers=config["target_layers"]
         )
         
         # Create the actual steering vector request using builder
@@ -171,8 +174,8 @@ def chat():
             target_layers=config["target_layers"],
             algorithm=config["algorithm"],
             steer_name=f"chat_{preset}",
-            prefill_trigger_tokens=config.get("prefill_trigger_token_ids"),
-            generate_trigger_tokens=config.get("generate_trigger_token_ids"),
+            prefill_trigger_tokens=config.get("prefill_trigger_tokens"),
+            generate_trigger_tokens=config.get("generate_trigger_tokens"),
             normalize=config.get("normalize", False)
         )
         

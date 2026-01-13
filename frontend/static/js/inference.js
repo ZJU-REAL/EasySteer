@@ -225,18 +225,15 @@ export async function importSelectedConfig() {
         document.getElementById('algorithm').value = config.steer_vector.algorithm || 'direct';
         document.getElementById('targetLayers').value = config.steer_vector.target_layers || '';
         
-        // Set trigger configuration - based on algorithm type
-        if (config.steer_vector.algorithm === 'loreft') {
-            // LoReft algorithm uses position triggers
-            document.getElementById('prefillTriggerPositions').value = config.steer_vector.prefill_positions || '';
-            document.getElementById('prefillTriggerTokens').value = '';
-            document.getElementById('generateTriggerTokens').value = '';
-        } else {
-            // Direct algorithm uses token triggers
-            document.getElementById('prefillTriggerTokens').value = config.steer_vector.prefill_trigger_tokens || '';
-            document.getElementById('generateTriggerTokens').value = config.steer_vector.generate_trigger_tokens || '';
-            document.getElementById('prefillTriggerPositions').value = '';
-        }
+        // Set trigger configuration - unified field names
+        // Support both old field names (prefill_positions) and new unified names (prefill_trigger_positions)
+        const prefillPositions = config.steer_vector.prefill_trigger_positions || config.steer_vector.prefill_positions || '';
+        const prefillTokens = config.steer_vector.prefill_trigger_tokens || '';
+        const generateTokens = config.steer_vector.generate_trigger_tokens || '';
+        
+        document.getElementById('prefillTriggerPositions').value = prefillPositions;
+        document.getElementById('prefillTriggerTokens').value = prefillTokens;
+        document.getElementById('generateTriggerTokens').value = generateTokens;
         
         showResponse({
             message: window.t('import_success_message'),

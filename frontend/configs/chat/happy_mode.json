@@ -4,8 +4,8 @@
     "scale": 2.0,
     "target_layers": [23,22,21,20,19,18,17,16,15,14,13,12,11,10],
     "algorithm": "direct",
-    "prefill_trigger_token_ids": [-1],
-    "generate_trigger_token_ids": [-1],
+    "prefill_trigger_tokens": [-1],
+    "generate_trigger_tokens": [-1],
     "normalize": false
   },
   "model": {

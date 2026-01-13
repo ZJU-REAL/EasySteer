@@ -116,17 +116,24 @@ def generate():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
+        # Get algorithm and target_layers for baseline request
+        algorithm = data.get('algorithm', 'direct')
+        target_layers = data.get('target_layers')
+        
         # Create baseline (non-steered) request using builder
+        # Must use same algorithm and target_layers as the actual vector to load it correctly
         baseline_request = SteerRequestBuilder.build_baseline_request(
-            vector_path=data['steer_vector_local_path']
+            vector_path=data['steer_vector_local_path'],
+            algorithm=algorithm,
+            target_layers=target_layers
         )
         
         # Create the actual steering vector request using builder
         steer_vector_request = SteerRequestBuilder.build_single_vector_request(
             vector_path=data['steer_vector_local_path'],
             scale=data.get('scale', 1.0),
-            target_layers=data.get('target_layers'),
-            algorithm=data.get('algorithm', 'direct'),
+            target_layers=target_layers,
+            algorithm=algorithm,
             steer_name=data.get('steer_vector_name'),
             prefill_trigger_tokens=data.get('prefill_trigger_tokens'),
             prefill_trigger_positions=data.get('prefill_trigger_positions'),
@@ -215,12 +222,18 @@ def generate_multi():
         # Format input based on model type
         prompt = get_model_prompt(data['model_path'], data['instruction'])
         
-        # Get the first vector path for baseline
-        first_vector_path = data['vector_configs'][0]['path'] if data['vector_configs'] else "/dummy/path.gguf"
+        # Get the first vector configuration for baseline
+        first_vector_config = data['vector_configs'][0] if data['vector_configs'] else {}
+        first_vector_path = first_vector_config.get('path', "/dummy/path.gguf")
+        first_algorithm = first_vector_config.get('algorithm', 'direct')
+        first_target_layers = first_vector_config.get('target_layers')
         
         # Create baseline (non-steered) request using builder
+        # Must use same algorithm and target_layers as the first vector to load it correctly
         baseline_request = SteerRequestBuilder.build_baseline_request(
-            vector_path=first_vector_path
+            vector_path=first_vector_path,
+            algorithm=first_algorithm,
+            target_layers=first_target_layers
         )
         
         # Create multi-vector steer request using builder
@@ -249,7 +262,8 @@ def generate_multi():
             steered_text = steered_output[0].outputs[0].text
             
             # 记录生成结果并返回更详细的配置信息
-            logger.info(f"Generated multi-vector text comparison with {len(vector_configs)} vectors")
+            num_vectors = len(data['vector_configs'])
+            logger.info(f"Generated multi-vector text comparison with {num_vectors} vectors")
             
             # 构建包含更详细配置信息的响应
             response = {
@@ -260,24 +274,11 @@ def generate_multi():
                 'config': {
                     'model_path': data['model_path'],
                     'steer_vector_name': steer_vector_request.steer_vector_name,
-                    'num_vectors': len(vector_configs),
+                    'num_vectors': num_vectors,
                     'conflict_resolution': data.get('conflict_resolution', 'sequential'),
-                    'vectors': [
-                        {
-                            'path': vec.path,
-                            'scale': vec.scale,
-                            'algorithm': vec.algorithm,
-                            'target_layers': vec.target_layers,
-                            'prefill_trigger_tokens': vec.prefill_trigger_tokens,
-                            'prefill_trigger_positions': vec.prefill_trigger_positions,
-                            'generate_trigger_tokens': vec.generate_trigger_tokens
-                        }
-                        for vec in vector_configs
-                    ]
+                    'vectors': data['vector_configs']
                 }
             }
-            
-            logger.info(f"Generated multi-vector text comparison with {len(vector_configs)} vectors")
             
             return jsonify(response), 200
             

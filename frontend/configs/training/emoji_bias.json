@@ -1,7 +1,7 @@
 {
   "model": {
-    "path": "/data/zju-46/shenyl/hf/model/Qwen/Qwen2.5-1.5B-Instruct/",
-    "gpu_devices": "0"
+    "path": "/home/shenyl/hf/model/Qwen/Qwen2.5-1.5B-Instruct/",
+    "gpu_devices": "2"
   },
   "training": {
     "output_dir": "./results/emoji_bias",

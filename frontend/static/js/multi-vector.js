@@ -597,24 +597,23 @@ export async function importSelectedMultiConfig() {
             document.getElementById(`${configId}-layers`).value = config.steer_vector?.target_layers || '';
             document.getElementById(`${configId}-normalize`).checked = config.steer_vector?.normalize || false;
             
-            // 设置触发器配置
-            if (config.steer_vector?.algorithm === 'loreft') {
-                document.getElementById(`${configId}-prefill-positions`).value = config.steer_vector?.prefill_positions || '-1';
-            } else {
-                document.getElementById(`${configId}-prefill-positions`).value = config.steer_vector?.prefill_trigger_positions || '-1';
-                document.getElementById(`${configId}-prefill-tokens`).value = config.steer_vector?.prefill_trigger_tokens || '';
-                document.getElementById(`${configId}-generate-tokens`).value = config.steer_vector?.generate_trigger_tokens || '';
-            }
+            // 设置触发器配置 - 统一使用 prefill_trigger_positions 字段名，向后兼容旧字段名
+            const prefillPositions = config.steer_vector?.prefill_trigger_positions || config.steer_vector?.prefill_positions || '-1';
+            const prefillTokens = config.steer_vector?.prefill_trigger_tokens || '';
+            const generateTokens = config.steer_vector?.generate_trigger_tokens || '';
+            
+            document.getElementById(`${configId}-prefill-positions`).value = prefillPositions;
+            document.getElementById(`${configId}-prefill-tokens`).value = prefillTokens;
+            document.getElementById(`${configId}-generate-tokens`).value = generateTokens;
             
             // 更新配置对象
             vConfig.path = config.steer_vector?.path || '';
             vConfig.scale = parseFloat(config.steer_vector?.scale || '1.0');
             vConfig.algorithm = config.steer_vector?.algorithm || 'direct';
             vConfig.target_layers = parseListInput(config.steer_vector?.target_layers || '');
-            vConfig.prefill_trigger_positions = parseListInput(config.steer_vector?.prefill_positions || 
-                                                         config.steer_vector?.prefill_trigger_positions || '-1');
-            vConfig.prefill_trigger_tokens = parseListInput(config.steer_vector?.prefill_trigger_tokens || '');
-            vConfig.generate_trigger_tokens = parseListInput(config.steer_vector?.generate_trigger_tokens || '');
+            vConfig.prefill_trigger_positions = parseListInput(prefillPositions);
+            vConfig.prefill_trigger_tokens = parseListInput(prefillTokens);
+            vConfig.generate_trigger_tokens = parseListInput(generateTokens);
             vConfig.normalize = config.steer_vector?.normalize || false;
             
             // 切换到新创建的标签页

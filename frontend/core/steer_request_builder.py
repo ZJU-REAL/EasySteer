@@ -25,7 +25,9 @@ class SteerRequestBuilder:
     def build_baseline_request(
         vector_path: str,
         steer_id: Optional[int] = None,
-        steer_name: Optional[str] = None
+        steer_name: Optional[str] = None,
+        algorithm: str = "direct",
+        target_layers: Optional[List[int]] = None
     ) -> SteerVectorRequest:
         """
         Build a baseline (non-steered) request with scale=0.
@@ -34,27 +36,32 @@ class SteerRequestBuilder:
             vector_path: Path to a valid vector file (still required even though scale=0)
             steer_id: Optional custom ID (auto-generated if not provided)
             steer_name: Optional custom name (auto-generated if not provided)
+            algorithm: Algorithm to use (must match the vector file type, default: "direct")
+            target_layers: Target layers (must match the vector configuration, default: [0])
             
         Returns:
             SteerVectorRequest: A baseline request with zero steering
             
         Examples:
             >>> request = SteerRequestBuilder.build_baseline_request("/path/to/vector.safetensors")
+            >>> request = SteerRequestBuilder.build_baseline_request("/path/to/loreft/", algorithm="loreft", target_layers=[8])
         """
         if steer_id is None:
             steer_id = generate_unique_id()
         if steer_name is None:
             steer_name = generate_unique_name("baseline")
+        if target_layers is None:
+            target_layers = [0]
         
-        logger.info(f"Building baseline request: ID={steer_id}, name={steer_name}")
+        logger.info(f"Building baseline request: ID={steer_id}, name={steer_name}, algorithm={algorithm}, layers={target_layers}")
         
         return SteerVectorRequest(
             steer_vector_name=steer_name,
             steer_vector_int_id=steer_id,
             steer_vector_local_path=vector_path,
             scale=0.0,  # Zero scale = no steering
-            target_layers=[0],
-            algorithm="direct"
+            target_layers=target_layers,
+            algorithm=algorithm
         )
     
     @staticmethod

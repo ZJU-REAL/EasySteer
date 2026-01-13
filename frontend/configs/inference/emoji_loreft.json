@@ -13,11 +13,11 @@
     "steer_vector": {
         "name": "emoji_loreft",
         "id": "1",
-        "path": "/home/xhl/my_lab/test/results/loreft/",
+        "path": "./results/emoji_loreft/",
         "scale": "1.0",
         "algorithm": "loreft",
         "target_layers": "8",
-        "prefill_positions": "-1",
-        "debug": true
+        "prefill_trigger_positions": "-1",
+        "debug": false
     }
 } 
