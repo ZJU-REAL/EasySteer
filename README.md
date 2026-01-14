@@ -8,6 +8,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
+[![Docker](https://img.shields.io/docker/v/xuhaolei/easysteer?label=docker)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 
 \[ English | [中文](README_zh.md) \]
 </div>
@@ -108,6 +109,23 @@ pip install -e . --no-build-isolation -v
 # Install EasySteer
 cd ..
 pip install -e .
+```
+
+### Docker Image
+
+If you encounter issues with the above two installation methods, we recommend using Docker directly:
+
+```bash
+# Pull the Docker image
+docker pull xuhaolei/easysteer:latest
+
+# Run container with GPU support
+# For testing, you can mount your downloaded Qwen model and run the test script
+docker run --gpus all -it \
+  -v /home/shenyl/hf/model/Qwen:/app/models/Qwen \
+  easysteer:latest
+
+python3 /app/easysteer/docker/docker_test.py
 ```
 
 
