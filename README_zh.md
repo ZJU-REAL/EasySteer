@@ -8,6 +8,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
+[![Docker](https://img.shields.io/docker/v/xuhaolei/easysteer?label=docker)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 
 \[ [English](README.md) | 中文 \]
 </div>
@@ -109,6 +110,24 @@ pip install -e . --no-build-isolation -v
 cd ..
 pip install -e .
 ```
+
+### Docker 镜像
+
+如果您在上述两种安装方法中遇到问题，我们建议您直接使用 Docker：
+
+```bash
+# 拉取 Docker 镜像
+docker pull xuhaolei/easysteer:latest
+
+# 使用 GPU 支持运行容器
+# 如需测试，您可以挂载已下载的 Qwen 模型并运行测试脚本
+docker run --gpus all -it \
+  -v /home/shenyl/hf/model/Qwen:/app/models/Qwen \
+  easysteer:latest
+
+python3 /app/easysteer/docker/docker_test.py
+```
+
 
 ### 快速示例
 
