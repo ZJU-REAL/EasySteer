@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  easysteer:
+    image: easysteer:latest
+    container_name: easysteer
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../workspace:/app/workspace
+    shm_size: '16gb'
+    stdin_open: true
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+.gitmodules
+vllm-steer/.git
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (don't include large model files)
+models/
+*.bin
+*.safetensors
+
+# Data
+data/
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+*.cache
+
+# Tests
+tests/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak
