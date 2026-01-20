@@ -13,7 +13,7 @@
 \[ English | [中文](README_zh.md) \]
 </div>
 
-👋 Join our [WeChat](figures/wechat.png) user group.
+👋 Join our [WeChat](figures/wechat.png) user group. If the QR code has expired, please contact me. (๑•̀ㅂ•́)و✧
 
 🔥 I just finished another work. I will come back to update soon.
 
