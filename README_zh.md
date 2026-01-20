@@ -13,7 +13,7 @@
 \[ [English](README.md) | 中文 \]
 </div>
 
-👋 加入我们的 [微信群](figures/wechat.png)。
+👋 加入我们的 [微信群](figures/wechat.png)。如果二维码过期了，请联系我。(๑•̀ㅂ•́)و✧
 
 🔥 我刚刚做完了另一项工作。我很快就会回来更新。
 
