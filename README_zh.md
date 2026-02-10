@@ -26,7 +26,9 @@
 - [2025/09/29] 我们发布了论文。
 - [2025/09/28] 我们开源了 EasySteer 代码，欢迎试用！
 
-## 很棒的PRs
+## 使用 EasySteer 的优秀工作与 PRs
+- [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions
+[仓库地址](https://github.com/sznnzs/LLM-Latent-Action)
 - [2025/11/23] SHARP: Steering Hallucination in LVLMs via Representation Engineering (EMNLP2025 Main)
 [复现代码](replications/sharp/)
 
