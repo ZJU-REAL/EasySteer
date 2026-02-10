@@ -26,7 +26,9 @@
 - [2025/09/29] We’ve released our paper.
 - [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
 
-## Awesome PRs
+## Awesome Work with EasySteer & PRs
+- [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions
+[Repository](https://github.com/sznnzs/LLM-Latent-Action)
 - [2025/11/23] SHARP: Steering Hallucination in LVLMs via Representation Engineering (EMNLP2025 Main)
 [Replication Code](replications/sharp/)
 
