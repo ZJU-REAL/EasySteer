@@ -170,6 +170,96 @@ print(happy_output[0].outputs[0].text)
 # I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are plenty of exciting things to do!
 ```
 
+### OpenAI 兼容 API
+
+EasySteer 支持 OpenAI 兼容的 API，可以将启用干预的模型部署为 HTTP 服务，并通过标准 OpenAI Python 客户端或 `curl` 进行交互。
+
+#### 1. 启动服务
+
+```bash
+vllm serve Qwen/Qwen2.5-1.5B-Instruct --enable-steer-vector --port 8017 --enforce-eager
+```
+
+#### 2. Python 客户端（OpenAI SDK）
+
+通过 `extra_body` 参数传递 `steer_vector_request`：
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8017/v1",
+    api_key="EMPTY",  # vLLM 不需要真实的 API key
+)
+
+# ====== Baseline（scale=0，不施加干预）======
+baseline_response = client.chat.completions.create(
+    model="Qwen/Qwen2.5-1.5B-Instruct",
+    messages=[
+        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."}
+    ],
+    max_tokens=128,
+    temperature=0.0,
+    extra_body={
+        "steer_vector_request": {
+            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
+            "scale": 0,
+            "target_layers": list(range(10, 26)),
+            "prefill_trigger_tokens": [-1],
+            "generate_trigger_tokens": [-1],
+            "normalize": True,
+        }
+    },
+)
+print("====== Baseline ======")
+print(baseline_response.choices[0].message.content)
+
+# ====== Happy Steering（scale=2.0）======
+happy_response = client.chat.completions.create(
+    model="Qwen/Qwen2.5-1.5B-Instruct",
+    messages=[
+        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."}
+    ],
+    max_tokens=128,
+    temperature=0.0,
+    extra_body={
+        "steer_vector_request": {
+            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
+            "scale": 2.0,
+            "target_layers": list(range(10, 26)),
+            "prefill_trigger_tokens": [-1],
+            "generate_trigger_tokens": [-1],
+            "normalize": True,
+        }
+    },
+)
+print("====== Happy Steering ======")
+print(happy_response.choices[0].message.content)
+```
+
+#### 3. curl
+
+```bash
+curl http://localhost:8017/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "messages": [
+      {"role": "user", "content": "Alice'\''s dog has passed away. Please comfort her."}
+    ],
+    "max_tokens": 128,
+    "temperature": 0.0,
+    "steer_vector_request": {
+      "steer_vector_local_path": "vectors/happy_diffmean.gguf",
+      "scale": 2.0,
+      "target_layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
+      "prefill_trigger_tokens": [-1],
+      "generate_trigger_tokens": [-1],
+      "normalize": true
+    }
+  }'
+```
+
 ## 模块
 
 ### vllm-steer
