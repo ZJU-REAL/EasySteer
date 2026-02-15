@@ -20,6 +20,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/02/15] We've added OpenAI-compatible API support for steering vectors
 - [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
 - [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
 - [2025/10/10] We’ve adapted EasySteer for the VLMs.
