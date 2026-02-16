@@ -9,6 +9,7 @@
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 [![Docker](https://img.shields.io/badge/docker-v0.13.0-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
+[![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Online%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 
 \[ English | [中文](README_zh.md) \]
 </div>
@@ -20,6 +21,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/02/16] We've launched an [Online Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces
 - [2026/02/15] We've added OpenAI-compatible API support for steering vectors
 - [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
 - [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
