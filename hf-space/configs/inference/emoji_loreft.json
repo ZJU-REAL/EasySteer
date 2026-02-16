@@ -1,0 +1,21 @@
+{
+    "model": {
+        "path": "/app/models/Qwen2.5-1.5B-Instruct",
+        "instruction": "Who are you?"
+    },
+    "sampling": {
+        "temperature": "0.0",
+        "max_tokens": "128",
+        "repetition_penalty": "1.1"
+    },
+    "steer_vector": {
+        "name": "emoji_loreft",
+        "id": "1",
+        "path": "results/emoji_loreft/",
+        "scale": "1.0",
+        "algorithm": "loreft",
+        "target_layers": "22",
+        "prefill_trigger_positions": "-1",
+        "debug": false
+    }
+}

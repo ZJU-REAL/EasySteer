@@ -1,0 +1,22 @@
+{
+    "model": {
+        "path": "/app/models/Qwen2.5-1.5B-Instruct",
+        "instruction": "Alice's dog has passed away. Please comfort her."
+    },
+    "sampling": {
+        "temperature": "0.0",
+        "max_tokens": "128",
+        "repetition_penalty": "1.1"
+    },
+    "steer_vector": {
+        "name": "emotion_direct",
+        "id": "1",
+        "path": "vectors/happy_diffmean.gguf",
+        "scale": "2.0",
+        "algorithm": "direct",
+        "target_layers": "23,22,21,20,19,18,17,16,15,14,13,12,11,10",
+        "prefill_trigger_tokens": "-1",
+        "generate_trigger_tokens": "-1",
+        "debug": false
+    }
+}

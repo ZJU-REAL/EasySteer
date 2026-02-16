@@ -1,0 +1,5 @@
+# 应用依赖
+# GPU 模式下 vLLM、torch、transformers 等已在基础镜像中安装
+# API 模式下仅需 gradio + openai
+gradio>=5.0.0
+openai>=1.0.0

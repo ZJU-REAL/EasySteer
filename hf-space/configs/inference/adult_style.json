@@ -1,0 +1,23 @@
+{
+    "model": {
+        "path": "/app/models/Qwen2.5-1.5B-Instruct",
+        "instruction": "What are some activities our family can do in the city this weekend?"
+    },
+    "sampling": {
+        "temperature": "0.0",
+        "max_tokens": "128",
+        "repetition_penalty": "1.1"
+    },
+    "steer_vector": {
+        "name": "adult",
+        "id": "2",
+        "path": "vectors/style-probe.gguf",
+        "scale": "1.5",
+        "algorithm": "direct",
+        "target_layers": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27",
+        "prefill_trigger_tokens": "-1",
+        "generate_trigger_tokens": "-1",
+        "normalize": true,
+        "debug": false
+    }
+}
