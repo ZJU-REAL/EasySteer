@@ -247,7 +247,7 @@ def _api_generate(prompt: str, config: Dict[str, Any], sv_dict: dict) -> str:
     sampling = config["sampling"]
     response = _api_client.chat.completions.create(
         model=API_MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "system", "content": ""}, {"role": "user", "content": prompt}],
         max_tokens=int(sampling.get("max_tokens", 128)),
         temperature=float(sampling.get("temperature", 0.0)),
         extra_body={
