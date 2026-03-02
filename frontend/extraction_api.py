@@ -6,7 +6,6 @@ import threading
 from flask import Blueprint, request, jsonify
 import numpy as np
 from datetime import datetime
-from safetensors.torch import save_file
 
 # Import core modules for unified management
 from core import llm_manager, resource_manager
@@ -119,9 +118,6 @@ def run_extraction(config):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         update_extraction_status(f"Using device: {device}")
         
-        # Set vllm environment variables
-        os.environ["VLLM_USE_V1"] = "0"
-        
         # Load vllm model using unified LLM manager
         update_extraction_status("Loading VLLM model...")
         model_path = config['model_path']
@@ -212,22 +208,9 @@ def run_extraction(config):
         output_path = config['output_path']
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        # Convert to safetensors format
+        # Export to GGUF format (required by vllm steer vector loader)
         update_extraction_status(f"Saving control vector to: {output_path}")
-        tensors = {}
-        for layer, direction in control_vector.directions.items():
-            tensors[f"layer_{layer}"] = torch.tensor(direction, dtype=torch.float32)
-        
-        # Add metadata
-        metadata = {
-            "vector_name": config.get('vector_name', 'extracted_vector'),
-            "method": method,
-            "model_type": control_vector.model_type,
-            "extraction_time": datetime.now().isoformat(),
-            **{k: str(v) for k, v in control_vector.metadata.items()}
-        }
-        
-        save_file(tensors, output_path, metadata=metadata)
+        control_vector.export_gguf(output_path)
         
         # Update status
         result = {
