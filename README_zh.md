@@ -9,24 +9,22 @@
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 [![Docker](https://img.shields.io/badge/docker-v0.13.0-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
-[![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Online%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
+[![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 
 \[ [English](README.md) | 中文 \]
 </div>
 
 👋 加入我们的 [微信群](figures/wechat.png)。如果二维码过期了，请联系我。(๑•̀ㅂ•́)و✧
 
-🔥 我刚刚做完了另一项工作。我很快就会回来更新。
-
 <a id="news"></a>
 ## 新闻 🔥
 
-- [2026/02/16] 上线 [在线 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer)（Hugging Face Spaces）
+- [2026/02/16] 我们在 Hugging Face Spaces 上发布了 [轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 供快速体验。完整版功能请参考 [Frontend](#frontend) 部分
 - [2026/02/15] 新增 OpenAI 兼容 API，支持通过 HTTP 接口使用干预向量
 - [2026/01/11] 我们已将 EasySteer 适配至 vLLM v0.13.0
-- [2025/10/31] 我们已将 EasySteer 适配至 vLLM v1 引擎。
-- [2025/10/10] 我们已适配 VLMs。
-- [2025/09/29] 我们发布了论文。
+- [2025/10/31] 我们已将 EasySteer 适配至 vLLM v1 引擎
+- [2025/10/10] 我们已适配 VLMs
+- [2025/09/29] 我们发布了论文
 - [2025/09/28] 我们开源了 EasySteer 代码，欢迎试用！
 
 ## 使用 EasySteer 的优秀工作与 PRs
