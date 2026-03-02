@@ -7,6 +7,8 @@ The frontend module provides a web interface with the following features:
 - **Extract** — Extract steering vectors from models (e.g. DiffMean, PCA)
 - **Chat** — Multi-turn chat with real-time steering interventions
 
+![EasySteer Frontend](../figures/demosys.png)
+
 ## Getting Started
 
 ```bash
