@@ -10,6 +10,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 [![Docker](https://img.shields.io/badge/docker-v0.13.0-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
+[![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
 
 \[ English | [中文](README_zh.md) \]
 </div>
