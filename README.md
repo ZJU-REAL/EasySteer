@@ -48,7 +48,7 @@
 
 Built on vLLM, EasySteer is a unified framework for high-performance LLM steering. EasySteer is fast, flexible and easy to use with:
 
-- **High Performance**: 5.5-11.4× faster than existing frameworks through vLLM integration
+- **High Performance**: 10.8-22.3× faster than existing frameworks through vLLM integration
 - **Modular Design**: Pluggable interfaces for custom steering algorithms without modifying core code  
 - **Fine-Grained Control**: Token-level, position-specific, and multi-vector steering capabilities
 - **Ready-to-Use**: Pre-computed steering vectors for 8 domains (safety, reasoning, knowledge, etc.)
