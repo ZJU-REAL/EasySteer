@@ -8,7 +8,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
-[![Docker](https://img.shields.io/badge/docker-v0.13.0-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
+[![Docker](https://img.shields.io/badge/docker-v0.17.1-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 [![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
 
@@ -20,6 +20,7 @@
 <a id="news"></a>
 ## 新闻 🔥
 
+- [2026/03/12] EasySteer 升级至 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速（约 2.3 倍加速）
 - [2026/02/16] 我们在 Hugging Face Spaces 上发布了 [轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 供快速体验。完整版功能请参考 [Frontend](#frontend) 部分
 - [2026/02/15] 新增 OpenAI 兼容 API，支持通过 HTTP 接口使用干预向量
 - [2026/01/11] 我们已将 EasySteer 适配至 vLLM v0.13.0
@@ -74,9 +75,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # 使用预编译版本安装（推荐）
-# 注意：我们适配的版本为 vLLM v0.13.0 发布时的 commit。
+# 注意：我们适配的版本为 vLLM v0.17.1 发布时的 commit。
 # 请指定以下 commit 号以获取适配的预编译版本。
-export VLLM_PRECOMPILED_WHEEL_COMMIT=72506c98349d6bcd32b4e33eec7b5513453c1502
+export VLLM_PRECOMPILED_WHEEL_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # 安装 EasySteer

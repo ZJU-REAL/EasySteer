@@ -8,7 +8,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
-[![Docker](https://img.shields.io/badge/docker-v0.13.0-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
+[![Docker](https://img.shields.io/badge/docker-v0.17.1-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 [![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
 
@@ -20,6 +20,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/03/12] Upgraded to vLLM v0.17.1, with server-level steering and CUDA graph support (~2.3x speedup)
 - [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to [Frontend](#frontend).
 - [2026/02/15] We've added OpenAI-compatible API support for steering vectors
 - [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
@@ -74,9 +75,9 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
-# Note: We adapted EasySteer for the commit when vLLM v0.13.0 was released.
+# Note: We adapted EasySteer for the commit when vLLM v0.17.1 was released.
 # Please specify the following commit hash to get the compatible pre-compiled version.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=72506c98349d6bcd32b4e33eec7b5513453c1502
+export VLLM_PRECOMPILED_WHEEL_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # Install EasySteer
