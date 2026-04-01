@@ -20,7 +20,7 @@
 <a id="news"></a>
 ## 新闻 🔥
 
-- [2026/03/12] EasySteer 升级至 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速（约 2.3 倍加速）
+- [2026/03/31] 初步支持 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速
 - [2026/02/16] 我们在 Hugging Face Spaces 上发布了 [轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 供快速体验。完整版功能请参考 [Frontend](#frontend) 部分
 - [2026/02/15] 新增 OpenAI 兼容 API，支持通过 HTTP 接口使用干预向量
 - [2026/01/11] 我们已将 EasySteer 适配至 vLLM v0.13.0

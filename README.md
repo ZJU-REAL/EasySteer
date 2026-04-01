@@ -20,7 +20,7 @@
 <a id="news"></a>
 ## News 🔥
 
-- [2026/03/12] Upgraded to vLLM v0.17.1, with server-level steering and CUDA graph support (~2.3x speedup)
+- [2026/03/31] Initial support for vLLM v0.17.1, with server-level steering and CUDA graph support
 - [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to [Frontend](#frontend).
 - [2026/02/15] We've added OpenAI-compatible API support for steering vectors
 - [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
