@@ -43,6 +43,7 @@ Capture streams (dense):
 CPU-only units:
 - `test_mask_equivalence.py` — 5000-case trigger-mask fuzz vs the legacy collector (`_legacy_position_collector.py`)
 - `test_store_reload_unit.py` — VectorStore file-version reload semantics
+- `test_algorithm_loaders.py` — every algorithm's `load_from_path` against synthetic files, including the explicit-failure paths
 
 Benchmarks:
 - `bench_eager_vs_cudagraphs.py` — decode throughput, eager vs CUDA graphs
