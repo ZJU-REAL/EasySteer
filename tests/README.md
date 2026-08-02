@@ -62,3 +62,6 @@ Benchmarks:
   steering trace) are not.
 - Compiled-vs-eager outputs differ by kernel numerics; tests compare
   behavior via the steering trace (`VLLM_STEER_TRACE_DIR`), not bytes.
+- The capture package's canonical import path is `vllm.capture`;
+  `vllm.hidden_states` is a backward-compatibility alias. Tests import
+  the alias on purpose so it stays covered.

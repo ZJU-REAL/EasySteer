@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory() as tmp:
         f.write(b"version-1")
 
     with mock.patch(
-        "vllm.steer_vectors.models.SteerVectorModel.from_local_checkpoint",
+        "vllm.steer_vectors.models.LoadedSteerVector.from_local_checkpoint",
         side_effect=fake_load,
     ):
         store = VectorStore("cpu", cfg)

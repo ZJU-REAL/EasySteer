@@ -17,7 +17,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _legacy_position_collector as legacy  # noqa: E402
 
-from vllm.steer_vectors.algorithms.parameter_control import (  # noqa: E402
+from vllm.steer_vectors.algorithms.triggers import (  # noqa: E402
     collect_positions_gpu_batch as new_collect,
 )
 
