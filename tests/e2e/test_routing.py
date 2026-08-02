@@ -77,6 +77,18 @@ def two_vector_spec():
     )
 
 
+def test_single_layer_pt_vector_through_engine(llm, plain, tmp_path):
+    """Single-layer .pt formats need target_layers forwarded through the
+    vector store at admission (regression: the store used to load with
+    target_layers=None, which single-layer loaders reject)."""
+    import torch
+
+    pt = str(tmp_path / "direction.pt")
+    torch.save(torch.randn(1536) * 0.02, pt)
+    out = gen(llm, [PROMPT], steering_spec(source=pt, scale=8.0, layers=[10]))[0]
+    assert out != plain, "engine-path .pt steering had no effect"
+
+
 class TestMultiVector:
     def test_single_entry_multi_equals_single(self, llm):
         from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec

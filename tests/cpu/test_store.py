@@ -62,6 +62,29 @@ def test_store_versioning(vec_path):
         assert len(loads) == 3, "explicit reload must force a load"
 
 
+def test_store_forwards_target_layers(vec_path):
+    """Single-layer formats need target_layers at load; the store must
+    forward them and key entries per layer set (correctness over dedup)."""
+    cfg = types.SimpleNamespace(max_steer_vectors=8)
+    seen_layers = []
+
+    def fake_load(**kwargs):
+        seen_layers.append(kwargs["target_layers"])
+        return types.SimpleNamespace(layer_payloads={})
+
+    with mock.patch(
+        "vllm.steer_vectors.models.LoadedSteerVector.from_local_checkpoint",
+        side_effect=fake_load,
+    ):
+        store = VectorStore("cpu", cfg)
+        a = store.get(vec_path, "lm_steer", target_layers=[11])
+        b = store.get(vec_path, "lm_steer", target_layers=[11])
+        c = store.get(vec_path, "lm_steer", target_layers=[3, 5])
+        assert a is b, "same layer set must dedup"
+        assert c is not a, "different layer set must load its own entry"
+        assert seen_layers == [[11], [3, 5]]
+
+
 def test_fingerprint_tracks_file_version(vec_path):
     def req():
         return SteerVectorRequest(
