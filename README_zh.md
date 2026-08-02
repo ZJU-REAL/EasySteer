@@ -139,7 +139,7 @@ python3 /app/easysteer/docker/docker_test.py
 
 ```python
 from vllm import LLM, SamplingParams
-from vllm.steer_vectors.request import SteerVectorRequest
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 import os
 
 # 设置你的GPU
@@ -147,22 +147,26 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 
 # 初始化 LLM 模型
 # enable_steer_vector=True: 启用向量干预（不设置则与普通 vLLM 一致）
-# enforce_eager=True: 确保干预时的可靠性与稳定性（强烈建议）
-# enable_chunked_prefill=False: 避免潜在的一些问题
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1, enable_chunked_prefill=False)
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
 
 sampling_params = SamplingParams(
     temperature=0.0,
     max_tokens=128,
 )
 text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
-target_layers = list(range(10,26))
 
-baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
-baseline_output = llm.generate(text, steer_vector_request=baseline_request, sampling_params=sampling_params)
+def happy_steering(scale):
+    # 一份干预配置：使用哪个向量、干预强度、作用在哪些层，
+    # 以及作用在哪些位置（这里是全部 prompt token 和生成 token）。
+    return SteeringSpec(vectors=[VectorSpec(
+        source="vectors/happy_diffmean.gguf",
+        scale=scale,
+        layers=list(range(10, 26)),
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    )])
 
-happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
-happy_output = llm.generate(text, steer_vector_request=happy_request, sampling_params=sampling_params)
+baseline_output = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
+happy_output = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
 
 print(baseline_output[0].outputs[0].text)
 print(happy_output[0].outputs[0].text)
@@ -171,7 +175,7 @@ print(happy_output[0].outputs[0].text)
 # I'm sorry to hear about the loss of your dog. Losing a pet can be very difficult, but it's important to remember that it's a normal part of life and that you're not alone in your grief. It's okay to feel sad, angry, or confused. Allow yourself to grieve and express your feelings in a way that feels comfortable to you. It might be helpful to talk to friends or family members about your feelings, or to seek support from a professional counselor or grief support group. Remember that healing takes time, and it's okay to take things one day at a time.
 
 # ======happy steer======
-# I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are plenty of exciting things to do!
+# I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are lots of exciting things to do!
 ```
 
 ### OpenAI 兼容 API
@@ -186,7 +190,7 @@ vllm serve Qwen/Qwen2.5-1.5B-Instruct --enable-steer-vector --port 8017 --enforc
 
 #### 2. Python 客户端（OpenAI SDK）
 
-通过 `extra_body` 参数传递 `steer_vector_request`：
+通过 `extra_body` 参数传递 `steering` 配置：
 
 ```python
 from openai import OpenAI
@@ -196,6 +200,17 @@ client = OpenAI(
     api_key="EMPTY",  # vLLM 不需要真实的 API key
 )
 
+def happy_steering(scale):
+    return {
+        "vectors": [{
+            "source": "vectors/happy_diffmean.gguf",
+            "scale": scale,
+            "layers": list(range(10, 26)),
+            "normalize": True,
+            "apply": {"phases": ["prompt", "generation"]},
+        }]
+    }
+
 # ====== Baseline（scale=0，不施加干预）======
 baseline_response = client.chat.completions.create(
     model="Qwen/Qwen2.5-1.5B-Instruct",
@@ -204,16 +219,7 @@ baseline_response = client.chat.completions.create(
     ],
     max_tokens=128,
     temperature=0.0,
-    extra_body={
-        "steer_vector_request": {
-            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-            "scale": 0,
-            "target_layers": list(range(10, 26)),
-            "prefill_trigger_tokens": [-1],
-            "generate_trigger_tokens": [-1],
-            "normalize": True,
-        }
-    },
+    extra_body={"steering": happy_steering(0.0)},
 )
 print("====== Baseline ======")
 print(baseline_response.choices[0].message.content)
@@ -226,16 +232,7 @@ happy_response = client.chat.completions.create(
     ],
     max_tokens=128,
     temperature=0.0,
-    extra_body={
-        "steer_vector_request": {
-            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-            "scale": 2.0,
-            "target_layers": list(range(10, 26)),
-            "prefill_trigger_tokens": [-1],
-            "generate_trigger_tokens": [-1],
-            "normalize": True,
-        }
-    },
+    extra_body={"steering": happy_steering(2.0)},
 )
 print("====== Happy Steering ======")
 print(happy_response.choices[0].message.content)
@@ -253,13 +250,14 @@ curl http://localhost:8017/v1/chat/completions \
     ],
     "max_tokens": 128,
     "temperature": 0.0,
-    "steer_vector_request": {
-      "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-      "scale": 2.0,
-      "target_layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
-      "prefill_trigger_tokens": [-1],
-      "generate_trigger_tokens": [-1],
-      "normalize": true
+    "steering": {
+      "vectors": [{
+        "source": "vectors/happy_diffmean.gguf",
+        "scale": 2.0,
+        "layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
+        "normalize": true,
+        "apply": {"phases": ["prompt", "generation"]}
+      }]
     }
   }'
 ```
@@ -275,22 +273,29 @@ EasySteer 的核心推理引擎，扩展 vLLM 以在生成过程中应用干预�
 
 ```plaintext
 vllm/steer_vectors/
-├── request.py                 # 请求定义
-├── worker_manager.py          # Worker 侧适配器管理
-├── models.py                  # 模型管理与向量加载
-├── layers.py                  # 层封装
-├── config.py                  # 包装器配置
+├── api.py                     # 面向用户的 v2 API（SteeringSpec/VectorSpec/ApplySpec）
+├── request.py                 # 引擎内部请求结构体与字段注册表
+├── worker_manager.py          # 配置槽位、指纹、向量存储的持有者
+├── store.py                   # 带版本管理的向量存储（去重 + 重载）
+├── models.py                  # 控制器发现与向量加载
+├── layers.py                  # 按槽位路由的干预控制器（decoder/MoE gate）
+├── discovery.py               # 模型结构自省辅助工具
+├── ops.py                     # vllm::steer_apply 自定义算子（piecewise 图）
+├── cache_salt.py              # 服务端级干预的前缀缓存 salt
+├── trace.py                   # 干预轨迹（测试/调试用 oracle）
 └── algorithms/                # 算法框架与实现
-    ├── base.py                # 算法基类
-    ├── template.py            # 模板（通用逻辑）
+    ├── base.py                # 算法接口与 payload 约定
+    ├── template.py            # 共享的应用逻辑（触发、缩放、归一化）
     ├── factory.py             # 算法注册与工厂
-    ├── parameter_control.py   # 参数管理
-    ├── utils.py               # 工具
+    ├── triggers.py            # 作用位置（where-to-apply）收集器
+    ├── loading.py             # 共享的 GGUF/ReFT 文件读取
     ├── direct.py              # 直接相加
     ├── linear.py              # 线性变换
     ├── loreft.py              # LoReFT
-    ├── lm_steer.py            # LM-Steer
-    └── multi_vector.py        # 多向量组合
+    ├── lm_steer.py            # LM-Steer 投影
+    ├── erase.py / replace.py  # 基于投影的编辑
+    ├── concept_replace.py     # 概念替换
+    └── moe_router.py          # MoE 路由 logit 干预
 ```
 
 </details>
@@ -308,30 +313,32 @@ from vllm.steer_vectors.algorithms.factory import register_algorithm
 
 @register_algorithm("my_algorithm")
 class MyAlgorithm(AlgorithmTemplate):
-    """只需实现 2 个方法"""
+    """自定义算法——只需实现 2 个方法！"""
     
-    def _transform(self, hidden_states: torch.Tensor, params) -> torch.Tensor:
-        """由 load_from_path 返回的 params 可为 Tensor 或 dict。
-        
-        Tensor: h + params                                      (direct)
-        dict:   h @ params["weight"].T + params["bias"]         (linear)
-        dict:   h + (h @ params["P1"]) @ params["P2"].T         (lm_steer)
-        dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
+    def _transform(self, hidden_states: torch.Tensor, payload) -> torch.Tensor:
+        """应用变换——payload 是 load_from_path 返回的
+        layer_payloads 中某一层对应的条目。
+
+        payload 可以是 Tensor 或 dict，取决于你的算法：
+            Tensor: h + payload                                     (direct)
+            dict:   h @ payload["weight"].T + payload["bias"]       (linear)
+            dict:   h + (h @ payload["P1"]) @ payload["P2"].T       (lm_steer)
+            dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
         """
-        return hidden_states + params
-    
+        return hidden_states + payload
+
     @classmethod
-    def load_from_path(cls, path: str, device: str, **kwargs):
-        """从文件加载参数（.gguf/.pt 等）。
-        
-        返回: {"layer_payloads": {layer_id: payload}}
-        
-        示例：
-            .pt:   {"layer_payloads": {0: torch.load(path)}}
-            .gguf: {"layer_payloads": {L: tensor for L, tensor in gguf}}
+    def load_from_path(cls, path, device, *, config, target_layers=None, **kwargs):
+        """从文件加载各层的 payload（.gguf、.pt 等）。
+
+        返回: {"layer_payloads": {layer_id: payload}}。当输入信息不足时
+        （例如单层向量文件却没有给出 target_layers），应直接抛出异常，
+        而不是默默使用某个默认值。
         """
+        if not target_layers:
+            raise ValueError("my_algorithm requires target_layers")
         vector = torch.load(path, map_location=device, weights_only=False)
-        target_layers = kwargs.get("target_layers", [0])
+        vector = vector.to(config.adapter_dtype)
         return {"layer_payloads": {layer: vector for layer in target_layers}}
 ```
 
@@ -345,53 +352,47 @@ from .my_algorithm import MyAlgorithm
 <details>
     <summary><b>向量配置示例</b></summary>
 
+v2 API 由三个概念构成（完整设计见 `STEERING_API_V2.md`）：
+
+- **`ApplySpec`** — 向量作用的位置与时机：`phases`（`"prompt"` / `"generation"`）、可选的 token/位置过滤与排除项，以及精确的半开区间 `generation_window`。
+- **`VectorSpec`** — 一个向量：`source` 文件、`algorithm`、`scale`、`layers`、`normalize`，以及算法特定的 `params`。
+- **`SteeringSpec`** — 有序的向量列表加上 `conflict` 冲突策略；可以按请求附加（`steering=`），也可以作为引擎默认配置（`--steering-config`）。
+
 ```python
-from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-# 示例 1：单向量干预配置
-single_vector_request = SteerVectorRequest(
-    steer_vector_name="sentiment_control",
-    steer_vector_int_id=1,
-    steer_vector_local_path="vectors/happy.gguf",
-    scale=2.0,
-    target_layers=[10, 11, 12],
-    prefill_trigger_tokens=[-1],
-    generate_trigger_tokens=[-1]
-)
+# 示例 1：单个向量，作用于全部 prompt token 和生成 token
+sentiment = SteeringSpec(vectors=[
+    VectorSpec(
+        source="vectors/happy.gguf",       # 向量文件
+        scale=2.0,                         # 正值增强，负值抑制
+        layers=[10, 11, 12],               # 需要干预的模型层
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    ),
+])
 
-# 示例 2：多向量干预配置
-multi_vector_request = SteerVectorRequest(
-    steer_vector_name="multi_direction_control",
-    steer_vector_int_id=2,
-    vector_configs=[
-        VectorConfig(
-            path="vector_direction1.gguf",
-            scale=1.5,
-            target_layers=[20],
-            prefill_trigger_positions=[-2],
-            algorithm="direct",
-            normalize=False
-        ),
-        VectorConfig(
-            path="vector_direction2.gguf",
-            scale=-0.8,
-            target_layers=[20],
-            prefill_trigger_positions=[-2],
-            algorithm="direct",
-            normalize=False
-        ),
-        VectorConfig(
-            path="vector_direction3.gguf",
-            scale=-1.0,
-            target_layers=[20],
-            prefill_trigger_positions=[-2],
-            algorithm="direct",
-            normalize=False
-        ),
+# 示例 2：多个方向向量，均作用于 prompt 的倒数第二个 token
+multi_direction = SteeringSpec(
+    conflict="sequential",                 # 在相同位置上依次叠加所有向量
+    vectors=[
+        VectorSpec(source="vector_direction1.gguf", scale=1.5, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+        VectorSpec(source="vector_direction2.gguf", scale=-0.8, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+        VectorSpec(source="vector_direction3.gguf", scale=-1.0, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
     ],
-    debug=False,
-    conflict_resolution="sequential"
 )
+
+# 示例 3：仅干预最先生成的 8 个 token
+early_generation = SteeringSpec(vectors=[
+    VectorSpec(
+        source="vectors/happy.gguf",
+        scale=2.0,
+        layers=[10, 11, 12],
+        apply=ApplySpec(phases=["generation"], generation_window=(0, 8)),
+    ),
+])
 ```
 
 </details>
@@ -412,12 +413,12 @@ import easysteer.hidden_states as hs
 # 很多用户反馈很多模型不支持embed任务导致无法提取hidden
 # 目前EasySteer已经支持直接使用generate task提取hidden （get_all_hidden_states_generate）
 # 我们后续将废弃并移除使用embed任务的get_all_hidden_states
+
 llm = LLM(
-    model="path/to/your/model",     # 模型路径
+    model="path/to/your/model",   # 模型路径
     tensor_parallel_size=1,
-    enforce_eager=True,
-    enable_chunked_prefill=False,   # 隐藏态提取暂不支持分块预填充
-    enable_prefix_caching=False     # 隐藏态提取暂不支持前缀缓存
+    enforce_eager=True,           # 捕获隐藏状态需要 eager 执行
+    enable_prefix_caching=False,  # 命中前缀缓存的 token 不会重新计算，因此无法被捕获
 )
 
 # 示例 prompts

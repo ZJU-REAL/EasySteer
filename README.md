@@ -139,7 +139,7 @@ python3 /app/easysteer/docker/docker_test.py
 
 ```python
 from vllm import LLM, SamplingParams
-from vllm.steer_vectors.request import SteerVectorRequest
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 import os
 
 # Set your GPU
@@ -147,22 +147,26 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 
 # Initialize the LLM model
 # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-# enforce_eager=True: Ensures reliability and stability of interventions (strongly recommended)
-# enable_chunked_prefill=False: To avoid potential issues
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1, enable_chunked_prefill=False)
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
 
 sampling_params = SamplingParams(
     temperature=0.0,
     max_tokens=128,
 )
 text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
-target_layers = list(range(10,26))
 
-baseline_request = SteerVectorRequest("baseline", 1, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
-baseline_output = llm.generate(text, steer_vector_request=baseline_request, sampling_params=sampling_params)
+def happy_steering(scale):
+    # A steering configuration: which vector, how strongly, on which
+    # layers, and where it applies (all prompt + generated tokens here).
+    return SteeringSpec(vectors=[VectorSpec(
+        source="vectors/happy_diffmean.gguf",
+        scale=scale,
+        layers=list(range(10, 26)),
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    )])
 
-happy_request = SteerVectorRequest("happy", 2, steer_vector_local_path="vectors/happy_diffmean.gguf", scale=2.0, target_layers=target_layers, prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1])
-happy_output = llm.generate(text, steer_vector_request=happy_request, sampling_params=sampling_params)
+baseline_output = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
+happy_output = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
 
 print(baseline_output[0].outputs[0].text)
 print(happy_output[0].outputs[0].text)
@@ -186,7 +190,7 @@ vllm serve Qwen/Qwen2.5-1.5B-Instruct --enable-steer-vector --port 8017 --enforc
 
 #### 2. Python Client (OpenAI SDK)
 
-Pass the `steer_vector_request` via the `extra_body` parameter:
+Pass the `steering` spec via the `extra_body` parameter:
 
 ```python
 from openai import OpenAI
@@ -196,6 +200,17 @@ client = OpenAI(
     api_key="EMPTY",  # vLLM does not require a real API key
 )
 
+def happy_steering(scale):
+    return {
+        "vectors": [{
+            "source": "vectors/happy_diffmean.gguf",
+            "scale": scale,
+            "layers": list(range(10, 26)),
+            "normalize": True,
+            "apply": {"phases": ["prompt", "generation"]},
+        }]
+    }
+
 # ====== Baseline (scale=0, no steering applied) ======
 baseline_response = client.chat.completions.create(
     model="Qwen/Qwen2.5-1.5B-Instruct",
@@ -204,16 +219,7 @@ baseline_response = client.chat.completions.create(
     ],
     max_tokens=128,
     temperature=0.0,
-    extra_body={
-        "steer_vector_request": {
-            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-            "scale": 0,
-            "target_layers": list(range(10, 26)),
-            "prefill_trigger_tokens": [-1],
-            "generate_trigger_tokens": [-1],
-            "normalize": True,
-        }
-    },
+    extra_body={"steering": happy_steering(0.0)},
 )
 print("====== Baseline ======")
 print(baseline_response.choices[0].message.content)
@@ -226,16 +232,7 @@ happy_response = client.chat.completions.create(
     ],
     max_tokens=128,
     temperature=0.0,
-    extra_body={
-        "steer_vector_request": {
-            "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-            "scale": 2.0,
-            "target_layers": list(range(10, 26)),
-            "prefill_trigger_tokens": [-1],
-            "generate_trigger_tokens": [-1],
-            "normalize": True,
-        }
-    },
+    extra_body={"steering": happy_steering(2.0)},
 )
 print("====== Happy Steering ======")
 print(happy_response.choices[0].message.content)
@@ -253,13 +250,14 @@ curl http://localhost:8017/v1/chat/completions \
     ],
     "max_tokens": 128,
     "temperature": 0.0,
-    "steer_vector_request": {
-      "steer_vector_local_path": "vectors/happy_diffmean.gguf",
-      "scale": 2.0,
-      "target_layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
-      "prefill_trigger_tokens": [-1],
-      "generate_trigger_tokens": [-1],
-      "normalize": true
+    "steering": {
+      "vectors": [{
+        "source": "vectors/happy_diffmean.gguf",
+        "scale": 2.0,
+        "layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
+        "normalize": true,
+        "apply": {"phases": ["prompt", "generation"]}
+      }]
     }
   }'
 ```
@@ -275,22 +273,29 @@ The core inference engine of EasySteer, extending vLLM to enable the application
 
 ```plaintext
 vllm/steer_vectors/
-├── request.py                 # Request definitions
-├── worker_manager.py          # Worker-level adapter management
-├── models.py                  # Model management & vector loading
-├── layers.py                  # Layer wrappers
-├── config.py                  # Wrapper configuration
+├── api.py                     # User-facing v2 API (SteeringSpec/VectorSpec/ApplySpec)
+├── request.py                 # Internal engine request struct + field registry
+├── worker_manager.py          # Config slots, fingerprints, vector store owner
+├── store.py                   # Versioned vector store (dedup + reload)
+├── models.py                  # Controller discovery & vector loading
+├── layers.py                  # Slot-routed steering controllers (decoder/MoE gate)
+├── discovery.py               # Structural model introspection helpers
+├── ops.py                     # vllm::steer_apply custom op (piecewise graphs)
+├── cache_salt.py              # Server-level prefix-cache salt
+├── trace.py                   # Steering trace (test/debug oracle)
 └── algorithms/                # Algorithm framework & implementations
-    ├── base.py                # Algorithm base class
-    ├── template.py            # Algorithm template with common logic
+    ├── base.py                # Algorithm interface & payload contract
+    ├── template.py            # Shared apply logic (triggers, scale, normalize)
     ├── factory.py             # Algorithm registry & factory
-    ├── parameter_control.py   # Parameter management
-    ├── utils.py               # Utilities
+    ├── triggers.py            # Where-to-apply position collectors
+    ├── loading.py             # Shared GGUF/ReFT file readers
     ├── direct.py              # Direct addition
     ├── linear.py              # Linear transformation
     ├── loreft.py              # LoReFT
-    ├── lm_steer.py            # LM steering
-    └── multi_vector.py        # Multi-vector combination
+    ├── lm_steer.py            # LM-Steer projectors
+    ├── erase.py / replace.py  # Projection-based edits
+    ├── concept_replace.py     # Concept swap
+    └── moe_router.py          # MoE router-logit steering
 ```
 
 </details>
@@ -310,29 +315,30 @@ from vllm.steer_vectors.algorithms.factory import register_algorithm
 class MyAlgorithm(AlgorithmTemplate):
     """Custom algorithm - only 2 methods needed!"""
     
-    def _transform(self, hidden_states: torch.Tensor, params) -> torch.Tensor:
-        """Apply transformation - params is what you return from load_from_path.
-        
-        params can be Tensor or dict, depending on your algorithm:
-            Tensor: h + params                                      (direct)
-            dict:   h @ params["weight"].T + params["bias"]         (linear)
-            dict:   h + (h @ params["P1"]) @ params["P2"].T         (lm_steer)
+    def _transform(self, hidden_states: torch.Tensor, payload) -> torch.Tensor:
+        """Apply transformation - payload is one layer's entry from
+        load_from_path's layer_payloads.
+
+        payload can be Tensor or dict, depending on your algorithm:
+            Tensor: h + payload                                     (direct)
+            dict:   h @ payload["weight"].T + payload["bias"]       (linear)
+            dict:   h + (h @ payload["P1"]) @ payload["P2"].T       (lm_steer)
             dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
         """
-        return hidden_states + params
-    
+        return hidden_states + payload
+
     @classmethod
-    def load_from_path(cls, path: str, device: str, **kwargs):
-        """Load parameters from a file (.gguf, .pt, etc.).
-        
-        Returns: {"layer_payloads": {layer_id: payload}}
-        
-        Example loading patterns:
-            .pt file:       {"layer_payloads": {0: torch.load(path)}}
-            .gguf file:     {"layer_payloads": {L: tensor for L, tensor in gguf}}
+    def load_from_path(cls, path, device, *, config, target_layers=None, **kwargs):
+        """Load per-layer payloads from a file (.gguf, .pt, ...).
+
+        Returns: {"layer_payloads": {layer_id: payload}}. Raise on
+        underspecified inputs (e.g. a single-layer file without
+        target_layers) instead of assuming a default.
         """
+        if not target_layers:
+            raise ValueError("my_algorithm requires target_layers")
         vector = torch.load(path, map_location=device, weights_only=False)
-        target_layers = kwargs.get("target_layers", [0])
+        vector = vector.to(config.adapter_dtype)
         return {"layer_payloads": {layer: vector for layer in target_layers}}
 ```
 
@@ -346,63 +352,47 @@ from .my_algorithm import MyAlgorithm
 <details>
     <summary><b>Vector Configuration Examples</b></summary>
 
+The v2 API is built from three concepts (see `STEERING_API_V2.md` for the full design):
+
+- **`ApplySpec`** — where a vector applies: `phases` (`"prompt"` / `"generation"`), optional token/position filters, exclusions, and an exact half-open `generation_window`.
+- **`VectorSpec`** — one vector: `source` file, `algorithm`, `scale`, `layers`, `normalize`, algorithm-specific `params`.
+- **`SteeringSpec`** — an ordered list of vectors plus a `conflict` policy; attach it per request (`steering=`) or as the engine default (`--steering-config`).
+
 ```python
-from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-# Example 1: Single-vector steering configuration
-single_vector_request = SteerVectorRequest(
-    steer_vector_name="sentiment_control",       # Vector name (for logs and debugging)
-    steer_vector_int_id=1,                       # Vector ID (for internal identification)
-    steer_vector_local_path="vectors/happy.gguf",# Vector file path
-    scale=2.0,                                   # Application strength (positive enhances, negative suppresses)
-    target_layers=[10, 11, 12],                  # Target layers (specify which model layers to apply to)
-    prefill_trigger_tokens=[-1],                 # Token IDs to intervene during prefill (-1 means all tokens)
-    generate_trigger_tokens=[-1]                 # Token IDs to intervene during generation (-1 means all tokens)
-)
+# Example 1: single vector applied to every prompt + generated token
+sentiment = SteeringSpec(vectors=[
+    VectorSpec(
+        source="vectors/happy.gguf",       # vector file
+        scale=2.0,                         # positive enhances, negative suppresses
+        layers=[10, 11, 12],               # model layers to steer
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    ),
+])
 
-# Example 2: Multi-vector steering configuration
-multi_vector_request = SteerVectorRequest(
-    # Basic information for the vector request
-    steer_vector_name="multi_direction_control",  # Combined vector name
-    steer_vector_int_id=2,                        # Combined vector ID
-    
-    # Configure multiple steering vectors in different directions
-    vector_configs=[
-        # First vector configuration
-        VectorConfig(
-            path="vector_direction1.gguf",         # Vector file path
-            scale=1.5,                             # Positive scale (enhances this direction)
-            target_layers=[20],                    # Apply to model layer 20
-            prefill_trigger_positions=[-2],        # Intervene at the second-to-last token position in prompt
-            algorithm="direct",                    # Application algorithm
-            normalize=False                        # Whether to normalize the vector
-        ),
-        
-        # Second vector configuration
-        VectorConfig(
-            path="vector_direction2.gguf",         # Vector file path
-            scale=-0.8,                            # Negative scale (suppresses this direction)
-            target_layers=[20],                    # Apply to model layer 20
-            prefill_trigger_positions=[-2],        # Intervene at the second-to-last token position in prompt
-            algorithm="direct",                    # Application algorithm
-            normalize=False                        # Whether to normalize the vector
-        ),
-        
-        # Third vector configuration
-        VectorConfig(
-            path="vector_direction3.gguf",         # Vector file path
-            scale=-1.0,                            # Negative scale (suppresses this direction)
-            target_layers=[20],                    # Apply to model layer 20
-            prefill_trigger_positions=[-2],        # Intervene at the second-to-last token position in prompt
-            algorithm="direct",                    # Application algorithm
-            normalize=False                        # Whether to normalize the vector
-        ),
+# Example 2: several directions, each at the second-to-last prompt token
+multi_direction = SteeringSpec(
+    conflict="sequential",                 # stack all vectors at shared positions
+    vectors=[
+        VectorSpec(source="vector_direction1.gguf", scale=1.5, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+        VectorSpec(source="vector_direction2.gguf", scale=-0.8, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+        VectorSpec(source="vector_direction3.gguf", scale=-1.0, layers=[20],
+                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
     ],
-    
-    # Additional parameters for multi-vector intervention
-    debug=False,                                   # Whether to output debug information
-    conflict_resolution="sequential"               # Conflict resolution strategy: apply sequentially
 )
+
+# Example 3: steer only the first 8 generated tokens
+early_generation = SteeringSpec(vectors=[
+    VectorSpec(
+        source="vectors/happy.gguf",
+        scale=2.0,
+        layers=[10, 11, 12],
+        apply=ApplySpec(phases=["generation"], generation_window=(0, 8)),
+    ),
+])
 ```
 
 </details>
@@ -425,9 +415,8 @@ import easysteer.hidden_states as hs
 llm = LLM(
     model="path/to/your/model",   # Model path
     tensor_parallel_size=1,
-    enforce_eager=True,
-    enable_chunked_prefill=False, # Hidden states extraction doesn't support prefix caching yet
-    enable_prefix_caching=False   # Hidden states extraction doesn't support chunked prefill yet
+    enforce_eager=True,           # Capture requires eager execution
+    enable_prefix_caching=False,  # Cache-hit tokens are never recomputed, so they cannot be captured
 )
 
 # Prepare some example prompts

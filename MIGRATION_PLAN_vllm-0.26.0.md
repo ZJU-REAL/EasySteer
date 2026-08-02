@@ -348,6 +348,19 @@ recapture per config and blocked per-request steering.
 
 ## Future requirements (recorded, not current priority)
 
+- **Dedicated documentation site**: rather than extending the current
+  README-based docs, we may build a dedicated project page with detailed
+  documentation similar in scope and structure to the vLLM docs site
+  (user guide / API reference / algorithm catalog / replication index).
+  The v2 API design doc (STEERING_API_V2.md) and the standardized
+  notebooks are written to be liftable into such a site.
+- **Frontend + hf-space adaptation to v2** (deferred; not urgent): both
+  still use the v1 request JSON (`frontend/core/steer_request_builder.py`,
+  `frontend/chat_api.py`, `frontend/inference_api.py`, `hf-space/app.py` —
+  note its triggerless scale-0 baseline request also needs an `apply`
+  clause under v2). The frontend is additionally slated for a visual
+  overhaul later; adapt API + looks together.
+
 - Remaining (not yet validated): Tier-1 full-graph steering kernel
   (planned; legacy `steer_allow_cuda_graphs` bake-in slated for
   retirement), OpenAI server-level steering endpoints, MoE
