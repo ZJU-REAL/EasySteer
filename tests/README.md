@@ -30,8 +30,12 @@ Dense decoder-path steering (Qwen2.5-1.5B):
 - `test_require_preload.py` — `--steer-require-preload` frontend enforcement
 - `test_phase_chunked_prefill.py` — trace-oracle phase classification and
   chunked-prefill correctness (1-token prompts, 1-token tail chunks,
-  negative trigger positions), request-validation explicit failures,
-  prefix-caching rejection
+  negative trigger positions), request-validation explicit failures
+- `test_steering_prefix_cache.py` — steering-aware prefix caching:
+  fingerprint-keyed KV reuse (`num_cached_tokens` oracle), length-
+  sensitive and phase-boundary keying, capture/fresh-install rejections
+- `test_server_prefix_cache.py` — server-level steering with prefix
+  caching (startup salt; scale update + `reset_prefix_cache`)
 - `verify_steering_correctness.py` — model/hardware sanity harness (argparse)
 
 MoE gate steering + router-logit capture (OLMoE-1B-7B):
@@ -43,6 +47,8 @@ MoE gate steering + router-logit capture (OLMoE-1B-7B):
 
 Capture streams (dense):
 - `test_capture_hidden_states.py` — hook-based capture: layer subsets, reductions, budgets, dtypes, legacy RPC shims
+- `test_capture_chunked.py` — capture coverage and chunk-aware `last`
+  reduction under chunked prefill
 
 CPU-only units:
 - `test_mask_equivalence.py` — 5000-case trigger-mask fuzz vs the legacy collector (`_legacy_position_collector.py`)
@@ -54,8 +60,12 @@ Benchmarks:
 
 ## Notes
 
-- Steering requires `enable_prefix_caching=False`; capture streams require
-  `enforce_eager=True`.
+- Steering supports prefix caching (block hashes are keyed by the
+  steering config fingerprint; server-level mode salts every hash and
+  scale updates reset the cache) and chunked prefill. Capture requires
+  `enforce_eager=True` and `enable_prefix_caching=False` (cache-hit
+  tokens are never recomputed, so they cannot be captured — enabling a
+  capture stream on a prefix-caching engine raises).
 - Byte-exact cross-run comparisons need identical batch geometry: use
   `ignore_eos=True` and pin `async_scheduling=False` (async admission makes
   prefill co-batching timing-dependent).

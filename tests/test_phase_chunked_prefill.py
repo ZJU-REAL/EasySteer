@@ -5,12 +5,11 @@ Uses the steering trace as an exact oracle for which absolute token
 positions were steered. Covers the cases the old query-length heuristic
 misclassified (1-token prompts, 1-token chunked-prefill tails), the
 prompt-relative semantics of negative trigger positions under chunking,
-the request-validation explicit failures, and the prefix-caching
-rejection.
+and the request-validation explicit failures.
 
-Checks:
+Checks (prefix-cache interaction checks live in
+test_steering_prefix_cache.py / test_server_prefix_cache.py):
   P0  request validation: triggerless and moe-no-target configs rejected
-  P1  prefix caching + steering rejected at engine construction
   P2  1-token prompt: prefill [-1] steers exactly abs position 0
   P3  chunked prompt (64,64,1): prefill [-1] covers every prompt token,
       including the 1-token tail chunk
@@ -147,20 +146,6 @@ r = SteerVectorRequest(
     generate_trigger_tokens=[-1],
 )
 check("P0c valid no-file moe_router request accepted", r is not None)
-
-# --- P1: prefix caching rejected --------------------------------------
-expect_raises(
-    "P1 steering + prefix caching rejected",
-    Exception,
-    lambda: LLM(
-        model=MODEL,
-        enable_steer_vector=True,
-        enable_prefix_caching=True,
-        enforce_eager=True,
-        gpu_memory_utilization=0.18,
-    ),
-    needle="prefix caching",
-)
 
 # --- engine with chunked prefill enabled ------------------------------
 llm = LLM(
