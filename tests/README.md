@@ -54,5 +54,11 @@ Benchmarks:
 - Byte-exact cross-run comparisons need identical batch geometry: use
   `ignore_eos=True` and pin `async_scheduling=False` (async admission makes
   prefill co-batching timing-dependent).
+- Stored goldens (`golden.txt` comparisons in the sentiment and
+  server-slot tests) are GPU-model-specific: kernel numerics differ
+  across GPU models, so compare only on the model that recorded the
+  golden. Behavior-level checks (does the output change/flip) can also
+  be hardware-sensitive; mechanism-level checks (captured logits,
+  steering trace) are not.
 - Compiled-vs-eager outputs differ by kernel numerics; tests compare
   behavior via the steering trace (`VLLM_STEER_TRACE_DIR`), not bytes.

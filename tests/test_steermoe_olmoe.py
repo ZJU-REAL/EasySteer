@@ -42,7 +42,7 @@ PKL = os.environ.get(
     "STEERMOE_PKL",
     "activations_[allenai--OLMoE-1B-7B-0125-Instruct]_[faithfulness].pkl",
 )
-N_DEACT = 40  # experts to deactivate in the digit demo (~4% of 1024)
+N_DEACT = 100  # tuned digit->words flip count (see replications/steermoe)
 
 with open(os.path.join(MODEL, "config.json")) as f:
     hf_cfg = json.load(f)
