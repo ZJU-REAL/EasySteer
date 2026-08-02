@@ -28,6 +28,10 @@ Dense decoder-path steering (Qwen2.5-1.5B):
 - `test_per_request_scale_sweep.py` — per-request isolation across a 51-scale batch
 - `test_server_default_slot.py` — server-level (default-slot) steering
 - `test_require_preload.py` — `--steer-require-preload` frontend enforcement
+- `test_phase_chunked_prefill.py` — trace-oracle phase classification and
+  chunked-prefill correctness (1-token prompts, 1-token tail chunks,
+  negative trigger positions), request-validation explicit failures,
+  prefix-caching rejection
 - `verify_steering_correctness.py` — model/hardware sanity harness (argparse)
 
 MoE gate steering + router-logit capture (OLMoE-1B-7B):
@@ -60,7 +64,14 @@ Benchmarks:
   across GPU models, so compare only on the model that recorded the
   golden. Behavior-level checks (does the output change/flip) can also
   be hardware-sensitive; mechanism-level checks (captured logits,
-  steering trace) are not.
+  steering trace) are not. golden.txt was re-recorded 2026-08-02 after
+  `steer_vector_dtype="auto"` started resolving to the model dtype
+  (bf16 vectors); the fp16-era golden is kept as
+  `golden.txt.fp16-bak`.
+- Steering requests must set at least one trigger field
+  (`prefill_trigger_tokens=[-1]` / `generate_trigger_tokens=[-1]` for
+  global application) — triggerless configs are rejected instead of
+  silently steering nothing.
 - Compiled-vs-eager outputs differ by kernel numerics; tests compare
   behavior via the steering trace (`VLLM_STEER_TRACE_DIR`), not bytes.
 - The capture package's canonical import path is `vllm.capture`;
