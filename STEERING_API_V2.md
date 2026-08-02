@@ -1,0 +1,119 @@
+# Steering API v2 — design and migration
+
+Status: approved direction (2026-08-02). v1 is deprecated and will be removed
+after the EasySteer package and notebooks migrate.
+
+## Why
+
+The v1 surface accreted concepts users must not need: two request schemas
+(pydantic + msgspec) held together by a registry assert; single-vector fields
+*and* `vector_configs` as two shapes of one thing; a separate server-level
+surface with different defaults (`server_normalize=True` vs request `False`);
+seven trigger fields with a `-1` sentinel that also silently bypasses
+exclusions; a `first_k` window that steers k−1 decode steps; vestigial
+identity fields (`steer_vector_name`, `steer_vector_int_id`); an algorithm
+embedded in the path (`"path|algo"`); and four MoE request fields. Internally
+everything already routes through fingerprinted config slots — server-level
+steering is just a config on the default slot — so the API distinctions are
+historical, not architectural.
+
+## Concept model (3 concepts)
+
+```python
+from vllm.steer_vectors import SteeringSpec, VectorSpec, ApplySpec
+
+spec = SteeringSpec(vectors=[
+    VectorSpec(
+        source="vectors/happy.gguf",   # path only; no "path|algo"
+        algorithm="direct",
+        scale=0.5,
+        layers=[10],
+        normalize=False,
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    ),
+])
+```
+
+1. **`ApplySpec`** — *where and when* a vector applies. Replaces the seven
+   trigger fields and their sentinels.
+2. **`VectorSpec`** — one vector: source, algorithm, scale, layers,
+   normalize, algorithm-specific `params`, and its `apply` clause.
+3. **`SteeringSpec`** — an ordered list of `VectorSpec` plus a conflict
+   policy. The single-vector case is a one-entry list, not a second schema.
+
+Two attachment scopes, same object:
+
+- per request: `llm.generate(..., steering=spec)` / HTTP `"steering": {...}`
+- engine default: `--steering-config spec.json` (or inline JSON), replaced at
+  runtime via `POST /v1/steering {"spec": {...}}` (prefix cache is reset).
+
+## ApplySpec semantics (locked)
+
+- `phases: list["prompt" | "generation"]` — required, non-empty. Explicit
+  phase selection replaces the `-1` sentinel. Phases are named for what the
+  tokens *are* (prompt vs generated), not how they execute (prefill/decode):
+  chunked prefill, prefix caching and CUDA graphs never change meaning.
+- `tokens: list[int] | None` — token-id allowlist (real ids only, `>= 0`).
+- `positions: list[int] | None` — absolute sequence positions; negatives are
+  Python-style from the end of the *prompt* (`-1` = last prompt token),
+  stable across prefill chunks.
+- Within the selected phases: no `tokens`/`positions` → all tokens of those
+  phases; otherwise the union of token matches and position matches.
+- `exclude_tokens` / `exclude_positions` — **always subtract, in every
+  case.** The v1 "`-1` trigger bypasses exclusions" behavior is gone.
+- `generation_window: (start, stop)` — half-open interval over 0-based
+  decode steps (the step processing generated token *j* is in the window iff
+  `start <= j < stop`; `stop=None` = unbounded). `(0, k)` steers exactly the
+  first k decode steps — the v1 `first_k` off-by-one is gone. Requires
+  `"generation"` in `phases`. Replaces `generate_first_k_tokens` /
+  `generate_after_k_tokens`.
+
+## Other locked decisions
+
+- **Identity**: no user-visible name/int-id. The config fingerprint (already
+  the identity for slots and prefix-cache keys) is the identity. `VectorSpec`
+  keeps an optional `name` for logs only.
+- **Defaults**: `normalize=False` everywhere. The v1 server default of `True`
+  survives only in the deprecated `--steer-*` flags.
+- **Algorithm params**: `VectorSpec.params` dict, validated per algorithm
+  (moe_router: `expert_ids`, `mode`, `lambda`, `topk`; other algorithms
+  accept no params — unknown keys fail loudly). The four `moe_*` request
+  fields fold in here.
+- **Backend invariant**: the spec is backend-independent. Eager, piecewise
+  and full CUDA-graph engines accept the same spec; a backend that cannot
+  run a spec rejects it at admission with an explicit error
+  (full-graph: direct algorithm, no normalize, single vector — unchanged).
+  `--steer-graph-mode` is an engine-level optimization setting, never
+  something that changes how a request is written.
+- **Server + per-request coexistence** stays disallowed for now (same as
+  v1); the fingerprint + salt machinery would support relaxing it later.
+- **Capture** is unaffected (already unified under `CaptureSession`).
+
+## Implementation architecture
+
+The engine wire format (`SteerVectorRequest`, msgspec) stays as an internal
+struct. v2 specs translate at admission via
+`vllm.steer_vectors.api.to_engine_request()`:
+
+- The where-clause travels as one canonical `apply_spec` dict field on the
+  internal struct (registered in `STEER_TRIGGER_FIELDS`, so the fingerprint,
+  slot configuration and `configure_from_dict` propagate it automatically).
+  `apply_spec` and legacy trigger fields are mutually exclusive on a struct.
+- `TriggerController` executes `apply_spec` natively with a dedicated v2
+  position collector (exact semantics above). The v1 collector and its
+  legacy-equivalence fuzz test are untouched and die with v1.
+- The full-graph fill path reuses the same collector, so v2 specs work under
+  all three backends with no extra code.
+- Prefix caching: `apply_spec` participates in the fingerprint via the field
+  registry; negative positions and `generation_window` mark the config
+  prompt-length-sensitive, same rules as v1.
+
+## Deprecation plan
+
+1. **Now**: v2 is the documented API. v1 (`steer_vector_request` offline
+   kwarg and HTTP field, `--steer-vector-path`/`--steer-scale`/... flags)
+   logs a deprecation warning on use and translates/behaves as before.
+2. **Next**: EasySteer package, notebooks, hf-space and tests migrate to v2.
+3. **Then**: v1 fields, the v1 collector, the legacy fuzz test, the
+   `"path|algo"` hack and the pydantic Param twins are deleted; `apply_spec`
+   becomes the only where-clause.

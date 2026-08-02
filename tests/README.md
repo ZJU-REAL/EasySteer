@@ -33,9 +33,16 @@ Dense decoder-path steering (Qwen2.5-1.5B):
   negative trigger positions), request-validation explicit failures
 - `test_steering_prefix_cache.py` — steering-aware prefix caching:
   fingerprint-keyed KV reuse (`num_cached_tokens` oracle), length-
-  sensitive and phase-boundary keying, capture/fresh-install rejections
+  sensitive and phase-boundary keying, capture/fresh-install rejections,
+  v2-spec fingerprint keying (S9/S10)
 - `test_server_prefix_cache.py` — server-level steering with prefix
   caching (startup salt; scale update + `reset_prefix_cache`)
+- `test_api_v2.py` — v2 steering API (`SteeringSpec`/`ApplySpec`) trace
+  oracle: phase selection, composing exclusions, exact generation
+  windows, token/position filters, multi-vector apply clauses,
+  deprecated-v1-path compat
+- `test_api_v2_server.py` — engine-default steering via
+  `--steering-config` (v2 spec JSON) with prefix caching (salt + reuse)
 - `verify_steering_correctness.py` — model/hardware sanity harness (argparse)
 
 MoE gate steering + router-logit capture (OLMoE-1B-7B):
@@ -51,7 +58,10 @@ Capture streams (dense):
   reduction under chunked prefill
 
 CPU-only units:
-- `test_mask_equivalence.py` — 5000-case trigger-mask fuzz vs the legacy collector (`_legacy_position_collector.py`)
+- `test_api_v2_unit.py` — v2 API spec validation, translation to the
+  engine struct, fingerprint/length-sensitivity participation, and the
+  v2 position collector's semantics
+- `test_mask_equivalence.py` — 5000-case trigger-mask fuzz vs the legacy collector (`_legacy_position_collector.py`; v1 semantics only — the v2 collector is covered by `test_api_v2_unit.py`)
 - `test_store_reload_unit.py` — VectorStore file-version reload semantics
 - `test_algorithm_loaders.py` — every algorithm's `load_from_path` against synthetic files, including the explicit-failure paths
 
@@ -78,10 +88,16 @@ Benchmarks:
   `steer_vector_dtype="auto"` started resolving to the model dtype
   (bf16 vectors); the fp16-era golden is kept as
   `golden.txt.fp16-bak`.
-- Steering requests must set at least one trigger field
+- The documented steering API is v2 (`SteeringSpec`/`VectorSpec`/
+  `ApplySpec`, see `STEERING_API_V2.md`): `llm.generate(...,
+  steering=spec)`, HTTP `"steering"`, engine default `--steering-config`.
+  The v1 surface (`steer_vector_request`, `--steer-vector-path` flags)
+  is deprecated — it still works but warns.
+- v1 steering requests must set at least one trigger field
   (`prefill_trigger_tokens=[-1]` / `generate_trigger_tokens=[-1]` for
   global application) — triggerless configs are rejected instead of
-  silently steering nothing.
+  silently steering nothing. In v2 the `apply` clause is structurally
+  required.
 - Compiled-vs-eager outputs differ by kernel numerics; tests compare
   behavior via the steering trace (`VLLM_STEER_TRACE_DIR`), not bytes.
 - The capture package's canonical import path is `vllm.capture`;

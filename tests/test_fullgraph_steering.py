@@ -11,7 +11,10 @@ host-side each step. Checks:
   F5  routing isolation: in a [steered, plain] batch the plain request is
       byte-identical to the same batch without steering (ignore_eos keeps
       geometries aligned);
-  F6  non-graph-safe config (loreft) is rejected with a clear error.
+  F6  non-graph-safe config (loreft) is rejected with a clear error;
+  F7  a v2 SteeringSpec drives the same full-graph kernel (backend
+      independence): steered != plain, and identical to the equivalent
+      v1 request's output.
 
 Env: GPU_ID; STEER_TEST_EAGER=1 runs the same kernel path eagerly.
 """
@@ -92,6 +95,21 @@ try:
     failures.append("F6: loreft accepted in full-graph mode")
 except Exception as e:
     print(f"F6 OK: loreft rejected ({type(e).__name__})")
+
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec  # noqa: E402
+
+v2_happy = llm.generate(
+    [text],
+    steering=SteeringSpec(vectors=[VectorSpec(
+        source=VEC, scale=2.0, layers=layers,
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    )]),
+    sampling_params=sp,
+)[0].outputs[0].text
+if v2_happy == plain:
+    failures.append("F7: v2 spec did not steer under full graphs")
+if v2_happy != happy:
+    failures.append("F7: v2 spec output differs from equivalent v1 request")
 
 print("======unsteered======")
 print(plain)

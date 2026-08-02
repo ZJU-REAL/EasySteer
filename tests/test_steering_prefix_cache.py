@@ -16,6 +16,10 @@ on output text, so no batch-shape numerics sensitivity):
   S7  capture cannot be enabled on a prefix-caching engine
   S8  fresh runtime install of server-level steering rejected on a
       prefix-caching engine (pre-install blocks are unsalted)
+  S9  v2 SteeringSpec requests key blocks by apply_spec fingerprint:
+      same spec reuses, different apply clause does not
+  S10 v2 length-sensitive spec (generation window): no cross-length
+      reuse, reuse at equal length
 """
 
 import os
@@ -147,6 +151,55 @@ except Exception as e:
           "prefix" in str(e).lower(), f"message: {e}")
 else:
     check("S7 capture rejected under prefix caching", False, "did not raise")
+
+# --- S9/S10: v2 specs key blocks by apply_spec fingerprint -------------
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec  # noqa: E402
+
+
+def v2_spec(**apply_kwargs):
+    return SteeringSpec(
+        vectors=[
+            VectorSpec(
+                source=VECTOR,
+                scale=2.0,
+                layers=[10],
+                apply=ApplySpec(**apply_kwargs),
+            )
+        ]
+    )
+
+
+def run_v2(prompt_ids, steering):
+    return llm.generate(
+        TokensPrompt(prompt_token_ids=list(prompt_ids)),
+        params,
+        steering=steering,
+        use_tqdm=False,
+    )[0]
+
+
+out = run_v2(PROMPT_48, v2_spec(phases=["prompt", "generation"]))
+check("S9a v2 spec cold: no cache hit", out.num_cached_tokens == 0,
+      f"cached={out.num_cached_tokens}")
+out = run_v2(PROMPT_48, v2_spec(phases=["prompt", "generation"]))
+check("S9b same v2 spec warm: cache reused", out.num_cached_tokens > 0,
+      f"cached={out.num_cached_tokens}")
+out = run_v2(PROMPT_48, v2_spec(phases=["prompt", "generation"],
+                                exclude_positions=[0]))
+check("S9c different apply clause: NO reuse", out.num_cached_tokens == 0,
+      f"cached={out.num_cached_tokens}")
+
+win_spec = v2_spec(phases=["generation"], generation_window=(0, 2))
+prompt_56b = PROMPT_48 + list(range(400, 408))
+out = run_v2(PROMPT_48, win_spec)
+check("S10a v2 window spec cold: no hit", out.num_cached_tokens == 0,
+      f"cached={out.num_cached_tokens}")
+out = run_v2(prompt_56b, win_spec)
+check("S10b longer prompt, same window spec: NO reuse (plen key)",
+      out.num_cached_tokens == 0, f"cached={out.num_cached_tokens}")
+out = run_v2(PROMPT_48, win_spec)
+check("S10c equal length, same window spec: reuse",
+      out.num_cached_tokens > 0, f"cached={out.num_cached_tokens}")
 
 # --- S8: fresh runtime server-steering install rejected ----------------
 try:

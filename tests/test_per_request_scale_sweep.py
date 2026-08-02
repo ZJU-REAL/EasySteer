@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import os
 import time
 
 from vllm import LLM, SamplingParams
