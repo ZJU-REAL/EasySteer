@@ -37,7 +37,7 @@ on any FusedMoE architecture**:
 | --- | --- | --- |
 | Record router logits | per-model forked file writing `.npy`s | `router_logits` capture stream (gate forward hooks) |
 | Detect experts | offline risk difference | same, from the captured stream |
-| Steer experts | per-model forked forward | `moe_router` algorithm, `mode: "steermoe"` |
+| Steer experts | per-model forked forward | `moe_router` algorithm, `activate`/`deactivate` modes |
 
 - `expert_detection.ipynb` — capture per-token router logits for a few
   contrastive pairs, compute the risk difference, and write a `steermoe`
@@ -61,11 +61,14 @@ A steering config is a JSON file mapping layers to expert lists:
 ```json
 {
   "layer_configs": {
-    "7":  {"mode": "steermoe", "deactivate_ids": [30, 25]},
-    "9":  {"mode": "steermoe", "activate_ids": [12], "deactivate_ids": [35]}
+    "7":  {"mode": "deactivate", "expert_ids": [30, 25]},
+    "9":  {"mode": "activate", "activate_ids": [12], "deactivate_ids": [35]}
   }
 }
 ```
+
+(`boost`, `suppress`, `soft_hard` and `steermoe` are accepted as
+deprecated aliases of `activate`/`deactivate`.)
 
 applied per request via:
 
