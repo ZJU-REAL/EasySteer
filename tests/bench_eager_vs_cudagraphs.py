@@ -63,12 +63,15 @@ def start_server(
         "--no-enable-chunked-prefill",
     ]
     if server_level:
-        cmd += [
-            "--steer-vector-path", vector_path,
-            "--steer-scale", str(scale),
-            "--steer-target-layers", *[str(layer) for layer in TARGET_LAYERS],
-            "--steer-normalize",
-        ]
+        import json as _json
+        spec = {"vectors": [{
+            "source": vector_path,
+            "scale": scale,
+            "layers": TARGET_LAYERS,
+            "normalize": True,
+            "apply": {"phases": ["prompt", "generation"]},
+        }]}
+        cmd += ["--steering-config", _json.dumps(spec)]
     else:
         cmd += [
             "--enable-steer-vector",
@@ -117,15 +120,13 @@ def bench(
             "temperature": 0.8,
         }
         if per_request:
-            body["steer_vector_request"] = {
-                "steer_vector_local_path": vector_path,
+            body["steering"] = {"vectors": [{
+                "source": vector_path,
                 "scale": scale,
-                "target_layers": TARGET_LAYERS,
-                "algorithm": "direct",
+                "layers": TARGET_LAYERS,
                 "normalize": True,
-                "prefill_trigger_tokens": [-1],
-                "generate_trigger_tokens": [-1],
-            }
+                "apply": {"phases": ["prompt", "generation"]},
+            }]}
         r = client.post(f"{url}/v1/chat/completions", json=body)
         if r.status_code != 200:
             raise RuntimeError(f"Warmup failed: {r.status_code} {r.text[:300]}")
@@ -141,15 +142,13 @@ def bench(
             "temperature": 0.8,
         }
         if per_request:
-            body["steer_vector_request"] = {
-                "steer_vector_local_path": vector_path,
+            body["steering"] = {"vectors": [{
+                "source": vector_path,
                 "scale": scale,
-                "target_layers": TARGET_LAYERS,
-                "algorithm": "direct",
+                "layers": TARGET_LAYERS,
                 "normalize": True,
-                "prefill_trigger_tokens": [-1],
-                "generate_trigger_tokens": [-1],
-            }
+                "apply": {"phases": ["prompt", "generation"]},
+            }]}
         r = client.post(f"{url}/v1/chat/completions", json=body)
         if r.status_code != 200:
             raise RuntimeError(f"Request {i} failed: {r.status_code} {r.text[:300]}")

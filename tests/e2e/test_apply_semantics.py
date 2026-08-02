@@ -10,11 +10,8 @@ steered absolute positions, covering:
 - exclusions composing with phase-wide selection;
 - absolute/negative position filters and token filters (union);
 - exact half-open generation windows;
-- multi-vector specs with independent per-vector apply clauses;
-- the deprecated v1 argument path (removed together with v1).
+- multi-vector specs with independent per-vector apply clauses.
 """
-
-import pytest
 
 from vllm import SamplingParams
 
@@ -136,42 +133,3 @@ class TestMultiVector:
                                 steering=spec)
         assert sorted(p for p, _ in by_layer[10]) == [0]
         assert sorted(p for p, _ in by_layer[12]) == [129, 130, 131]
-
-
-class TestDeprecatedV1Path:
-    """Removed together with the v1 API."""
-
-    def test_v1_request_still_steers(self, trace):
-        from vllm.steer_vectors.request import SteerVectorRequest
-
-        req = SteerVectorRequest(
-            steer_vector_name="v1-compat",
-            steer_vector_int_id=901,
-            steer_vector_local_path=DENSE_VECTOR,
-            scale=0.5,
-            target_layers=[10],
-            prefill_trigger_positions=[-1],
-        )
-        assert trace.positions(
-            PROMPT_LONG, PARAMS, steer_vector_request=req
-        ) == [128]
-
-    def test_mixing_v1_and_v2_arguments_rejected(self, llm):
-        from vllm.inputs import TokensPrompt
-        from vllm.steer_vectors.request import SteerVectorRequest
-
-        req = SteerVectorRequest(
-            steer_vector_name="v1-mix",
-            steer_vector_int_id=902,
-            steer_vector_local_path=DENSE_VECTOR,
-            target_layers=[10],
-            prefill_trigger_tokens=[-1],
-        )
-        with pytest.raises(ValueError, match="not both"):
-            llm.generate(
-                TokensPrompt(prompt_token_ids=PROMPT_ONE),
-                PARAMS,
-                steering=steering_spec(phases=["prompt"]),
-                steer_vector_request=req,
-                use_tqdm=False,
-            )

@@ -1,0 +1,184 @@
+{
+  "layer_configs": {
+    "3": {
+      "mode": "deactivate",
+      "expert_ids": [
+        9,
+        61,
+        36,
+        63,
+        56,
+        23,
+        38
+      ]
+    },
+    "1": {
+      "mode": "deactivate",
+      "expert_ids": [
+        18,
+        47,
+        48,
+        11,
+        36
+      ]
+    },
+    "2": {
+      "mode": "deactivate",
+      "expert_ids": [
+        28,
+        61,
+        24,
+        60,
+        9,
+        4,
+        41,
+        15,
+        31,
+        30,
+        48,
+        62
+      ]
+    },
+    "14": {
+      "mode": "deactivate",
+      "expert_ids": [
+        13,
+        11,
+        60,
+        9,
+        58
+      ]
+    },
+    "0": {
+      "mode": "deactivate",
+      "expert_ids": [
+        23,
+        32,
+        29,
+        8
+      ]
+    },
+    "11": {
+      "mode": "deactivate",
+      "expert_ids": [
+        27,
+        51,
+        5,
+        23,
+        7,
+        13
+      ]
+    },
+    "10": {
+      "mode": "deactivate",
+      "expert_ids": [
+        43,
+        13,
+        62,
+        59,
+        5,
+        56,
+        6,
+        4
+      ]
+    },
+    "15": {
+      "mode": "deactivate",
+      "expert_ids": [
+        57,
+        16,
+        33,
+        9,
+        11,
+        53,
+        44,
+        60,
+        36,
+        3,
+        49
+      ]
+    },
+    "6": {
+      "mode": "deactivate",
+      "expert_ids": [
+        36,
+        9,
+        24
+      ]
+    },
+    "9": {
+      "mode": "deactivate",
+      "expert_ids": [
+        46,
+        15,
+        7,
+        52,
+        40,
+        6
+      ]
+    },
+    "13": {
+      "mode": "deactivate",
+      "expert_ids": [
+        7,
+        54,
+        2,
+        4,
+        42,
+        38,
+        62
+      ]
+    },
+    "7": {
+      "mode": "deactivate",
+      "expert_ids": [
+        12,
+        2,
+        58,
+        35,
+        21,
+        45,
+        9,
+        13
+      ]
+    },
+    "5": {
+      "mode": "deactivate",
+      "expert_ids": [
+        31,
+        61,
+        21,
+        60,
+        53,
+        42,
+        25,
+        17
+      ]
+    },
+    "4": {
+      "mode": "deactivate",
+      "expert_ids": [
+        25,
+        63
+      ]
+    },
+    "12": {
+      "mode": "deactivate",
+      "expert_ids": [
+        58,
+        17,
+        6
+      ]
+    },
+    "8": {
+      "mode": "deactivate",
+      "expert_ids": [
+        3,
+        14,
+        25,
+        29,
+        52
+      ]
+    }
+  }
+}

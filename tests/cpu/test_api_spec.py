@@ -113,7 +113,6 @@ class TestTranslation:
         req = to_engine_request(spec)
         assert req.steer_vector_local_path == VEC
         assert req.scale == 0.5 and req.target_layers == [10]
-        assert req.prefill_trigger_tokens is None
         assert req.apply_spec == {
             "phases": ["prompt"],
             "tokens": [5],
@@ -165,14 +164,12 @@ class TestTranslation:
 
 
 class TestEngineStructValidation:
-    def test_apply_spec_plus_legacy_triggers_rejected(self):
+    def test_missing_apply_spec_rejected(self):
         with pytest.raises(ValueError, match="apply_spec"):
             SteerVectorRequest(
                 steer_vector_name="x",
                 steer_vector_int_id=7,
                 steer_vector_local_path=VEC,
-                prefill_trigger_tokens=[-1],
-                apply_spec={"phases": ["prompt"]},
             )
 
     def test_malformed_apply_spec_rejected(self):
@@ -313,4 +310,3 @@ class TestTriggerControllerIntegration:
         )
         assert not ctrl.is_global_only_config()
         assert ctrl.has_any_triggers()
-        assert ctrl.has_prefill_triggers()

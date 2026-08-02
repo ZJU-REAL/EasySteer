@@ -1,10 +1,33 @@
 # EasySteer validation tests
 
-End-to-end validation scripts for EasySteer's vLLM fork (`vllm-steer/`).
-Each script boots its own engine, prints per-check `OK:`/`FAIL:` lines and
-an `OVERALL: PASS|FAIL` verdict, and exits nonzero on failure. They are
-standalone scripts (not pytest) because each needs a dedicated engine
-configuration and a GPU.
+Pytest suites for EasySteer's vLLM fork (`vllm-steer/`), all using the
+v2 steering API (`SteeringSpec` / `VectorSpec` / `ApplySpec`, see
+`../STEERING_API_V2.md`).
+
+## Layout
+
+- `conftest.py` — GPU/trace environment setup and the engine fixture:
+  a GPU module declares `ENGINE_KWARGS` at module level and every test
+  in it shares that one engine (`llm` / `trace` fixtures).
+- `helpers.py` — model/vector path constants (env-overridable), the
+  `steering_spec()` builder, and the `TraceOracle` (exact steered
+  absolute positions from the steering trace).
+- `cpu/` — no GPU: spec validation/translation/fingerprints and the
+  position collector (`test_api_spec.py`), algorithm loaders
+  (`test_loaders.py`), vector-store versioning (`test_store.py`).
+- `e2e/` — dense-model engine suites, one engine config per module:
+  apply-clause semantics under chunked prefill, slot routing + scale
+  sweep, prefix caching, engine-default steering, golden sentiment,
+  require-preload, piecewise and full-graph compilation, capture.
+- `moe/` — OLMoE/Qwen3-MoE suites: router-logit steering modes and slot
+  routing, compiled MoE, SteerMoE replication, second-architecture
+  smoke.
+- `run_suites.sh` — runs each GPU module in its own pytest process
+  (vLLM engines do not reliably release GPU state in-process):
+  `GPU_ID=2 ./run_suites.sh [cpu|dense|moe|all]`.
+- `verify_steering_correctness.py` — model/hardware sanity harness
+  (argparse tool, not a pytest suite).
+- `bench_eager_vs_cudagraphs.py` — decode throughput benchmark.
 
 ## Configuration
 
@@ -15,91 +38,26 @@ configuration and a GPU.
 | `STEER_TEST_VECTOR` | steering vector (gguf) for the dense tests | `~/EasySteer/vectors/happy_diffmean.gguf` |
 | `STEER_TEST_MOE_MODEL` | MoE test model (OLMoE-1B-7B-0125-Instruct) | `~/models/OLMoE-1B-7B-0125-Instruct` |
 | `STEER_TEST_QWEN3` | Qwen3-MoE smoke-test model | lab path |
-| `STEER_TEST_EAGER` | `1` eager / `0` compiled (where supported) | `1` |
+| `STEER_TEST_EAGER` | `1` eager / `0` compiled (where supported) | per suite |
+| `STEER_TEST_TP` | tensor parallel size | `1` |
 | `STEERMOE_PKL` | SteerMoE released rankings pickle (optional) | cwd |
-
-## Suites
-
-Dense decoder-path steering (Qwen2.5-1.5B):
-- `test_piecewise_steering.py` — Tier-2 steering under piecewise CUDA graphs
-- `test_fullgraph_steering.py` — Tier-1 full-graph steering (`--steer-graph-mode=full`)
-- `test_trigger_positions.py` — trigger/exclusion position oracle vs steering trace (takes `--model`/`--vector`)
-- `test_multi_vector_routed.py` — slot-routed multi-vector configs
-- `test_per_request_scale_sweep.py` — per-request isolation across a 51-scale batch
-- `test_server_default_slot.py` — server-level (default-slot) steering
-- `test_require_preload.py` — `--steer-require-preload` frontend enforcement
-- `test_phase_chunked_prefill.py` — trace-oracle phase classification and
-  chunked-prefill correctness (1-token prompts, 1-token tail chunks,
-  negative trigger positions), request-validation explicit failures
-- `test_steering_prefix_cache.py` — steering-aware prefix caching:
-  fingerprint-keyed KV reuse (`num_cached_tokens` oracle), length-
-  sensitive and phase-boundary keying, capture/fresh-install rejections,
-  v2-spec fingerprint keying (S9/S10)
-- `test_server_prefix_cache.py` — server-level steering with prefix
-  caching (startup salt; scale update + `reset_prefix_cache`)
-- `test_api_v2.py` — v2 steering API (`SteeringSpec`/`ApplySpec`) trace
-  oracle: phase selection, composing exclusions, exact generation
-  windows, token/position filters, multi-vector apply clauses,
-  deprecated-v1-path compat
-- `test_api_v2_server.py` — engine-default steering via
-  `--steering-config` (v2 spec JSON) with prefix caching (salt + reuse)
-- `verify_steering_correctness.py` — model/hardware sanity harness (argparse)
-
-MoE gate steering + router-logit capture (OLMoE-1B-7B):
-- `test_moe_modes.py` — activate/deactivate semantics, deprecated aliases, mixed configs, no-file requests, trigger positions
-- `test_moe_slot_routing.py` — per-request MoE routing in mixed batches
-- `test_steermoe_olmoe.py` — SteerMoE (arXiv:2509.09660) end-to-end replication checks
-- `test_moe_compiled.py` — MoE gate steering under piecewise CUDA graphs (trace-verified)
-- `test_qwen3moe_smoke.py` — second architecture (internal-router gate path)
-
-Capture streams (dense):
-- `test_capture_hidden_states.py` — hook-based capture: layer subsets, reductions, budgets, dtypes, legacy RPC shims
-- `test_capture_chunked.py` — capture coverage and chunk-aware `last`
-  reduction under chunked prefill
-
-CPU-only units:
-- `test_api_v2_unit.py` — v2 API spec validation, translation to the
-  engine struct, fingerprint/length-sensitivity participation, and the
-  v2 position collector's semantics
-- `test_mask_equivalence.py` — 5000-case trigger-mask fuzz vs the legacy collector (`_legacy_position_collector.py`; v1 semantics only — the v2 collector is covered by `test_api_v2_unit.py`)
-- `test_store_reload_unit.py` — VectorStore file-version reload semantics
-- `test_algorithm_loaders.py` — every algorithm's `load_from_path` against synthetic files, including the explicit-failure paths
-
-Benchmarks:
-- `bench_eager_vs_cudagraphs.py` — decode throughput, eager vs CUDA graphs
 
 ## Notes
 
 - Steering supports prefix caching (block hashes are keyed by the
-  steering config fingerprint; server-level mode salts every hash and
-  scale updates reset the cache) and chunked prefill. Capture requires
+  steering config fingerprint; engine-default mode salts every hash and
+  spec updates reset the cache) and chunked prefill. Capture requires
   `enforce_eager=True` and `enable_prefix_caching=False` (cache-hit
-  tokens are never recomputed, so they cannot be captured — enabling a
-  capture stream on a prefix-caching engine raises).
+  tokens are never recomputed, so they cannot be captured).
 - Byte-exact cross-run comparisons need identical batch geometry: use
-  `ignore_eos=True` and pin `async_scheduling=False` (async admission makes
-  prefill co-batching timing-dependent).
-- Stored goldens (`golden.txt` comparisons in the sentiment and
-  server-slot tests) are GPU-model-specific: kernel numerics differ
-  across GPU models, so compare only on the model that recorded the
-  golden. Behavior-level checks (does the output change/flip) can also
-  be hardware-sensitive; mechanism-level checks (captured logits,
-  steering trace) are not. golden.txt was re-recorded 2026-08-02 after
-  `steer_vector_dtype="auto"` started resolving to the model dtype
-  (bf16 vectors); the fp16-era golden is kept as
-  `golden.txt.fp16-bak`.
-- The documented steering API is v2 (`SteeringSpec`/`VectorSpec`/
-  `ApplySpec`, see `STEERING_API_V2.md`): `llm.generate(...,
-  steering=spec)`, HTTP `"steering"`, engine default `--steering-config`.
-  The v1 surface (`steer_vector_request`, `--steer-vector-path` flags)
-  is deprecated — it still works but warns.
-- v1 steering requests must set at least one trigger field
-  (`prefill_trigger_tokens=[-1]` / `generate_trigger_tokens=[-1]` for
-  global application) — triggerless configs are rejected instead of
-  silently steering nothing. In v2 the `apply` clause is structurally
-  required.
-- Compiled-vs-eager outputs differ by kernel numerics; tests compare
-  behavior via the steering trace (`VLLM_STEER_TRACE_DIR`), not bytes.
+  `ignore_eos=True` and pin `async_scheduling=False`. Batched-vs-
+  sequential equality is NOT asserted anywhere (vLLM batch-shape
+  numerics); determinism and anchor checks gate instead.
+- Stored goldens (`test_golden_sentiment.py`) are GPU-model-specific:
+  compare only on the GPU model that recorded them (currently RTX PRO
+  5000, bf16 vectors). Mechanism-level checks (captured logits,
+  steering trace, `num_cached_tokens`) are hardware-robust.
+- Compiled-vs-eager outputs differ by kernel numerics; compiled tests
+  compare behavior via the steering trace, not bytes.
 - The capture package's canonical import path is `vllm.capture`;
-  `vllm.hidden_states` is a backward-compatibility alias. Tests import
-  the alias on purpose so it stays covered.
+  `vllm.hidden_states` is a covered back-compat alias.

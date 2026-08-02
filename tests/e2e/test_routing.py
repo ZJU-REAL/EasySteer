@@ -6,12 +6,16 @@ One eager dense engine, greedy sampling. Covers:
   single-vector spec (same math through the multi path);
 - a two-vector spec (split layers, sequential) steers;
 - no cross-request contamination in a [steered, plain] batch;
-- a 51-scale sweep: batch-repeat determinism and scale-0 == unsteered.
+- a 51-scale sweep: scale-0 == unsteered, outputs vary across scales,
+  and per-request isolation in the batched pass verified through the
+  steering trace (every applied position belongs to a request routed to
+  that apply's slot).
 
-Batched-vs-sequential byte equality is deliberately NOT asserted: vLLM
-batch-shape numerics make it approximate (a long-standing, confirmed
-expectation). The gates are repeat determinism (same batch twice must
-match exactly) and the anchors; a real routing bug shows up there.
+Byte-level batch comparisons (batched-vs-sequential, and even repeated
+identical batches) are deliberately NOT asserted: large-batch numerics
+vary with GPU conditions (observed on shared GPUs even at scale 0), a
+vLLM-level property unrelated to steering. Isolation is asserted at the
+mechanism level via the trace instead, which is hardware-robust.
 
 async_scheduling is pinned off: byte-comparing one request's output
 across generate calls needs identical batch geometry, and async
@@ -110,36 +114,61 @@ def _scale_spec(scale):
 
 @pytest.fixture(scope="module")
 def sweep(llm):
+    import os
+
+    from helpers import read_trace
+
     llm.preload_steer_vectors([DENSE_VECTOR])
     unsteered = gen(llm, [PROMPT], None, max_tokens=64)[0]
     ref = {
         s: gen(llm, [PROMPT], _scale_spec(s), max_tokens=64)[0]
         for s in SCALES
     }
+    trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
+    steps_before, _ = read_trace(trace_dir, 0, ())
+    start = max(steps_before, default=0)
     batch = dict(zip(SCALES, gen(
         llm, [PROMPT] * len(SCALES),
         [_scale_spec(s) for s in SCALES], max_tokens=64,
     )))
-    batch2 = dict(zip(SCALES, gen(
-        llm, [PROMPT] * len(SCALES),
-        [_scale_spec(s) for s in SCALES], max_tokens=64,
-    )))
-    return unsteered, ref, batch, batch2
+    steps, applies = read_trace(trace_dir, start, (LAYERS[0],))
+    return unsteered, ref, batch, steps, applies
 
 
 class TestScaleSweep:
-    def test_batch_repeat_determinism(self, sweep):
-        _, _, batch, batch2 = sweep
-        mismatched = [s for s in SCALES if batch[s] != batch2[s]]
-        assert not mismatched, f"batch repeat differed at scales {mismatched}"
-
     def test_scale_zero_is_unsteered_and_sweep_varies(self, sweep):
-        unsteered, ref, _, _ = sweep
+        unsteered, ref, _, _, _ = sweep
         assert ref[0.0] == unsteered, "scale 0.0 must equal the unsteered output"
         assert len(set(ref.values())) > 5, "sweep outputs barely vary"
 
     def test_batched_sweep_produces_scale_dependent_outputs(self, sweep):
-        _, _, batch, _ = sweep
+        _, _, batch, _, _ = sweep
         assert len(set(batch.values())) > 5, (
             "batched sweep outputs barely vary across scales"
+        )
+
+    def test_batched_isolation_via_trace(self, sweep):
+        """Every applied position belongs to a request routed to that
+        apply's slot — the mechanism-level no-cross-request guarantee."""
+        _, _, _, steps, applies = sweep
+        assert applies, "batched sweep produced no steering applies"
+        distinct_slots = set()
+        for rec in applies:
+            step = steps[rec["step"]]
+            qsl = step["query_start_loc"]
+            slots = step["slots"]
+            distinct_slots.add(rec["slot"])
+            for pos in rec["positions"]:
+                req_idx = next(
+                    i for i in range(len(qsl) - 1)
+                    if qsl[i] <= pos < qsl[i + 1]
+                )
+                assert slots[req_idx] == rec["slot"], (
+                    f"step {rec['step']}: position {pos} of slot "
+                    f"{rec['slot']} lies in request {req_idx} routed to "
+                    f"slot {slots[req_idx]}"
+                )
+        assert len(distinct_slots) == len(SCALES), (
+            f"expected {len(SCALES)} live slots (one per scale), got "
+            f"{len(distinct_slots)}"
         )

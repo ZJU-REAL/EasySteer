@@ -1,7 +1,11 @@
 # Steering API v2 — design and migration
 
-Status: approved direction (2026-08-02). v1 is deprecated and will be removed
-after the EasySteer package and notebooks migrate.
+Status: v2 is the only API (2026-08-03). The v1 surface — trigger
+fields, `steer_vector_request` (offline and HTTP), the pydantic Param
+twins, the `--steer-vector-path` flag family and the v1 position
+collector — has been deleted; notebooks, tests, docs and the docker
+smoke test all use v2. (`frontend/` and `hf-space/` adaptation is
+deferred; see MIGRATION_PLAN.)
 
 ## Why
 
@@ -108,12 +112,11 @@ struct. v2 specs translate at admission via
   registry; negative positions and `generation_window` mark the config
   prompt-length-sensitive, same rules as v1.
 
-## Deprecation plan
+## Deprecation history
 
-1. **Now**: v2 is the documented API. v1 (`steer_vector_request` offline
-   kwarg and HTTP field, `--steer-vector-path`/`--steer-scale`/... flags)
-   logs a deprecation warning on use and translates/behaves as before.
-2. **Next**: EasySteer package, notebooks, hf-space and tests migrate to v2.
-3. **Then**: v1 fields, the v1 collector, the legacy fuzz test, the
-   `"path|algo"` hack and the pydantic Param twins are deleted; `apply_spec`
-   becomes the only where-clause.
+1. 2026-08-03 (`9ef3909`): v2 introduced; v1 deprecated with warnings.
+2. 2026-08-03: notebooks, tests, docs, docker test migrated to v2.
+3. 2026-08-03: v1 deleted — trigger fields, the v1 collector, the legacy
+   fuzz oracle, the `"path|algo"` hack, the pydantic Param twins, and the
+   `--steer-*` server flag family; `apply_spec` is the only where-clause
+   and `--steering-config` the only engine-default mechanism.

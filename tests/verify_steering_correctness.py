@@ -36,7 +36,7 @@ from pathlib import Path
 import torch
 
 from vllm import LLM, SamplingParams
-from vllm.steer_vectors.request import SteerVectorRequest
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
 LOGPROB_ATOL = 1e-4
 
@@ -83,12 +83,12 @@ def generate(
     llm: LLM,
     prompts: list[str],
     max_tokens: int,
-    steer_req: SteerVectorRequest | None = None,
+    steering: SteeringSpec | None = None,
 ) -> list[tuple[list[str], list[float]]]:
     sampling = SamplingParams(temperature=0.0, max_tokens=max_tokens, logprobs=0)
     kwargs = {}
-    if steer_req is not None:
-        kwargs["steer_vector_request"] = steer_req
+    if steering is not None:
+        kwargs["steering"] = steering
     outputs = llm.generate(prompts, sampling_params=sampling, **kwargs)
     return extract_logprobs(outputs)
 
@@ -148,13 +148,14 @@ def make_llm(
         max_model_len=max_model_len,
     )
     if vector_path is not None:
-        # Server-level steering
-        kwargs["steer_vector_path"] = vector_path
-        kwargs["steer_scale"] = scale
-        kwargs["steer_target_layers"] = target_layers
-        kwargs["steer_normalize"] = normalize
-        kwargs["steer_algorithm"] = "direct"
-        # Server-level implies enable_steer_vector
+        # Engine-default steering (implies enable_steer_vector)
+        kwargs["steering_config"] = SteeringSpec(vectors=[VectorSpec(
+            source=vector_path,
+            scale=scale,
+            layers=target_layers,
+            normalize=normalize,
+            apply=ApplySpec(phases=["prompt", "generation"]),
+        )]).model_dump_json()
     elif enable_steer:
         kwargs["enable_steer_vector"] = True
     return LLM(**kwargs)
