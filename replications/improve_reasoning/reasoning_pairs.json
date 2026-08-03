@@ -1,0 +1,52 @@
+[
+  {
+    "question": "A basketball team has 3 players. Player A scored 15 points. Player B scored twice as many points as Player A. Player C scored 10 points less than Player B. What is the total score of the team?",
+    "sound": "Player A scored 15 points. Player B scored 15 * 2 = 30 points. Player C scored 30 - 10 = 20 points. The total score is 15 + 30 + 20 = 65 points. #### 65",
+    "flawed": "Player A scored 15 points. Player B scored 15 * 2 = 30 points. Player C scored 15 - 10 = 5 points. The total score is 15 + 30 + 5 = 50 points. #### 50"
+  },
+  {
+    "question": "A recipe for 12 cookies requires 2 cups of flour. If you want to bake 36 cookies, how many cups of flour do you need?",
+    "sound": "To make 36 cookies, you need to make 36 / 12 = 3 batches. Each batch needs 2 cups of flour. So, you need 3 * 2 = 6 cups of flour. #### 6",
+    "flawed": "You want to make 36 cookies, which is 24 more than 12. So you need 2 + 24 = 26 cups of flour. #### 26"
+  },
+  {
+    "question": "A book has 300 pages. A student reads 25 pages per day for a full week. How many pages are left to read?",
+    "sound": "In a week (7 days), the student reads 25 * 7 = 175 pages. The number of pages left is 300 - 175 = 125 pages. #### 125",
+    "flawed": "In a week (7 days), the student reads 25 * 7 = 175 pages. The number of pages left is 300 + 175 = 475 pages. #### 475"
+  },
+  {
+    "question": "Sarah starts with $50 in her savings account. She saves an additional $10 every week for 8 weeks. Then she spends $20 on a toy. How much money does she have left?",
+    "sound": "Over 8 weeks, Sarah saves 10 * 8 = $80. Her total money becomes 50 + 80 = $130. After spending $20, she has 130 - 20 = $110 left. #### 110",
+    "flawed": "Over 8 weeks, Sarah saves 10 * 8 = $80. After spending $20, she has 80 - 20 = $60 left. #### 60"
+  },
+  {
+    "question": "A jacket costs $80. It is on sale with a 25% discount. What is the final price of the jacket?",
+    "sound": "The discount amount is 25% of $80, which is 80 * 0.25 = $20. The final price is the original price minus the discount, so 80 - 20 = $60. #### 60",
+    "flawed": "The discount is 25%. The final price is 80 * 0.25 = $20. #### 20"
+  },
+  {
+    "question": "A train travels at a constant speed of 60 miles per hour. How long will it take to travel a distance of 150 miles?",
+    "sound": "Time is calculated as Distance / Speed. So, the time it will take is 150 miles / 60 mph = 2.5 hours. #### 2.5",
+    "flawed": "Time is calculated as Speed / Distance. So, the time it will take is 60 mph / 150 miles = 0.4 hours. #### 0.4"
+  },
+  {
+    "question": "A farmer has 4 fields. Each field contains 120 apple trees, and each tree produces 10 apples. How many apples does the farmer have in total?",
+    "sound": "The total number of trees is 4 fields * 120 trees/field = 480 trees. The total number of apples is 480 trees * 10 apples/tree = 4800 apples. #### 4800",
+    "flawed": "The farmer has 4 fields, 120 trees, and 10 apples. The total number of apples is 4 + 120 + 10 = 134 apples. #### 134"
+  },
+  {
+    "question": "The temperature in the morning was 15 degrees Celsius. It dropped by 2 degrees every hour for 6 hours. What is the new temperature?",
+    "sound": "The total temperature drop over 6 hours is 2 * 6 = 12 degrees. The new temperature is 15 - 12 = 3 degrees Celsius. #### 3",
+    "flawed": "The total temperature drop over 6 hours is 2 * 6 = 12 degrees. The new temperature is 15 + 12 = 27 degrees Celsius. #### 27"
+  },
+  {
+    "question": "A large box contains 144 pencils. A teacher buys 3 boxes and wants to distribute all the pencils equally among her 24 students. How many pencils does each student get?",
+    "sound": "The total number of pencils is 3 boxes * 144 pencils/box = 432 pencils. The number of pencils per student is 432 / 24 = 18 pencils. #### 18",
+    "flawed": "A large box contains 144 pencils. The number of pencils per student is 144 / 24 = 6 pencils. #### 6"
+  },
+  {
+    "question": "For a party of 30 people, the host estimates they will need 2 pizzas for every 5 people. How many pizzas should the host order?",
+    "sound": "The number of groups of 5 people is 30 / 5 = 6 groups. Each group needs 2 pizzas, so the total number of pizzas needed is 6 * 2 = 12 pizzas. #### 12",
+    "flawed": "The number of groups of 5 people is 30 / 5 = 6 groups. The total number of pizzas is 30 + 6 + 2 = 38 pizzas. #### 38"
+  }
+]
