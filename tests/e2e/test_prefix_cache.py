@@ -122,3 +122,31 @@ class TestCachingEngineRejections:
                 "add_steer_vector",
                 args=(to_engine_request(steering_spec(scale=1.0)),),
             )
+
+
+class TestBaselineIsolation:
+    """The notebook flow: baseline, then steering, then the baseline
+    again in the same engine — the post-steering baseline must be
+    byte-identical. The reference is the WARM (cache-hit) baseline, not
+    the cold first run: a cache hit recomputes only the block tail via a
+    different kernel path, which shifts numerics on its own with no
+    steering involved (cold != warm even for pure baselines).
+    """
+
+    PROMPT = list(range(300, 348))
+
+    def test_baseline_steered_baseline_byte_identical(self, llm):
+        spec = steering_spec(scale=20.0, layers=tuple(range(10, 26)),
+                             phases=["prompt"])
+        run(llm, self.PROMPT, max_tokens=24)  # cold run fills the cache
+        warm = run(llm, self.PROMPT, max_tokens=24).outputs[0]
+        steered = run(llm, self.PROMPT, spec, max_tokens=24).outputs[0]
+        assert steered.text != warm.text, (
+            "prompt-phase steering produced no effect; the isolation "
+            "assertion below would be vacuous"
+        )
+        again = run(llm, self.PROMPT, max_tokens=24).outputs[0]
+        assert again.text == warm.text, (
+            "warm baseline rerun after a steered request diverged — "
+            "steering state leaked across requests"
+        )

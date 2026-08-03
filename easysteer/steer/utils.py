@@ -18,10 +18,12 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass
 class StatisticalControlVector:
     """Statistical control vector with multi-layer directions"""
-    model_type: str
     method: str
     directions: dict[int, np.ndarray]
     metadata: dict = None
+    # Only echoed into the gguf "model_hint" field for repeng
+    # compatibility; nothing in EasySteer consumes it.
+    model_type: str = "unknown"
 
     def export_gguf(self, path: os.PathLike[str] | str):
         """

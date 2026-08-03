@@ -120,7 +120,6 @@ class LinearProbeExtractor(BaseExtractor):
         all_hidden_states,
         positive_indices,
         negative_indices=None,
-        model_type: str = "unknown",
         normalize: bool = True,
         token_pos: int | str = -1,
         regularization: str = "l2",
@@ -140,19 +139,6 @@ class LinearProbeExtractor(BaseExtractor):
                 samples. If None, every sample index not in
                 ``positive_indices`` becomes a negative, in ascending
                 sample order (the convention shared by all extractors).
-            model_type (str): Model type name recorded in the result.
-            normalize (bool): Normalize each direction to unit L2 norm.
-            token_pos (int | str): Token position, -1 selects the last
-                token (default); supports int/"first"/"last"/"mean"/
-                "max"/"min".
-            regularization (str): Regularization type, one of "l1",
-                "l2", "elasticnet", "none"; anything else raises
-                ValueError.
-            C (float): Inverse regularization strength (smaller means
-                stronger regularization).
-            standardize (bool): Standardize features before fitting.
-            **kwargs (Any): Ignored here; unified_interface rejects
-                unknown options before dispatching.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -207,7 +193,6 @@ class LinearProbeExtractor(BaseExtractor):
             all_hidden_states,
             positive_indices,
             negative_indices,
-            model_type=model_type,
             normalize=normalize,
             token_pos=token_pos,
             opts={"penalty": penalty, "C": C, "standardize": standardize},

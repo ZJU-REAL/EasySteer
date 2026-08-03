@@ -64,7 +64,6 @@ class BaseExtractor(abc.ABC):
         positive_indices,
         negative_indices,
         *,
-        model_type,
         normalize,
         token_pos,
         extraction_negatives=None,
@@ -87,20 +86,6 @@ class BaseExtractor(abc.ABC):
             negative_indices (list[int] | None): Resolved negative
                 indices; used for the metadata count and, by default,
                 for extraction.
-            model_type (str): Model type name recorded in the result.
-            normalize (bool): Normalize each direction to unit L2 norm.
-            token_pos (int | str): Token position passed to
-                `extract_token_hiddens`.
-            extraction_negatives (list[int] | None): Negative indices
-                to actually extract. None (default) extracts
-                ``negative_indices``; pass `[]` when the method ignores
-                negative rows.
-            opts (dict | None): Keyword options forwarded to
-                `_direction()`.
-            extra_metadata (dict | None): Method-specific metadata
-                entries recorded verbatim.
-            method (str | None): Override for the recorded method name;
-                defaults to `cls.method`.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -138,7 +123,6 @@ class BaseExtractor(abc.ABC):
             **layer_stats,
         )
         return StatisticalControlVector(
-            model_type=model_type,
             method=method or cls.method,
             directions=directions,
             metadata=metadata,

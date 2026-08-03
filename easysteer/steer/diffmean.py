@@ -40,7 +40,6 @@ class DiffMeanExtractor(BaseExtractor):
         all_hidden_states,
         positive_indices,
         negative_indices=None,
-        model_type: str = "unknown",
         normalize: bool = True,
         token_pos: int | str = -1,
         **kwargs
@@ -57,13 +56,6 @@ class DiffMeanExtractor(BaseExtractor):
                 samples. If None, every sample index not in
                 ``positive_indices`` becomes a negative, in ascending
                 sample order (the convention shared by all extractors).
-            model_type (str): Model type name recorded in the result.
-            normalize (bool): Normalize each direction to unit L2 norm.
-            token_pos (int | str): Token position, -1 selects the last
-                token (default); supports int/"first"/"last"/"mean"/
-                "max"/"min".
-            **kwargs (Any): Ignored here; unified_interface rejects
-                unknown options before dispatching.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -76,7 +68,6 @@ class DiffMeanExtractor(BaseExtractor):
             all_hidden_states,
             positive_indices,
             negative_indices,
-            model_type=model_type,
             normalize=normalize,
             token_pos=token_pos,
         )
@@ -85,7 +76,6 @@ class DiffMeanExtractor(BaseExtractor):
     def from_moments(
         pos_moments,
         neg_moments,
-        model_type: str = "unknown",
         normalize: bool = True,
     ) -> StatisticalControlVector:
         """Build a diffmean vector from streaming moment accumulators.
@@ -99,8 +89,6 @@ class DiffMeanExtractor(BaseExtractor):
                 (easysteer.steer.accumulators).
             neg_moments (MomentsAccumulator): Accumulator fed the
                 negative rows layer by layer.
-            model_type (str): Model type name recorded in the result.
-            normalize (bool): Normalize each direction to unit L2 norm.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -119,7 +107,6 @@ class DiffMeanExtractor(BaseExtractor):
             for layer in layers
         }
         return StatisticalControlVector(
-            model_type=model_type,
             method="diffmean",
             directions=directions,
             metadata=_metadata(

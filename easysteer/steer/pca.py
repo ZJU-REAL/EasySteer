@@ -116,7 +116,6 @@ class PCAExtractor(BaseExtractor):
         all_hidden_states,
         positive_indices,
         negative_indices=None,
-        model_type: str = "unknown",
         n_components: int = 1,
         method: str = "standard",  # "standard", "diff", or "center"
         correct_direction: bool = True,
@@ -136,22 +135,6 @@ class PCAExtractor(BaseExtractor):
                 samples. If None, every sample index not in
                 ``positive_indices`` becomes a negative, in ascending
                 sample order (the convention shared by all extractors).
-            model_type (str): Model type name recorded in the result.
-            n_components (int): Number of PCA components. Only 1 is
-                supported; other values raise ValueError.
-            method (str): PCA variant, one of:
-                "standard" - plain PCA (positive samples only),
-                "diff" - PCA over positive/negative differences,
-                "center" - PCA over pair-centered samples.
-            correct_direction (bool): Flip the vector if needed so it
-                points from the negative samples toward the positive
-                samples.
-            normalize (bool): Normalize each direction to unit L2 norm.
-            token_pos (int | str): Token position, -1 selects the last
-                token (default); supports int/"first"/"last"/"mean"/
-                "max"/"min".
-            **kwargs (Any): Ignored here; unified_interface rejects
-                unknown options before dispatching.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -189,7 +172,6 @@ class PCAExtractor(BaseExtractor):
             all_hidden_states,
             positive_indices,
             negative_indices,
-            model_type=model_type,
             normalize=normalize,
             token_pos=token_pos,
             extraction_negatives=extraction_negatives,
@@ -205,7 +187,6 @@ class PCAExtractor(BaseExtractor):
     @staticmethod
     def from_moments(
         moments,
-        model_type: str = "unknown",
         normalize: bool = True,
         pos_moments=None,
         neg_moments=None,
@@ -221,12 +202,6 @@ class PCAExtractor(BaseExtractor):
         Args:
             moments (MomentsAccumulator): Accumulator with
                 ``track_second_moment=True`` fed the positive rows.
-            model_type (str): Model type name recorded in the result.
-            normalize (bool): Normalize each direction to unit L2 norm.
-            pos_moments (MomentsAccumulator | None): First-moment
-                accumulator of the positive rows, for sign correction.
-            neg_moments (MomentsAccumulator | None): First-moment
-                accumulator of the negative rows, for sign correction.
 
         Returns:
             StatisticalControlVector: The extracted control vector.
@@ -252,7 +227,6 @@ class PCAExtractor(BaseExtractor):
                 direction = l2_normalize(direction)
             directions[layer] = direction.astype(np.float32)
         return StatisticalControlVector(
-            model_type=model_type,
             method="pca_standard",
             directions=directions,
             metadata=_metadata(

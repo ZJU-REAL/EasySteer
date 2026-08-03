@@ -150,23 +150,10 @@ def run_extraction(config):
             update_extraction_status(f"Warning: Invalid token position '{token_pos}', using -1 (last token) instead.")
             token_pos = -1
         
-        # Get model type (inferred from model path)
-        model_type = "qwen2.5"  # Default value, can be further inferred from model path
-        if "qwen" in model_path.lower():
-            if "2.5" in model_path:
-                model_type = "qwen2.5"
-            elif "2" in model_path:
-                model_type = "qwen2"
-            else:
-                model_type = "qwen"
-        elif "llama" in model_path.lower():
-            model_type = "llama"
-        
         extract_kwargs = {
             "all_hidden_states": all_hidden_states,
             "positive_indices": positive_indices,
             "negative_indices": negative_indices,
-            "model_type": model_type,
             "normalize": config.get('normalize', True),
             "token_pos": token_pos
         }

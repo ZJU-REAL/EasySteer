@@ -134,7 +134,7 @@ def extract_diffmean_control_vector(
             ``positive_indices`` becomes a negative, in ascending
             sample order.
         **kwargs (Any): Options accepted by DiffMeanExtractor:
-            `model_type` (str), `normalize` (bool, default True),
+            `normalize` (bool, default True),
             `token_pos` (int | str, default -1). Unknown options raise
             ValueError.
 
@@ -169,7 +169,7 @@ def extract_pca_control_vector(
             True) flips the vector if needed so it points from negative
             toward positive samples; `n_components` (int, must be 1);
             `normalize` (bool, default True); `token_pos` (int | str,
-            default -1, the last token); `model_type` (str). Unknown
+            default -1, the last token). Unknown
             options raise ValueError.
 
     Returns:
@@ -219,7 +219,7 @@ def extract_lat_control_vector(
             flips the vector if needed so it points from negative
             toward positive samples; `n_components` (int, default 1);
             `normalize` (bool, default True); `token_pos` (int | str,
-            default -1, the last token); `model_type` (str). Unknown
+            default -1, the last token). Unknown
             options raise ValueError.
 
     Returns:
@@ -265,7 +265,7 @@ def extract_linear_probe_control_vector(
             C=10.0 or larger to avoid excessive sparsification; with
             "none" C is ignored); `standardize` (bool, default True);
             `normalize` (bool, default True); `token_pos` (int | str,
-            default -1, the last token); `model_type` (str). Unknown
+            default -1, the last token). Unknown
             options raise ValueError.
 
     Returns:
@@ -275,13 +275,13 @@ def extract_linear_probe_control_vector(
         >>> # L2 regularization (recommended)
         >>> linear_probe_vector = extract_linear_probe_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
-        ...     model_type="qwen2.5", regularization="l2", C=1.0
+        ...     regularization="l2", C=1.0
         ... )
         >>>
         >>> # L1 regularization (feature selection)
         >>> linear_probe_l1 = extract_linear_probe_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
-        ...     model_type="qwen2.5", regularization="l1", C=10.0
+        ...     regularization="l1", C=10.0
         ... )
     """
     return _dispatch(
