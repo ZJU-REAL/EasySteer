@@ -86,7 +86,7 @@ def get_all_hidden_states_generate(
         dtype: engine-side storage dtype (e.g. ``'float16'``).
         select: SelectSpec (or wire dict) — the full where-clause
             selection language; cannot combine with the shortcuts.
-        **generate_kwargs: forwarded into SamplingParams.
+        **generate_kwargs (Any): forwarded into SamplingParams.
 
     Returns:
         ``(hidden_states, outputs)`` where hidden_states is

@@ -39,7 +39,7 @@ def get_moe_router_logits_generate(
         split_by_samples: if True return one ``{layer_id: tensor}``
             dict per sample; if False return a single dict with all
             samples' rows concatenated per layer.
-        **generate_kwargs: forwarded into SamplingParams.
+        **generate_kwargs (Any): forwarded into SamplingParams.
 
     Returns:
         ``(router_logits, outputs)`` where router_logits is

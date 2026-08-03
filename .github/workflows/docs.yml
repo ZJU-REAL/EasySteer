@@ -39,7 +39,7 @@ jobs:
       - name: Install docs requirements
         run: pip install -r requirements-docs.txt
       - name: Build (strict)
-        run: mkdocs build  # TODO: restore --strict after docstring bracket cleanup (autorefs false refs)
+        run: mkdocs build --strict
 
   # Pushes to main / version tags: publish with mike to the gh-pages branch.
   #
@@ -63,7 +63,7 @@ jobs:
       - name: Install docs requirements
         run: pip install -r requirements-docs.txt
       - name: Build (strict) before publishing
-        run: mkdocs build  # TODO: restore --strict after docstring bracket cleanup (autorefs false refs)
+        run: mkdocs build --strict
       - name: Configure git for mike
         run: |
           git config user.name "github-actions[bot]"

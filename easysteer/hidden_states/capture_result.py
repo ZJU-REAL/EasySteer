@@ -118,7 +118,7 @@ class CaptureResult:
         return [int(first.token_ids[r]) for r in self._sample_rows[i]]
 
     def to_nested(self) -> List[List[torch.Tensor]]:
-        """Legacy extractor shape: [sample][layer_pos] (layers sorted by id)."""
+        """Legacy extractor shape: `[sample][layer_pos]` (layers sorted by id)."""
         return [
             [self.sample(i)[lid] for lid in self.layer_ids]
             for i in range(len(self))
@@ -150,7 +150,7 @@ def capture(
             entries keep the global selection. Requires positions='all'
             semantics (no reductions).
         stream: 'hidden_states' or 'router_logits'.
-        **generate_kwargs: forwarded into SamplingParams.
+        **generate_kwargs (Any): forwarded into SamplingParams.
 
     Returns:
         CaptureResult with exact per-sample views.

@@ -1,6 +1,5 @@
 """
-Unified Interface for Steering Methods
-统一的控制向量提取方法接口
+Unified interface for the control vector extraction (steering) methods.
 """
 
 from .utils import StatisticalControlVector
@@ -18,18 +17,19 @@ def extract_statistical_control_vector(
     **kwargs
 ) -> StatisticalControlVector:
     """
-    统一的控制向量提取接口
-    
+    Unified interface for extracting a control vector.
+
     Args:
-        method: 方法名称，支持的方法：
-               "diffmean", "pca", "lat", "linear_probe"
-        all_hidden_states: 三维列表 [样本][layer][token]
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表
-        **kwargs: 方法特定的参数
-    
+        method (str): Method name; one of "diffmean", "pca", "lat",
+            or "linear_probe".
+        all_hidden_states (list): Nested list of hidden states indexed by
+            `[sample][layer][token]`.
+        positive_indices (list): Indices of the positive samples.
+        negative_indices (list): Indices of the negative samples.
+        **kwargs (Any): Method-specific parameters.
+
     Returns:
-        StatisticalControlVector: 提取的控制向量
+        StatisticalControlVector: The extracted control vector.
     """
     method_map = {
         "diffmean": DiffMeanExtractor,
@@ -52,44 +52,52 @@ def extract_statistical_control_vector(
 
 
 def extract_diffmean_control_vector(all_hidden_states, positive_indices, negative_indices=None, **kwargs):
-    """提取DiffMean控制向量"""
+    """Extract a DiffMean control vector."""
     return DiffMeanExtractor.extract(all_hidden_states, positive_indices, negative_indices, **kwargs)
 
 
 def extract_pca_control_vector(all_hidden_states, positive_indices, negative_indices=None, **kwargs):
     """
-    提取PCA控制向量
-    
+    Extract a PCA control vector.
+
     Args:
-        all_hidden_states: 三维列表 [样本][layer][token]
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表
-        use_positive_only: 是否只使用正样本，默认True
-            - True: 只使用正样本（传统PCA）
-            - False: 先计算正负样本差值，再进行PCA
-        correct_direction: 是否校正向量方向（确保从负样本指向正样本），默认True
-        n_components: PCA组件数量，默认1
-        normalize: 是否归一化向量，默认True
-        token_pos: token位置，默认-1（最后一个token）
-        **kwargs: 其他参数
-    
+        all_hidden_states (list): Nested list of hidden states indexed by
+            `[sample][layer][token]`.
+        positive_indices (list): Indices of the positive samples.
+        negative_indices (list): Indices of the negative samples.
+        **kwargs (Any): Method-specific options:
+
+            - use_positive_only (bool): If True (default), use only the
+              positive samples (traditional PCA); if False, run PCA on the
+              differences between positive and negative samples.
+            - correct_direction (bool): Whether to correct the vector
+              direction so that it points from the negative samples to the
+              positive samples. Defaults to True.
+            - n_components (int): Number of PCA components. Defaults to 1.
+            - normalize (bool): Whether to normalize the vector. Defaults
+              to True.
+            - token_pos (int): Token position. Defaults to -1 (the last
+              token).
+
     Returns:
-        StatisticalControlVector: PCA控制向量
-    
+        (StatisticalControlVector): The extracted PCA control vector.
+
     Examples:
-        >>> # 只使用正样本（传统PCA）
+        >>> # Use only the positive samples (traditional PCA)
         >>> pca_vector = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices,
         ...     use_positive_only=True
         ... )
-        >>> 
-        >>> # 使用正负样本差值进行PCA，启用方向校正（默认）
+        >>>
+        >>> # Run PCA on positive/negative differences, with direction
+        >>> # correction enabled (the default)
         >>> pca_diff_vector = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
         ...     use_positive_only=False, correct_direction=True
         ... )
-        >>> 
-        >>> # 使用正负样本差值进行PCA，关闭方向校正
+        >>>
+        >>> # Run PCA on positive/negative differences, without direction
+        >>> # correction
         >>> pca_diff_no_correct = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
         ...     use_positive_only=False, correct_direction=False
@@ -100,30 +108,38 @@ def extract_pca_control_vector(all_hidden_states, positive_indices, negative_ind
 
 def extract_lat_control_vector(all_hidden_states, positive_indices, negative_indices=None, **kwargs):
     """
-    提取LAT控制向量
-    
+    Extract a LAT control vector.
+
     Args:
-        all_hidden_states: 三维列表 [样本][layer][token]
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表
-        use_positive_only: 是否只使用正样本，默认True
-        correct_direction: 是否校正向量方向（确保从负样本指向正样本），默认True
-        n_components: PCA组件数量，默认1
-        normalize: 是否归一化向量，默认True
-        token_pos: token位置，默认-1（最后一个token）
-        **kwargs: 其他参数
-    
+        all_hidden_states (list): Nested list of hidden states indexed by
+            `[sample][layer][token]`.
+        positive_indices (list): Indices of the positive samples.
+        negative_indices (list): Indices of the negative samples.
+        **kwargs (Any): Method-specific options:
+
+            - use_positive_only (bool): Whether to use only the positive
+              samples. Defaults to True.
+            - correct_direction (bool): Whether to correct the vector
+              direction so that it points from the negative samples to the
+              positive samples. Defaults to True.
+            - n_components (int): Number of PCA components. Defaults to 1.
+            - normalize (bool): Whether to normalize the vector. Defaults
+              to True.
+            - token_pos (int): Token position. Defaults to -1 (the last
+              token).
+
     Returns:
-        StatisticalControlVector: LAT控制向量
-    
+        (StatisticalControlVector): The extracted LAT control vector.
+
     Examples:
-        >>> # 只使用正样本（传统LAT）
+        >>> # Use only the positive samples (traditional LAT)
         >>> lat_vector = extract_lat_control_vector(
         ...     all_hidden_states, positive_indices,
         ...     use_positive_only=True
         ... )
-        >>> 
-        >>> # 使用正负样本，启用方向校正（默认）
+        >>>
+        >>> # Use positive and negative samples, with direction correction
+        >>> # enabled (the default)
         >>> lat_mixed_vector = extract_lat_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
         ...     use_positive_only=False, correct_direction=True
@@ -134,31 +150,36 @@ def extract_lat_control_vector(all_hidden_states, positive_indices, negative_ind
 
 def extract_linear_probe_control_vector(all_hidden_states, positive_indices, negative_indices=None, **kwargs):
     """
-    提取Linear Probe控制向量
-    
+    Extract a Linear Probe control vector.
+
     Args:
-        all_hidden_states: 三维列表 [样本][layer][token]
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表
-        regularization: 正则化类型 ("l1", "l2", "elasticnet", "none")，默认"l2"
-        C: 正则化强度的倒数，默认1.0。注意：
-           - L2正则化: C=1.0通常合适
-           - L1正则化: 建议C=10.0或更大，避免过度稀疏化
-           - 无正则化: C参数被忽略
-        standardize: 是否标准化特征，默认True
-        **kwargs: 其他参数
-    
+        all_hidden_states (list): Nested list of hidden states indexed by
+            `[sample][layer][token]`.
+        positive_indices (list): Indices of the positive samples.
+        negative_indices (list): Indices of the negative samples.
+        **kwargs (Any): Method-specific options:
+
+            - regularization (str): Regularization type ("l1", "l2",
+              "elasticnet", "none"). Defaults to "l2".
+            - C (float): Inverse of the regularization strength. Defaults
+              to 1.0. Note: C=1.0 is usually fine for L2 regularization;
+              for L1, prefer C=10.0 or larger to avoid over-sparsification;
+              without regularization the C parameter is ignored.
+            - standardize (bool): Whether to standardize the features.
+              Defaults to True.
+
     Returns:
-        StatisticalControlVector: Linear Probe控制向量
-    
-    Example:
-        >>> # L2正则化（推荐）
+        (StatisticalControlVector): The extracted Linear Probe control
+            vector.
+
+    Examples:
+        >>> # L2 regularization (recommended)
         >>> linear_probe_vector = extract_linear_probe_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
         ...     model_type="qwen2.5", regularization="l2", C=1.0
         ... )
-        >>> 
-        >>> # L1正则化（特征选择）
+        >>>
+        >>> # L1 regularization (feature selection)
         >>> linear_probe_l1 = extract_linear_probe_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
         ...     model_type="qwen2.5", regularization="l1", C=10.0
