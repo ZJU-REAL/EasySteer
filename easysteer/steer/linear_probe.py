@@ -1,6 +1,5 @@
 """
 Linear Probe Extractor
-线性探测器方法
 """
 
 import numpy as np
@@ -30,91 +29,111 @@ class LinearProbeExtractor:
         standardize: bool = True,
         **kwargs
     ) -> StatisticalControlVector:
-        """
-        Extract control vectors using Linear Probe method.
-        
+        """Extract control vectors using the Linear Probe method.
+
         Args:
-            all_hidden_states: 三维列表 [样本][layer][token]
-            positive_indices: 正样本的索引列表
-            negative_indices: 负样本的索引列表
-            model_type: 模型类型名称
-            normalize: 是否归一化向量
-            token_pos: token位置，-1表示最后一个token（默认），支持int/"first"/"last"/"mean"/"max"/"min"
-            regularization: 正则化类型 ("l1", "l2", "elasticnet", "none")
-            C: 正则化强度的倒数（值越小正则化越强）
-            standardize: 是否标准化特征
+            all_hidden_states (list | CaptureResult): Nested
+                `[sample][layer][token]` hidden states, or a
+                CaptureResult from easysteer.hidden_states.
+            positive_indices (list[int]): Indices of positive samples.
+                Never modified or rebound.
+            negative_indices (list[int] | None): Indices of negative
+                samples. If None, every sample index not in
+                ``positive_indices`` becomes a negative, in ascending
+                sample order (the convention shared by all extractors).
+            model_type (str): Model type name recorded in the result.
+            normalize (bool): Normalize each direction to unit L2 norm.
+            token_pos (int | str): Token position, -1 selects the last
+                token (default); supports int/"first"/"last"/"mean"/
+                "max"/"min".
+            regularization (str): Regularization type, one of "l1",
+                "l2", "elasticnet", "none"; anything else raises
+                ValueError.
+            C (float): Inverse regularization strength (smaller means
+                stronger regularization).
+            standardize (bool): Standardize features before fitting.
+            **kwargs (Any): Ignored here; unified_interface rejects
+                unknown options before dispatching.
+
+        Returns:
+            StatisticalControlVector: The extracted control vector.
         """
+        from .utils import derive_negative_indices, extract_token_hiddens
+
         if negative_indices is None:
-            n_samples = len(all_hidden_states)
-            negative_indices = list(range(len(positive_indices), n_samples))
-        
-        # 检查样本数量
+            negative_indices = derive_negative_indices(
+                len(all_hidden_states), positive_indices
+            )
+
         total_samples = len(positive_indices) + len(negative_indices)
         if total_samples < 4:
             raise ValueError(
-                f"LinearProbe方法至少需要4个样本（2个positive + 2个negative），"
-                f"但只提供了{total_samples}个样本。"
+                f"The LinearProbe method needs at least 4 samples "
+                f"(2 positive + 2 negative), but only {total_samples} "
+                f"were provided."
             )
-        
+
         if len(positive_indices) < 1 or len(negative_indices) < 1:
             raise ValueError(
-                f"LinearProbe方法需要至少1个positive样本和1个negative样本，"
-                f"但提供了{len(positive_indices)}个positive样本和{len(negative_indices)}个negative样本。"
+                f"The LinearProbe method needs at least 1 positive and "
+                f"1 negative sample, but got {len(positive_indices)} "
+                f"positive and {len(negative_indices)} negative."
             )
-        
-        # L1正则化的参数建议
+
+        penalty_map = {
+            "l1": "l1",
+            "l2": "l2",
+            "elasticnet": "elasticnet",
+            "none": None
+        }
+        if regularization not in penalty_map:
+            raise ValueError(
+                f"Unknown regularization: {regularization!r}. Accepted "
+                f"values: {list(penalty_map)}"
+            )
+        penalty = penalty_map[regularization]
+
         if regularization == "l1" and C <= 1.0:
             logger.warning(
-                f"L1正则化使用C={C}可能过强，容易产生全零权重。"
-                f"建议尝试更大的C值（如C=10.0或C=100.0）以减少稀疏化程度。"
+                f"L1 regularization with C={C} may be too strong and "
+                f"can produce all-zero weights. Try a larger C (e.g. "
+                f"C=10.0 or C=100.0) to reduce sparsification."
             )
-        
-        logger.info(f"LinearProbe: 使用{len(positive_indices)}个positive样本和{len(negative_indices)}个negative样本")
-        logger.info(f"正则化方法: {regularization}, C: {C}")
-        
-        n_layers = len(all_hidden_states[0])
+
+        logger.info(
+            f"LinearProbe: using {len(positive_indices)} positive and "
+            f"{len(negative_indices)} negative samples"
+        )
+        logger.info(f"Regularization: {regularization}, C: {C}")
+
         directions = {}
         model_scores = {}
-        
-        from .utils import extract_token_hiddens
-        
-        # 提取指定位置的token hidden states
+
         positive_hiddens, negative_hiddens = extract_token_hiddens(
             all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
         )
-        
-        for layer in tqdm(range(n_layers), desc="Computing LinearProbe directions"):
-            # 准备训练数据
+
+        for layer in tqdm(
+            list(positive_hiddens.keys()), desc="Computing LinearProbe directions"
+        ):
             X_pos = positive_hiddens[layer]  # [n_positive, hidden_dim]
             X_neg = negative_hiddens[layer]  # [n_negative, hidden_dim]
-            
-            # 合并数据
+
             X = np.vstack([X_pos, X_neg])  # [n_total, hidden_dim]
             y = np.hstack([
-                np.ones(len(X_pos)),   # positive样本标签为1
-                np.zeros(len(X_neg))   # negative样本标签为0
+                np.ones(len(X_pos)),   # positive samples labeled 1
+                np.zeros(len(X_neg))   # negative samples labeled 0
             ])
-            
-            # 特征标准化
+
             if standardize:
                 scaler = StandardScaler()
                 X = scaler.fit_transform(X)
-            
-            # 设置正则化参数
-            penalty_map = {
-                "l1": "l1",
-                "l2": "l2", 
-                "elasticnet": "elasticnet",
-                "none": None
-            }
-            penalty = penalty_map.get(regularization, "l2")
-            
-            # 训练逻辑回归分类器
+
             if penalty == "elasticnet":
                 clf = LogisticRegression(
                     penalty=penalty,
                     C=C,
-                    l1_ratio=0.5,  # elasticnet的l1和l2权重比例
+                    l1_ratio=0.5,  # elasticnet l1/l2 mixing ratio
                     solver="saga",
                     max_iter=1000,
                     random_state=42
@@ -138,45 +157,47 @@ class LinearProbeExtractor:
             
             try:
                 clf.fit(X, y)
-                
-                # 获取分类器权重作为控制向量
-                # 权重向量指向positive类别的方向
-                direction = clf.coef_[0]  # [hidden_dim]
-                
-                # 计算分类准确率
-                train_score = clf.score(X, y)
-                model_scores[layer] = float(train_score)
-                
-                # 检查权重稀疏性（针对L1正则化）
-                non_zero_weights = np.count_nonzero(direction)
-                sparsity_ratio = 1.0 - (non_zero_weights / len(direction))
-                
-                logger.info(f"Layer {layer}: 分类准确率 {train_score:.4f}, 稀疏度 {sparsity_ratio:.3f} ({non_zero_weights}/{len(direction)} 非零权重)")
-                
-                # 如果所有权重都是零，发出警告
-                if non_zero_weights == 0:
-                    logger.warning(f"Layer {layer}: 所有权重为零！可能需要调整正则化参数。")
-                
-                if normalize:
-                    norm = np.linalg.norm(direction)
-                    if norm > 0:
-                        direction = direction / norm
-                    else:
-                        logger.warning(f"Layer {layer}: 零向量无法归一化")
-                
-                directions[layer] = direction.astype(np.float32)
-                
             except Exception as e:
-                logger.warning(f"Layer {layer}: 训练失败，使用零向量。错误: {e}")
                 raise RuntimeError(
                     f"linear probe fit failed for layer {layer}: {e}"
                 ) from e
-                model_scores[layer] = 0.0
-        
+
+            # The classifier weights point toward the positive class
+            direction = clf.coef_[0]  # [hidden_dim]
+
+            train_score = clf.score(X, y)
+            model_scores[layer] = float(train_score)
+
+            # Check weight sparsity (relevant for L1 regularization)
+            non_zero_weights = np.count_nonzero(direction)
+            sparsity_ratio = 1.0 - (non_zero_weights / len(direction))
+
+            logger.info(
+                f"Layer {layer}: accuracy {train_score:.4f}, sparsity "
+                f"{sparsity_ratio:.3f} ({non_zero_weights}/{len(direction)} "
+                f"non-zero weights)"
+            )
+
+            if non_zero_weights == 0:
+                logger.warning(
+                    f"Layer {layer}: all weights are zero; consider "
+                    f"adjusting the regularization parameters."
+                )
+
+            if normalize:
+                norm = np.linalg.norm(direction)
+                if norm > 0:
+                    direction = direction / norm
+                else:
+                    logger.warning(f"Layer {layer}: cannot normalize a zero vector")
+
+            directions[layer] = direction.astype(np.float32)
+
         metadata = {
             "normalize": normalize,
             "token_pos": token_pos,
-            "regularization": regularization,
+            # The effective penalty; "none" stands for penalty=None
+            "regularization": "none" if penalty is None else penalty,
             "C": C,
             "standardize": standardize,
             "n_positive": len(positive_indices),

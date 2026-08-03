@@ -1,11 +1,14 @@
 """
 Difference of Means Extractor
-正负样本均值差方法
 """
 
 import numpy as np
 from tqdm.auto import tqdm
-from .utils import StatisticalControlVector, extract_token_hiddens
+from .utils import (
+    StatisticalControlVector,
+    derive_negative_indices,
+    extract_token_hiddens,
+)
 
 
 class DiffMeanExtractor:
@@ -21,41 +24,57 @@ class DiffMeanExtractor:
         token_pos: int | str = -1,
         **kwargs
     ) -> StatisticalControlVector:
-        """
-        Extract control vectors using difference of means method.
-        
+        """Extract control vectors using the difference-of-means method.
+
         Args:
-            all_hidden_states: 三维列表 [样本][layer][token]
-            positive_indices: 正样本的索引列表
-            negative_indices: 负样本的索引列表
-            model_type: 模型类型名称
-            normalize: 是否归一化向量
-            token_pos: token位置，-1表示最后一个token（默认），支持int/"first"/"last"/"mean"/"max"/"min"
+            all_hidden_states (list | CaptureResult): Nested
+                `[sample][layer][token]` hidden states, or a
+                CaptureResult from easysteer.hidden_states.
+            positive_indices (list[int]): Indices of positive samples.
+                Never modified or rebound.
+            negative_indices (list[int] | None): Indices of negative
+                samples. If None, every sample index not in
+                ``positive_indices`` becomes a negative, in ascending
+                sample order (the convention shared by all extractors).
+            model_type (str): Model type name recorded in the result.
+            normalize (bool): Normalize each direction to unit L2 norm.
+            token_pos (int | str): Token position, -1 selects the last
+                token (default); supports int/"first"/"last"/"mean"/
+                "max"/"min".
+            **kwargs (Any): Ignored here; unified_interface rejects
+                unknown options before dispatching.
+
+        Returns:
+            StatisticalControlVector: The extracted control vector.
         """
+        if negative_indices is None:
+            negative_indices = derive_negative_indices(
+                len(all_hidden_states), positive_indices
+            )
+
         positive_hiddens, negative_hiddens = extract_token_hiddens(
             all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
         )
-        
+
         directions = {}
-        
+
         for layer in tqdm(positive_hiddens.keys(), desc="Computing DiffMean directions"):
-            # 计算正负样本的均值差
             mean_positive = np.mean(positive_hiddens[layer], axis=0)
             mean_negative = np.mean(negative_hiddens[layer], axis=0)
             direction = mean_positive - mean_negative
-            
+
             if normalize:
                 norm = np.linalg.norm(direction)
                 if norm > 0:
                     direction = direction / norm
-            
+
             directions[layer] = direction.astype(np.float32)
-        
+
         metadata = {
             "normalize": normalize,
             "token_pos": token_pos,
             "n_positive": len(positive_indices),
-            "n_negative": len(negative_indices) if negative_indices else len(all_hidden_states) - len(positive_indices)
+            "n_negative": len(negative_indices)
         }
         
         return StatisticalControlVector(

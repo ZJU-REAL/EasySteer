@@ -1,6 +1,6 @@
 """
-Utility classes and functions for steering methods:
-the StatisticalControlVector class and shared helper functions.
+Utility classes and functions for steering methods
+Contains the StatisticalControlVector class and shared helpers
 """
 
 import dataclasses
@@ -109,29 +109,51 @@ class StatisticalControlVector:
         return cls(model_type=model_hint, method=method, directions=directions, metadata=metadata)
 
 
-def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=None, token_pos=-1):
-    """
-    Extract the hidden states of the token at the given position from all_hidden_states.
+def derive_negative_indices(n_samples, positive_indices):
+    """Derive negative sample indices from the shared convention.
+
+    Every extractor uses one rule when ``negative_indices`` is None:
+    the negatives are every sample index not in ``positive_indices``,
+    in ascending sample order. ``positive_indices`` is never modified
+    or rebound.
 
     Args:
-        all_hidden_states (list): Nested list of hidden states indexed by
-            `[sample][layer][token]`, where each hidden state is a tensor
-            or numpy array.
-        positive_indices (list): Indices of the positive samples.
-        negative_indices (list): Indices of the negative samples; inferred
-            automatically when None.
-        token_pos (int | str): Token position. Supported formats:
-
-            - int: exact position index; -1 means the last token (default)
-            - "first": the first token
-            - "last": the last token
-            - "mean": mean over all tokens
-            - "max": the token with the largest L2 norm
-            - "min": the token with the smallest L2 norm
+        n_samples (int): Total number of samples.
+        positive_indices (list[int]): Indices of positive samples.
 
     Returns:
-        (tuple): A pair `(positive_hiddens, negative_hiddens)`; each is a
-            dict `{layer: np.ndarray}` of shape `(n_samples, hidden_dim)`.
+        list[int]: Indices of negative samples, in ascending order.
+    """
+    positive = set(positive_indices)
+    return [i for i in range(n_samples) if i not in positive]
+
+
+def extract_token_hiddens(
+    all_hidden_states, positive_indices, negative_indices=None, token_pos=-1
+) -> tuple[dict, dict]:
+    """Extract hidden states of one token position per sample.
+
+    Args:
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, where each entry is
+            a tensor or numpy array, or a CaptureResult from
+            easysteer.hidden_states.
+        positive_indices (list[int]): Indices of positive samples.
+            Never modified or rebound by this function.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None, every sample index not in
+            ``positive_indices`` becomes a negative, in ascending
+            sample order (the convention shared by all extractors).
+        token_pos (int | str): Token position to extract:
+            an int index (-1 selects the last token, the default),
+            "first", "last", "mean" (average over tokens), "max" or
+            "min" (token with the largest/smallest L2 norm).
+
+    Returns:
+        tuple[dict, dict]: `(positive_hiddens, negative_hiddens)`, each
+            a dict mapping layer key to a `(n_samples, hidden_dim)`
+            array. Layer keys are the TRUE layer ids for CaptureResult
+            input and positional indices for nested-list input.
     """
     # CaptureResult (easysteer.hidden_states) is accepted directly; it
     # converts to the nested [sample][layer][token] shape with exact,
@@ -142,20 +164,19 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
         layer_keys = list(all_hidden_states.layer_ids)
         all_hidden_states = all_hidden_states.to_nested()
     if negative_indices is None:
-        # Assume the first half of the samples is positive, the second half negative
-        n_samples = len(all_hidden_states)
-        positive_indices = list(range(n_samples // 2))
-        negative_indices = list(range(n_samples // 2, n_samples))
-    
-    n_layers = len(all_hidden_states[0])  # number of layers
+        negative_indices = derive_negative_indices(
+            len(all_hidden_states), positive_indices
+        )
+
+    n_layers = len(all_hidden_states[0])
     if layer_keys is None:
         layer_keys = list(range(n_layers))
 
     positive_hiddens = {layer: [] for layer in layer_keys}
     negative_hiddens = {layer: [] for layer in layer_keys}
-    
+
     def extract_token_from_sequence(token_sequence, pos):
-        """Extract the token at the given position from a token sequence."""
+        """Extract the token at the requested position from a sequence"""
         if isinstance(pos, int):
             return token_sequence[pos]
         elif pos == "first":
@@ -163,11 +184,10 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
         elif pos == "last":
             return token_sequence[-1]
         elif pos == "mean":
-            # Mean over all tokens
             tokens = np.stack([t.cpu().float().numpy() if torch.is_tensor(t) else t for t in token_sequence])
             return np.mean(tokens, axis=0)
         elif pos == "max":
-            # Pick the token with the largest L2 norm
+            # Token with the largest L2 norm
             norms = []
             tokens = []
             for t in token_sequence:
@@ -178,7 +198,7 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
             max_idx = np.argmax(norms)
             return tokens[max_idx]
         elif pos == "min":
-            # Pick the token with the smallest L2 norm
+            # Token with the smallest L2 norm
             norms = []
             tokens = []
             for t in token_sequence:
@@ -190,36 +210,34 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
             return tokens[min_idx]
         else:
             raise ValueError(f"Unsupported token_pos: {pos}")
-    
-    # Extract the selected token for the positive samples
+
     for sample_idx in positive_indices:
         sample_hiddens = all_hidden_states[sample_idx]
-        for layer_pos in range(n_layers):
-            token_hidden = extract_token_from_sequence(sample_hiddens[layer_pos], token_pos)
-            # Convert to a numpy array
+        for layer_pos, layer_key in enumerate(layer_keys):
+            token_hidden = extract_token_from_sequence(
+                sample_hiddens[layer_pos], token_pos
+            )
             if torch.is_tensor(token_hidden):
                 token_hidden = token_hidden.cpu().float().numpy()
-            positive_hiddens[layer_keys[layer_pos]].append(token_hidden)
-    
-    # Extract the selected token for the negative samples (only when negative_indices is non-empty)
+            positive_hiddens[layer_key].append(token_hidden)
+
     if negative_indices:
         for sample_idx in negative_indices:
             sample_hiddens = all_hidden_states[sample_idx]
-            for layer in range(n_layers):
-                token_hidden = extract_token_from_sequence(sample_hiddens[layer], token_pos)
-                # Convert to a numpy array
+            for layer_pos, layer_key in enumerate(layer_keys):
+                token_hidden = extract_token_from_sequence(
+                    sample_hiddens[layer_pos], token_pos
+                )
                 if torch.is_tensor(token_hidden):
                     token_hidden = token_hidden.cpu().float().numpy()
-                negative_hiddens[layer].append(token_hidden)
-    
-    # Convert to numpy arrays
+                negative_hiddens[layer_key].append(token_hidden)
+
     positive_hiddens = {k: np.vstack(v) for k, v in positive_hiddens.items()}
-    # Only vstack when negative_hiddens actually has data
     if negative_indices and any(negative_hiddens.values()):
         negative_hiddens = {k: np.vstack(v) for k, v in negative_hiddens.items()}
     else:
         negative_hiddens = {}
-    
+
     return positive_hiddens, negative_hiddens
 
 
