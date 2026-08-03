@@ -168,7 +168,9 @@ class LinearProbeExtractor:
                 
             except Exception as e:
                 logger.warning(f"Layer {layer}: 训练失败，使用零向量。错误: {e}")
-                directions[layer] = np.zeros(X.shape[1], dtype=np.float32)
+                raise RuntimeError(
+                    f"linear probe fit failed for layer {layer}: {e}"
+                ) from e
                 model_scores[layer] = 0.0
         
         metadata = {

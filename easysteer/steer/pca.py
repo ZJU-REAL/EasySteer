@@ -65,7 +65,7 @@ class PCAExtractor:
             all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
         )
         
-        for layer in tqdm(range(n_layers), desc="Computing PCA directions"):
+        for layer in tqdm(list(positive_hiddens.keys()), desc="Computing PCA directions"):
             if method == "standard":
                 # 标准PCA（只使用正样本）
                 all_activations = positive_hiddens[layer]

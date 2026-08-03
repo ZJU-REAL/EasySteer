@@ -3,7 +3,7 @@ Steering Methods Package
 统一的控制向量提取方法包
 """
 
-from .utils import StatisticalControlVector, extract_token_hiddens, extract_last_token_hiddens, extract_all_token_hiddens
+from .utils import StatisticalControlVector, extract_token_hiddens
 from .accumulators import (
     DiffMeanAccumulator,
     MomentsAccumulator,
@@ -31,8 +31,6 @@ __all__ = [
     
     # Utility functions
     'extract_token_hiddens',
-    'extract_last_token_hiddens',
-    'extract_all_token_hiddens',
     
     # Extractor classes
     'DiffMeanExtractor',

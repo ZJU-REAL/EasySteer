@@ -20,13 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
-class DatasetEntry:
-    """Dataset entry containing positive and negative examples"""
-    positive: str
-    negative: str
-
-
-@dataclasses.dataclass
 class StatisticalControlVector:
     """Statistical control vector with multi-layer directions"""
     model_type: str
@@ -138,8 +131,11 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
     """
     # CaptureResult (easysteer.hidden_states) is accepted directly; it
     # converts to the nested [sample][layer][token] shape with exact,
-    # label-driven per-sample rows.
+    # label-driven per-sample rows, and its TRUE layer ids key the
+    # output dicts (legacy nested input keeps positional keys).
+    layer_keys = None
     if hasattr(all_hidden_states, "to_nested"):
+        layer_keys = list(all_hidden_states.layer_ids)
         all_hidden_states = all_hidden_states.to_nested()
     if negative_indices is None:
         # 假设前半部分是positive，后半部分是negative
@@ -148,9 +144,11 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
         negative_indices = list(range(n_samples // 2, n_samples))
     
     n_layers = len(all_hidden_states[0])  # 层数
-    
-    positive_hiddens = {layer: [] for layer in range(n_layers)}
-    negative_hiddens = {layer: [] for layer in range(n_layers)}
+    if layer_keys is None:
+        layer_keys = list(range(n_layers))
+
+    positive_hiddens = {layer: [] for layer in layer_keys}
+    negative_hiddens = {layer: [] for layer in layer_keys}
     
     def extract_token_from_sequence(token_sequence, pos):
         """从token序列中提取指定位置的token"""
@@ -192,12 +190,12 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
     # 提取positive样本的指定token
     for sample_idx in positive_indices:
         sample_hiddens = all_hidden_states[sample_idx]
-        for layer in range(n_layers):
-            token_hidden = extract_token_from_sequence(sample_hiddens[layer], token_pos)
+        for layer_pos in range(n_layers):
+            token_hidden = extract_token_from_sequence(sample_hiddens[layer_pos], token_pos)
             # 转换为numpy array
             if torch.is_tensor(token_hidden):
                 token_hidden = token_hidden.cpu().float().numpy()
-            positive_hiddens[layer].append(token_hidden)
+            positive_hiddens[layer_keys[layer_pos]].append(token_hidden)
     
     # 提取negative样本的指定token（只有当negative_indices非空时）
     if negative_indices:
@@ -221,73 +219,4 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
     return positive_hiddens, negative_hiddens
 
 
-def extract_last_token_hiddens(all_hidden_states, positive_indices, negative_indices=None):
-    """
-    从all_hidden_states中提取最后一个token的hidden states（向后兼容函数）
-    
-    Args:
-        all_hidden_states: 三维列表 [样本][layer][token]，其中每个hidden state是tensor或numpy array
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表，如果为None则自动推断
-    
-    Returns:
-        tuple: (positive_hiddens, negative_hiddens)
-               每个都是dict {layer: np.ndarray}，shape为(n_samples, hidden_dim)
-    """
-    return extract_token_hiddens(all_hidden_states, positive_indices, negative_indices, token_pos=-1)
 
-
-def extract_all_token_hiddens(all_hidden_states, positive_indices, negative_indices=None):
-    """
-    从all_hidden_states中提取所有token的hidden states
-    
-    Args:
-        all_hidden_states: 三维列表 [样本][layer][token]
-        positive_indices: 正样本的索引列表
-        negative_indices: 负样本的索引列表，如果为None则自动推断
-    
-    Returns:
-        tuple: (positive_hiddens, negative_hiddens)
-               每个都是dict {layer: list of np.ndarray}
-    """
-    if negative_indices is None:
-        # 假设前半部分是positive，后半部分是negative
-        n_samples = len(all_hidden_states)
-        positive_indices = list(range(n_samples // 2))
-        negative_indices = list(range(n_samples // 2, n_samples))
-    
-    n_layers = len(all_hidden_states[0])  # 层数
-    
-    positive_hiddens = {layer: [] for layer in range(n_layers)}
-    negative_hiddens = {layer: [] for layer in range(n_layers)}
-    
-    # 提取positive样本的所有token
-    for sample_idx in positive_indices:
-        sample_hiddens = all_hidden_states[sample_idx]
-        for layer in range(n_layers):
-            for token_hidden in sample_hiddens[layer]:
-                # 转换为numpy array
-                if torch.is_tensor(token_hidden):
-                    token_hidden = token_hidden.cpu().float().numpy()
-                positive_hiddens[layer].append(token_hidden)
-    
-    # 提取negative样本的所有token（只有当negative_indices非空时）
-    if negative_indices:
-        for sample_idx in negative_indices:
-            sample_hiddens = all_hidden_states[sample_idx]
-            for layer in range(n_layers):
-                for token_hidden in sample_hiddens[layer]:
-                    # 转换为numpy array
-                    if torch.is_tensor(token_hidden):
-                        token_hidden = token_hidden.cpu().float().numpy()
-                    negative_hiddens[layer].append(token_hidden)
-    
-    # 转换为numpy arrays
-    positive_hiddens = {k: np.vstack(v) for k, v in positive_hiddens.items()}
-    # 只在negative_hiddens有数据时才进行vstack
-    if negative_indices and any(negative_hiddens.values()):
-        negative_hiddens = {k: np.vstack(v) for k, v in negative_hiddens.items()}
-    else:
-        negative_hiddens = {}
-    
-    return positive_hiddens, negative_hiddens 

@@ -34,7 +34,6 @@ from .capture_generate import (
 )
 from .moe_capture import (
     get_moe_router_logits,
-    analyze_expert_usage,
     MoERouterLogitsCaptureV1,
 )
 from .moe_capture_generate import (
@@ -53,7 +52,6 @@ __all__ = [
     "HiddenStatesCaptureGenerate",
     # MoE router logits (embed task)
     "get_moe_router_logits",
-    "analyze_expert_usage",
     "MoERouterLogitsCaptureV1",
     # MoE router logits (generate task)
     "get_moe_router_logits_generate",

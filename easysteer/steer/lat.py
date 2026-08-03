@@ -94,12 +94,13 @@ class LATExtractor:
                 combined_hiddens[layer] = np.vstack([positive_hiddens[layer], negative_hiddens[layer]])
             positive_hiddens = combined_hiddens
         
-        for layer in tqdm(range(n_layers), desc="Computing LAT directions"):
+        for layer in tqdm(list(positive_hiddens.keys()), desc="Computing LAT directions"):
             all_activations = positive_hiddens[layer]
             
             # LAT: 随机配对并计算差值
             logger.info(f"Layer {layer}: Shuffling {all_activations.shape[0]} activations")
-            np.random.shuffle(all_activations)
+            # Permute a copy: never mutate the caller-visible array.
+            all_activations = np.random.permutation(all_activations)
             length = all_activations.shape[0] // 2
             differences = all_activations[:length] - all_activations[length:length * 2]
             

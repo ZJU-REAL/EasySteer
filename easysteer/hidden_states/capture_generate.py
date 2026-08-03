@@ -201,8 +201,10 @@ class HiddenStatesCaptureGenerate:
         try:
             llm.llm_engine.engine_core.collective_rpc("clear_hidden_states")
             llm.llm_engine.engine_core.collective_rpc("disable_hidden_states_capture")
-        except Exception:
-            pass
+        except Exception as e:
+            # Cleanup runs in a finally block: swallow (a raise here would
+            # mask the original error) but never silently.
+            logger.warning("capture cleanup RPC failed: %s", e)
     
     def _split_hidden_states_by_samples(
         self,
