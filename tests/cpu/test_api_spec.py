@@ -347,34 +347,38 @@ class TestSelectSpec:
 
 
 class TestCaptureStreamConfigSelection:
-    """StreamConfig translates legacy kwargs into a SelectSpec clause
-    and validates select= at enable time."""
+    """StreamConfig validates select=, reduce= and dtype= at enable time."""
 
-    def test_legacy_kwargs_translate_to_select(self):
-        from vllm.capture.session import StreamConfig
+    def test_select_clause_normalized(self):
+        from vllm.capture.store import StreamConfig
 
-        config = StreamConfig(positions=[0, -1], token_ids=[42])
+        config = StreamConfig(
+            select={"phases": ["prompt", "generation"], "tokens": [42]}
+        )
         assert config.selects_rows
         assert config.select["phases"] == ["prompt", "generation"]
         assert config.select["tokens"] == [42]
-        assert config.select["positions"] == [0, -1]
 
     def test_select_clause_validated(self):
-        from vllm.capture.session import StreamConfig
+        from vllm.capture.store import StreamConfig
 
         with pytest.raises(ValueError, match="unknown selection fields"):
             StreamConfig(select={"phase": ["prompt"]})
 
-    def test_select_conflicts_with_legacy_kwargs(self):
-        from vllm.capture.session import StreamConfig
+    def test_unknown_reduce_rejected(self):
+        from vllm.capture.store import StreamConfig
 
-        with pytest.raises(ValueError, match="legacy"):
-            StreamConfig(
-                select={"phases": ["prompt"]}, token_ids=[1]
-            )
+        with pytest.raises(ValueError, match="reduce"):
+            StreamConfig(reduce="first")
+
+    def test_unknown_dtype_rejected(self):
+        from vllm.capture.store import StreamConfig
+
+        with pytest.raises(ValueError, match="dtype"):
+            StreamConfig(dtype="nn")
 
     def test_select_conflicts_with_reductions(self):
-        from vllm.capture.session import StreamConfig
+        from vllm.capture.store import StreamConfig
 
-        with pytest.raises(ValueError, match="last"):
-            StreamConfig(select={"phases": ["prompt"]}, positions="last")
+        with pytest.raises(ValueError, match="reduc"):
+            StreamConfig(select={"phases": ["prompt"]}, reduce="last")
