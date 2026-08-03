@@ -1,44 +1,40 @@
-/* 提取页面样式 */
-/* 大多数样式继承自base.css和其他文件，这里只添加特定于提取页面的样式 */
+/* ============================================================
+   Extraction page styles
+   Most components are shared (base.css, main.css); the run log
+   reuses .logs-container from training.css.
+   ============================================================ */
 
-/* 提取响应容器 */
+/* Extraction response containers */
 #extractResponse, #extractError {
     grid-column: 1 / -1;
 }
 
-#extractResponse.response-container {
-    background: rgba(230, 245, 235, 0.6);
-    border: 1px solid var(--success-color);
+/* Result metadata block */
+.extraction-result .result-info p {
+    margin: 0 0 6px;
+    font-size: 0.88rem;
+    color: var(--text-1);
 }
 
-#extractResponse h3 {
-    color: var(--success-color);
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.extraction-result .result-info code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    word-break: break-all;
 }
 
-#extractError.error-container {
-    background: rgba(245, 101, 101, 0.1);
-    border: 2px solid var(--error-color);
+.extraction-result .result-info pre {
+    margin-top: 6px;
 }
 
-#extractError h3 {
-    color: var(--error-color);
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* 提取方法特定选项 */
-#saeOptions {
-    background: rgba(247, 250, 252, 0.6);
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 15px;
-    border: 1px solid var(--border-color);
-}
-
-/* 日志和状态样式复用自training.css */ 
+/* Log token colorization (theme-aware; used by training + extraction logs) */
+.log-ts      { color: var(--text-3); }
+.log-epoch   { color: var(--info); font-weight: 600; }
+.log-loss    { color: var(--danger); font-weight: 600; }
+.log-grad    { color: var(--warning); font-weight: 600; }
+.log-lr      { color: var(--success); font-weight: 600; }
+.log-runtime { color: var(--accent); font-weight: 500; }
+.log-speed   { color: var(--warning); font-weight: 500; }

@@ -4,37 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EasySteer - Steer Vector Control Panel</title>
+    <script>
+        // Apply persisted theme before first paint to avoid a flash.
+        (function () {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || theme === 'light') {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="static/css/icons.css">
     <link rel="stylesheet" href="static/css/main.css">
-    <link rel="stylesheet" href="static/css/chat.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <div class="language-switcher">
-                <button class="lang-btn" onclick="changeLanguage('zh')" data-lang="zh">中文</button>
-                <button class="lang-btn active" onclick="changeLanguage('en')" data-lang="en">English</button>
-            </div>
-            <h1><i class="fas fa-compass"></i> EasySteer</h1>
-            <p class="subtitle" data-i18n="subtitle">Steer Vector Control Panel</p>
-        </header>
+        <header class="app-header">
+            <div class="app-header-inner">
+                <div class="brand">
+                    <span class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+                        </svg>
+                    </span>
+                    <div class="brand-text">
+                        <h1>EasySteer</h1>
+                        <p class="subtitle" data-i18n="subtitle">Steer Vector Control Panel</p>
+                    </div>
+                </div>
 
-        <!-- 页面导航 -->
-        <nav class="page-nav">
-            <button class="nav-btn active" onclick="switchPage('inference')" data-i18n="nav_inference">
-                <i class="fas fa-play"></i> Inference
-            </button>
-            <button class="nav-btn" onclick="switchPage('training')" data-i18n="nav_training">
-                <i class="fas fa-graduation-cap"></i> Training
-            </button>
-            <button class="nav-btn" onclick="switchPage('extraction')" data-i18n="nav_extraction">
-                <i class="fas fa-search"></i> Extraction
-            </button>
-            <button class="nav-btn" onclick="switchPage('chat')" data-i18n="nav_chat">
-                Chat
-            </button>
-        </nav>
+                <!-- Page navigation -->
+                <nav class="page-nav">
+                    <button class="nav-btn active" onclick="switchPage('inference')">
+                        <i class="fas fa-play"></i> <span data-i18n="nav_inference">Inference</span>
+                    </button>
+                    <button class="nav-btn" onclick="switchPage('training')">
+                        <i class="fas fa-graduation-cap"></i> <span data-i18n="nav_training">Training</span>
+                    </button>
+                    <button class="nav-btn" onclick="switchPage('extraction')">
+                        <i class="fas fa-search"></i> <span data-i18n="nav_extraction">Extraction</span>
+                    </button>
+                    <button class="nav-btn" onclick="switchPage('chat')">
+                        <i class="fas fa-paper-plane"></i> <span data-i18n="nav_chat">Chat</span>
+                    </button>
+                </nav>
+
+                <div class="header-controls">
+                    <div class="language-switcher">
+                        <button class="lang-btn" onclick="changeLanguage('zh')" data-lang="zh">中文</button>
+                        <button class="lang-btn active" onclick="changeLanguage('en')" data-lang="en">English</button>
+                    </div>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle color theme">
+                        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                        </svg>
+                        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>
+                            <path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
 
         <!-- Module content placeholders -->
         <div id="inference-module"></div>
@@ -51,11 +83,24 @@
     <script src="static/js/config.js"></script>
     <script src="i18n.js"></script>
     <script>
+        // Theme toggle: cycles the explicit override; falls back to the OS
+        // preference when unset.
+        function toggleTheme() {
+            var root = document.documentElement;
+            var current = root.getAttribute('data-theme');
+            if (!current) {
+                current = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            var next = current === 'dark' ? 'light' : 'dark';
+            root.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
         // Load HTML modules dynamically
         document.addEventListener('DOMContentLoaded', function() {
             const modules = ['inference', 'training', 'extraction', 'chat'];
             const promises = modules.map(moduleName => loadModule(moduleName));
-            
+
             Promise.all(promises).then(() => {
                 console.log('All HTML modules loaded successfully');
             }).catch(error => {
@@ -81,14 +126,14 @@
                     console.error(`Error loading ${moduleName} module:`, error);
                     const moduleContainer = document.getElementById(`${moduleName}-module`);
                     if (moduleContainer) {
-                        moduleContainer.innerHTML = 
+                        moduleContainer.innerHTML =
                             `<div class="error">Failed to load ${moduleName} module: ${error.message}</div>`;
                     }
                     throw error; // re-throw to be caught by Promise.all
                 });
         }
     </script>
-    <!-- 使用模块化的JavaScript文件 -->
+    <!-- Modular application JavaScript -->
     <script type="module" src="static/js/main.js"></script>
 </body>
-</html> 
+</html>

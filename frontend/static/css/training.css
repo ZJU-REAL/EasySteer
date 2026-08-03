@@ -1,159 +1,139 @@
-/* 训练页面样式 */
-/* 训练进度和日志样式 */
+/* ============================================================
+   Training page styles — progress, logs, status stream
+   (also reused by the extraction page's run log)
+   ============================================================ */
 
 .logs-container {
-    max-height: 280px;
+    max-height: 300px;
     overflow-y: auto;
-    background: transparent;
-    border-radius: 6px;
-    padding: 0;
-    font-family: 'Courier New', Courier, monospace;
-    border: none;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    font-family: var(--font-mono);
 }
 
 .log-entry {
-    padding: 4px 8px;
-    font-size: 0.85rem;
-    color: #4a5568;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    line-height: 1.4;
+    padding: 3px 8px;
+    font-size: 0.78rem;
+    color: var(--text-2);
+    line-height: 1.5;
     word-break: break-all;
-    background: rgba(255, 255, 255, 0.6);
-    margin-bottom: 2px;
-    border-radius: 4px;
-}
-
-.log-entry:last-child {
-    border-bottom: none;
+    border-radius: var(--radius-sm);
 }
 
 .log-entry:hover {
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--surface-3);
 }
 
-/* 状态条目特殊样式 */
+.log-entry code {
+    font-family: var(--font-mono);
+    background: var(--surface-3);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+/* Status entries (pinned messages inside the log stream) */
 .status-entry {
-    font-weight: bold;
-    font-size: 0.9rem !important;
-    background: rgba(255, 255, 255, 0.9) !important;
-    border-radius: 6px;
-    padding: 8px 12px !important;
-    margin: 6px 0 !important;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
+    font-size: 0.82rem !important;
+    font-family: var(--font-sans);
+    background: var(--surface) !important;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px !important;
+    margin: 5px 0 !important;
+    border: 1px solid var(--border);
+    color: var(--text-1);
 }
 
 .status-entry.error-status {
-    background: rgba(254, 226, 226, 0.9) !important;
-    border-color: #fca5a5;
-    color: #dc2626 !important;
+    background: var(--danger-soft) !important;
+    border-color: var(--danger);
+    color: var(--danger) !important;
 }
 
 .status-entry.success-status {
-    background: rgba(220, 252, 231, 0.9) !important;
-    border-color: #86efac;
-    color: #16a34a !important;
+    background: var(--success-soft) !important;
+    border-color: var(--success);
+    color: var(--success) !important;
 }
 
 .status-entry.training-status {
-    background: rgba(219, 234, 254, 0.9) !important;
-    border-color: #93c5fd;
-    color: #2563eb !important;
+    background: var(--info-soft) !important;
+    border-color: var(--info);
+    color: var(--info) !important;
 }
 
-/* 训练响应容器 */
+/* Training response containers */
 #trainResponse, #trainError {
     grid-column: 1 / -1;
 }
 
-#trainResponse.response-container {
-    background: rgba(230, 245, 235, 0.6);
-    border: 1px solid var(--success-color);
-}
-
-#trainResponse h3 {
-    color: var(--success-color);
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-#trainError.error-container {
-    background: rgba(245, 101, 101, 0.1);
-    border: 2px solid var(--error-color);
-}
-
-#trainError h3 {
-    color: var(--error-color);
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* 训练进度样式 */
+/* Training progress */
 .training-progress {
-    background: rgba(249, 250, 251, 0.7);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border: 1px solid var(--border-color);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
 }
 
 .progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .progress-header h4 {
     margin: 0;
-    font-size: 1.1rem;
-    color: var(--text-primary);
+    font-size: 0.92rem;
+    color: var(--text-1);
 }
 
 .progress-bar-container {
-    height: 12px;
-    background-color: #e2e8f0;
-    border-radius: 6px;
+    height: 8px;
+    background: var(--surface-3);
+    border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 15px;
+    margin-bottom: 14px;
 }
 
 .progress-bar {
     height: 100%;
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    border-radius: 6px;
+    background: var(--brand-gradient);
+    border-radius: 4px;
     transition: width 0.3s ease;
 }
 
 .progress-info {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin-bottom: 15px;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .progress-stat {
     padding: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     text-align: center;
 }
 
 .progress-stat h5 {
-    margin: 0 0 5px 0;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
+    margin: 0 0 4px 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
 }
 
 .progress-stat p {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
-    color: var(--text-primary);
-} 
+    font-variant-numeric: tabular-nums;
+    color: var(--text-1);
+}

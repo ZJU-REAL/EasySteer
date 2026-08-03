@@ -1,4 +1,7 @@
-/* 推理模式样式 */
+/* ============================================================
+   Inference page styles (single & multi vector modes)
+   ============================================================ */
+
 .inference-mode {
     display: none;
 }
@@ -7,121 +10,116 @@
     display: block;
 }
 
-/* Response containers */
+/* ---------- Response / error containers ---------- */
 .response-container,
 .error-container {
-    margin-top: 20px;
-    padding: 20px;
-    border-radius: 16px;
-    animation: fadeIn 0.5s ease;
-    box-shadow: var(--shadow);
+    margin-top: 16px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    animation: fadeIn 0.35s ease;
 }
 
 .response-container {
-    background: rgba(230, 245, 235, 0.6);
-    border: 1px solid var(--success-color);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
 }
 
 .response-container h3 {
-    color: var(--success-color);
-    margin-bottom: 10px;
+    color: var(--success);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .error-container {
-    background: rgba(245, 101, 101, 0.1);
-    border: 2px solid var(--error-color);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-left-width: 3px;
 }
 
 .error-container h3 {
-    color: var(--error-color);
-    margin-bottom: 15px;
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 pre {
-    background: var(--bg-color);
-    padding: 15px;
-    border-radius: 8px;
+    background: var(--surface-2);
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
     overflow-x: auto;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--text-1);
 }
 
-/* Comparison view styling */
+/* ---------- Comparison view (baseline vs steered) ---------- */
 .response-comparison-vertical {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 14px;
 }
 
-/* Keeping the old grid layout for reference */
 .response-comparison {
-    display: none; /* Hide the grid layout */
+    display: none; /* legacy grid layout, unused */
 }
 
 .response-section {
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 15px;
-    padding: 15px 20px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.response-section:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
+    background: var(--surface-2);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    border: 1px solid var(--border);
 }
 
 .baseline-section {
-    background: rgba(252, 252, 252, 0.8);
-    margin-bottom: 16px;
+    background: var(--surface-2);
 }
 
 .steered-section {
-    background: rgba(240, 242, 255, 0.8);
-    border-color: rgba(102, 126, 234, 0.3);
+    background: var(--accent-soft);
+    border-color: var(--accent-ring);
 }
 
 .response-section h4 {
-    margin-top: 0;
-    margin-bottom: 16px;
-    font-size: 1.2rem;
-    color: var(--text-primary);
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.baseline-section h4 {
-    color: #4b5563;
+    gap: 8px;
 }
 
 .steered-section h4 {
-    color: var(--primary-color);
-    border-bottom-color: rgba(102, 126, 234, 0.2);
+    color: var(--accent);
+    border-bottom-color: var(--accent-ring);
 }
 
 pre.baseline-text, pre.steered-text {
-    /* These styles override the default <pre> styles for our response boxes */
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    line-height: 1.5; /* Reduced line spacing for better readability */
+    font-family: var(--font-sans);
+    line-height: 1.6;
     padding: 0;
-    background: transparent; /* No background color, inherit from parent */
+    background: transparent;
     margin: 0;
-    white-space: pre-wrap; /* Ensure text wraps */
+    white-space: pre-wrap;
     overflow-x: auto;
-    font-size: 0.95rem; /* Match textarea font size for consistency */
+    font-size: 0.88rem;
     border: none;
     border-radius: 0;
+    color: var(--text-1);
 }
 
 .baseline-text, .steered-text {
@@ -131,51 +129,42 @@ pre.baseline-text, pre.steered-text {
     overflow-y: auto;
 }
 
-.steered-text {
-    background-color: rgba(102, 126, 234, 0.05);
-}
-
-/* Input with checkbox layout */
-.input-with-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
+/* ---------- Field groupings ---------- */
+.input-with-checkbox,
 .id-normalize-container {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 14px;
 }
 
 .id-normalize-container input[type="number"] {
-    min-width: 300px;
-}
-
-.inline-checkbox {
-    white-space: nowrap;
+    min-width: 140px;
+    flex: 1;
 }
 
 .inline-checkbox {
     display: flex;
     align-items: center;
-    font-weight: normal;
+    font-weight: 400;
+    font-size: 0.82rem;
+    color: var(--text-2);
     white-space: nowrap;
     cursor: pointer;
+    margin-bottom: 0;
 }
 
 .inline-checkbox input[type="checkbox"] {
     margin-right: 6px;
 }
 
-/* Triggers row layout */
+/* ---------- Trigger settings row ---------- */
 .triggers-row {
     display: flex;
-    gap: 20px;
-    margin-top: 25px;
+    gap: 18px;
+    margin-top: 20px;
     flex-wrap: wrap;
-    border-top: 1px solid var(--border-color);
-    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
 }
 
 .triggers-column {
@@ -185,95 +174,73 @@ pre.baseline-text, pre.steered-text {
     flex-direction: column;
 }
 
-.triggers-column label {
-    display: block;
-    font-weight: 500;
-    margin-bottom: 8px;
-    color: var(--text-primary);
-}
-
-.triggers-column input {
-    width: 100%;
-    padding: 10px 14px;
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-}
-
-.triggers-column input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-/* 向量配置列表样式 */
+/* ---------- Vector tab list (multi-vector mode) ---------- */
 .vector-configs {
-    margin-top: 20px;
-    border-top: 1px solid #e5e7eb;
-    padding-top: 15px;
+    margin-top: 18px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
 }
 
-/* 标签页导航 */
 .vector-tabs {
     display: flex;
-    gap: 1px;
-    border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 15px;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
     overflow-x: auto;
     scrollbar-width: thin;
-    background: #f9fafb;
-    border-radius: 6px 6px 0 0;
 }
 
 .vector-tab {
-    padding: 10px 15px;
-    background: #f3f4f6;
+    padding: 8px 14px;
+    background: transparent;
     border: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     cursor: pointer;
     white-space: nowrap;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    color: var(--text-2);
     position: relative;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .vector-tab:hover {
-    background: #e5e7eb;
+    background: var(--surface-2);
+    color: var(--text-1);
 }
 
 .vector-tab.active {
-    background: #fff;
+    background: var(--accent-soft);
     font-weight: 500;
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--primary-color);
+    color: var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .vector-tab .remove-tab {
     margin-left: 8px;
     opacity: 0.6;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: transparent;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .vector-tab .remove-tab:hover {
     opacity: 1;
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 .vector-tab-content {
     display: none;
-    padding: 15px;
-    background: #fff;
-    border-radius: 0 0 6px 6px;
-    animation: fadeIn 0.3s ease;
+    padding: 14px;
+    background: var(--surface);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    animation: fadeIn 0.25s ease;
 }
 
 .vector-tab-content.active {
@@ -281,16 +248,16 @@ pre.baseline-text, pre.steered-text {
 }
 
 .vector-config-item {
-    background: #f9fafb;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    margin-bottom: 14px;
     position: relative;
 }
 
 .vector-config-item:hover {
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    border-color: var(--border-strong);
 }
 
 .vector-config-header {
@@ -302,8 +269,8 @@ pre.baseline-text, pre.steered-text {
 
 .vector-config-header h4 {
     margin: 0;
-    font-size: 1rem;
-    color: #374151;
+    font-size: 0.9rem;
+    color: var(--text-1);
 }
 
 .vector-config-actions {
@@ -313,7 +280,7 @@ pre.baseline-text, pre.steered-text {
 
 .vector-config-actions button {
     padding: 4px 8px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .btn-add-vector {
@@ -321,40 +288,39 @@ pre.baseline-text, pre.steered-text {
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 12px;
-    background: #f3f4f6;
-    border: 2px dashed #d1d5db;
-    border-radius: 8px;
-    color: #4b5563;
+    padding: 11px;
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
 }
 
 .btn-add-vector:hover {
-    background: #e5e7eb;
-    border-color: #9ca3af;
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .btn-add-vector i {
     margin-right: 8px;
-    font-size: 1rem;
+    font-size: 0.95em;
 }
 
-/* 冲突解决选项 */
+/* ---------- Conflict resolution ---------- */
 .conflict-resolution {
-    margin: 0 0 15px 0;
+    margin: 0 0 14px 0;
     padding: 10px 0;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border);
 }
 
 .conflict-resolution label {
     display: block;
     margin-bottom: 8px;
-    color: #374151;
-    font-weight: 500;
 }
 
 .conflict-resolution select {
     max-width: 450px;
-} 
+}

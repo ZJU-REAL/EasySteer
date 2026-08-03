@@ -1,80 +1,82 @@
-/* Chat页面的样式 */
-
-/* 整体布局 */
-#chat-page.active {
-    padding: 0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
+/* ============================================================
+   Chat page — preset panel + baseline/steered comparison view
+   ============================================================ */
 
 .chat-container {
     display: flex;
     flex-direction: row;
-    height: calc(100vh - 60px); /* 减去顶部导航栏的高度 */
+    height: calc(100vh - var(--header-h) - 48px);
+    min-height: 480px;
     overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-1);
 }
 
-/* 左侧配置面板 */
+/* ---------- Left configuration panel ---------- */
 .chat-config-panel {
-    width: 400px;
-    background-color: #f5f5f7;
-    border-right: 1px solid #ddd;
+    width: 320px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--border);
     overflow-y: auto;
-    padding: 20px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
 }
 
 .chat-config-section {
-    background-color: #fff;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
 }
 
 .chat-config-header {
-    font-size: 0.85rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    color: #555;
+    color: var(--text-3);
     margin-bottom: 10px;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
 }
 
-/* Model selector styles removed as requested */
-
-/* 预设列表 */
+/* Preset list */
 .preset-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .preset-item {
     display: flex;
     align-items: center;
-    padding: 10px;
-    border: 1px solid #eee;
-    border-radius: 8px;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
+    background: var(--surface);
 }
 
 .preset-item:hover {
-    background-color: #f0f0f0;
+    border-color: var(--border-strong);
+    background: var(--surface-2);
 }
 
 .preset-item.active {
-    background-color: #e9f0ff;
-    border-color: #4a6bff;
+    background: var(--accent-soft);
+    border-color: var(--accent);
 }
 
 .preset-icon {
-    font-size: 1.5rem;
-    margin-right: 15px;
-    width: 30px;
+    font-size: 1.2rem;
+    margin-right: 12px;
+    width: 26px;
     text-align: center;
+    flex: none;
 }
 
 .preset-info {
@@ -82,35 +84,46 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    min-width: 0;
 }
 
 .preset-name {
     font-weight: 500;
+    font-size: 0.86rem;
+    color: var(--text-1);
 }
 
 .preset-demo-btn {
-    padding: 4px 10px;
-    background-color: #eee;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: #999;  /* 更浅的颜色 */
-    cursor: default;  /* 默认鼠标样式 */
-    user-select: none;  /* 防止文本选择 */
+    padding: 2px 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--text-3);
+    cursor: default;
+    user-select: none;
 }
 
-/* Steer slider and keywords styles removed as requested */
+.preset-item.active .preset-demo-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+}
 
-/* 高级设置 */
+/* Advanced settings */
 .advanced-settings {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 9px;
 }
 
 .setting-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
 }
 
 .setting-row.setting-row-center {
@@ -118,77 +131,44 @@
 }
 
 .setting-row label {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 500;
-    color: #555;
+    letter-spacing: 0.03em;
+    color: var(--text-2);
+    margin-bottom: 0;
 }
 
 .setting-row input[type="number"],
 .setting-row select,
 .setting-row .small-input {
-    width: 80px;
-    padding: 5px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    width: 84px;
+    padding: 5px 8px;
+    font-size: 0.82rem;
     text-align: right;
-}
-
-.setting-row input[type="text"][readonly] {
-    background-color: #f5f5f5;
-    color: #666;
-    cursor: not-allowed;
-    border: 1px solid #ddd;
-}
-
-.checkbox-container {
-    position: relative;
-    padding-left: 25px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.checkbox-container input {
-    position: absolute;
-    opacity: 0;
-    height: 0;
-    width: 0;
-}
-
-.checkmark {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 18px;
-    width: 18px;
-    background-color: #eee;
-    border-radius: 3px;
-}
-
-.checkbox-container:hover input ~ .checkmark {
-    background-color: #ccc;
-}
-
-.checkbox-container input:checked ~ .checkmark {
-    background-color: #4a6bff;
+    font-variant-numeric: tabular-nums;
 }
 
 .reset-settings-btn {
-    background-color: #f0f0f0;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 8px 15px;
-    color: #555;
-    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 7px 14px;
+    color: var(--text-2);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
     cursor: pointer;
     width: 100%;
-    margin-top: 10px;
+    margin-top: 6px;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: all 0.15s ease;
 }
 
 .reset-settings-btn:hover {
-    background-color: #e5e5e5;
+    background: var(--surface-2);
+    color: var(--text-1);
 }
 
 .notes-section {
@@ -200,21 +180,22 @@
 .notes-content {
     flex-grow: 1;
     padding: 10px;
-    background-color: #fafafa;
-    border-radius: 5px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: #666;
-    white-space: pre-wrap; /* Preserve line breaks */
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--text-2);
+    white-space: pre-wrap;
 }
 
-/* 右侧聊天界面 */
+/* ---------- Right chat interface ---------- */
 .chat-interface {
     flex: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    min-width: 0;
 }
 
 .chat-views {
@@ -227,8 +208,9 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid var(--border);
     position: relative;
+    min-width: 0;
 }
 
 .chat-view:last-child {
@@ -236,27 +218,38 @@
 }
 
 .chat-view-header {
-    background-color: #f5f5f7;
-    padding: 10px 15px;
+    background: var(--surface-2);
+    padding: 8px 14px;
+    font-size: 0.7rem;
     font-weight: 600;
-    border-bottom: 1px solid #ddd;
+    letter-spacing: 0.09em;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border);
     text-align: center;
+    text-transform: uppercase;
+}
+
+.steered-chat .chat-view-header {
+    color: var(--accent);
+    background: var(--accent-soft);
 }
 
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 18px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
 }
 
 .message-bubble {
-    padding: 12px 15px;
-    border-radius: 18px;
-    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    max-width: 82%;
     word-wrap: break-word;
+    font-size: 0.9rem;
+    line-height: 1.55;
 }
 
 .user-message {
@@ -265,9 +258,9 @@
 }
 
 .user-message .message-bubble {
-    background-color: #4a6bff;
-    color: white;
-    border-bottom-right-radius: 5px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-bottom-right-radius: 4px;
 }
 
 .ai-message {
@@ -276,94 +269,137 @@
 }
 
 .ai-message .message-bubble {
-    background-color: #f0f0f0;
-    color: #333;
-    border-bottom-left-radius: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-1);
+    border-bottom-left-radius: 4px;
 }
 
 .message-avatar {
-    display: none; /* 隐藏头像 */
-    background-color: #ddd;
-    width: 32px;
-    height: 32px;
-    border-radius: 16px;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    color: #666;
-    font-weight: bold;
+    display: none;
 }
 
-/* 底部输入区域 */
+/* ---------- Bottom input area ---------- */
 .chat-input-container {
-    background-color: #f5f5f7;
-    padding: 15px;
-    border-top: 1px solid #ddd;
+    background: var(--surface-2);
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
 }
 
 .chat-action-buttons {
     display: flex;
     justify-content: center;
-    margin-bottom: 15px;
-    gap: 20px;
+    margin-bottom: 10px;
+    gap: 12px;
 }
 
-.action-button {
-    padding: 8px 15px;
-    border-radius: 20px;
-    border: 1px solid #ddd;
-    background-color: #fff;
-    color: #555;
+.chat-action-buttons .action-button {
+    padding: 5px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-2);
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 0.9rem;
+    gap: 6px;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
 }
 
-.action-button:hover {
-    background-color: #f0f0f0;
+.chat-action-buttons .action-button:hover {
+    background: var(--surface-2);
+    color: var(--text-1);
 }
 
-.restart-button {
-    color: #e74c3c;
+.chat-action-buttons .restart-button {
+    color: var(--danger);
+    border-color: var(--danger);
 }
 
-.restart-button:hover {
-    background-color: #ffeeee;
+.chat-action-buttons .restart-button:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
 }
 
 .chat-input-box {
     display: flex;
     align-items: center;
-    background-color: white;
-    border-radius: 24px;
-    padding: 5px;
-    border: 1px solid #ddd;
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 4px 4px 4px 8px;
+    border: 1px solid var(--border-strong);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-input-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 #chatInput {
     flex: 1;
     border: none;
-    padding: 10px 15px;
-    border-radius: 20px;
+    background: transparent;
+    padding: 8px 12px;
+    border-radius: 999px;
     outline: none;
-    font-size: 1rem;
+    box-shadow: none;
+    font-size: 0.92rem;
+    color: var(--text-1);
+}
+
+#chatInput:focus {
+    box-shadow: none;
+    border: none;
 }
 
 .send-button {
-    background-color: #4a6bff;
-    color: white;
+    background: var(--accent);
+    color: var(--accent-contrast);
     border: none;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    padding: 0;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    transition: background 0.15s ease;
 }
 
 .send-button:hover {
-    background-color: #3a5ae0;
-} 
+    background: var(--accent-strong);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+    .chat-container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .chat-config-panel {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 320px;
+    }
+
+    .chat-views {
+        flex-direction: column;
+        min-height: 400px;
+    }
+
+    .chat-view {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        min-height: 200px;
+    }
+
+    .chat-view:last-child {
+        border-bottom: none;
+    }
+}

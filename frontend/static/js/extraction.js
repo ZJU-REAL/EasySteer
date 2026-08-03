@@ -194,9 +194,9 @@ export async function startExtraction() {
         gpu_devices: document.getElementById('extractGpuDevices').value,
         
         // Extraction method configuration
+        // Note: no target_layer here — extractors operate on all layers and
+        // the extraction backend does not support a per-layer restriction.
         method: document.getElementById('extractMethod').value,
-        target_layer: document.getElementById('extractTargetLayer').value ? 
-            parseInt(document.getElementById('extractTargetLayer').value) : null,
         token_pos: document.getElementById('extractTokenPos').value,
         normalize: document.getElementById('extractNormalize').checked,
         
@@ -307,9 +307,24 @@ async function updateExtractionStatus() {
         
     } catch (error) {
         console.error('Failed to get extraction status:', error);
-        // Stop polling on network error
+        // Stop polling on network error — and tell the user instead of
+        // silently freezing the log view.
         stopExtractionStatusPolling();
+        showExtractErrorInline(
+            (window.t ? window.t('network_error') : 'Network error') +
+            ' — lost connection while polling extraction status: ' + error.message
+        );
     }
+}
+
+// Show the error container without hiding the run log, so the user keeps
+// the context of what happened before the failure.
+function showExtractErrorInline(message) {
+    const errorDiv = document.getElementById('extractError');
+    const errorContent = document.getElementById('extractErrorContent');
+    errorContent.textContent = message;
+    errorDiv.style.display = 'block';
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Display extraction status
@@ -326,7 +341,9 @@ function displayExtractionStatus(status) {
         
         if (status.error_message) {
             statusClass += ' error-status';
-        } else if (!status.is_extracting && status.status_message.includes('完成')) {
+        } else if (!status.is_extracting &&
+                   (status.status_message.includes('完成') ||
+                    status.status_message.toLowerCase().includes('complete'))) {
             statusClass += ' success-status';
         } else if (status.is_extracting) {
             statusClass += ' training-status';
@@ -364,9 +381,14 @@ function displayExtractionStatus(status) {
     
     // Update log container
     logsContainer.innerHTML = allLogs.join('');
-    
+
     // Auto-scroll to bottom
     logsContainer.scrollTop = logsContainer.scrollHeight;
+
+    // Surface backend errors prominently (in addition to the log stream)
+    if (status.error_message) {
+        showExtractErrorInline(status.error_message);
+    }
 }
 
 // Reset extraction form
@@ -377,7 +399,6 @@ export function resetExtractForm() {
     
     // Reset method selection
     document.getElementById('extractMethod').value = 'diffmean'; // 将默认方法从lat改为diffmean
-    document.getElementById('extractTargetLayer').value = '';
     document.getElementById('extractTokenPos').value = -1; // 使用整数-1作为默认值
     document.getElementById('extractNormalize').checked = true;
     
@@ -468,11 +489,10 @@ export async function importSelectedExtractConfig() {
         document.getElementById('extractModelPath').value = config.model?.path || config.model_path || '';
         document.getElementById('extractGpuDevices').value = config.model?.gpu_devices || config.gpu_devices || '0';
         
-        // Set method configuration
+        // Set method configuration (any target_layer in old configs is
+        // ignored — unsupported by the extraction backend)
         document.getElementById('extractMethod').value = config.method?.name || config.method || 'diffmean';
-        document.getElementById('extractTargetLayer').value = config.method?.target_layer !== undefined ? config.method.target_layer : 
-                                                             (config.target_layer !== undefined ? config.target_layer : '');
-        
+
         // 处理token_pos，确保它是一个整数值
         let tokenPos = config.method?.token_pos || config.token_pos || -1;
         if (typeof tokenPos === 'string' && tokenPos !== '-1' && isNaN(parseInt(tokenPos))) {

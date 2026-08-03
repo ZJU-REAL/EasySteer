@@ -26,12 +26,9 @@
                 </select>
             </div>
             
-            <div class="form-group">
-                <label for="extractTargetLayer" data-i18n="extract_target_layer_label">Target Layer</label>
-                <input type="number" id="extractTargetLayer" min="0" max="50" placeholder="e.g., 8 (leave empty for all layers)">
-                <small class="help-text" data-i18n="extract_target_layer_help">Specify a single layer index or leave empty to extract from all layers.</small>
-            </div>
-            
+            <!-- Note: the former "Target Layer" field was removed on purpose —
+                 the extractors always operate on all layers and a per-layer
+                 restriction is not supported by the extraction backend. -->
             <div class="form-group">
                 <label for="extractTokenPos" data-i18n="extract_token_pos_label">Token Position</label>
                 <input type="number" id="extractTokenPos" value="-1" placeholder="e.g., -1 for last token, 0 for first token">

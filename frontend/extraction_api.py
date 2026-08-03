@@ -187,8 +187,9 @@ def run_extraction(config):
             "token_pos": token_pos
         }
         
-        if config.get('target_layer') is not None:
-            extract_kwargs["target_layer"] = config['target_layer']
+        # NOTE: 'target_layer' has no extractor support; forwarding it
+        # was silently ignored. Layer restriction belongs in capture
+        # (layers=) once the frontend moves to the v2 capture API.
         
         # Select extractor based on method
         if method == 'lat':

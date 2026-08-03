@@ -326,24 +326,25 @@ function displayTrainingStatus(status) {
             // Add colors for different types of information
             let coloredLog = log;
             
+            // Theme-aware classes are defined in extraction.css (.log-*)
             // Timestamp
-            coloredLog = coloredLog.replace(/\[\d{2}:\d{2}:\d{2}\]/g, '<span style="color: #6b7280;">$&</span>');
-            
+            coloredLog = coloredLog.replace(/\[\d{2}:\d{2}:\d{2}\]/g, '<span class="log-ts">$&</span>');
+
             // Epoch info
-            coloredLog = coloredLog.replace(/Epoch: [\d.]+/g, '<span style="color: #2563eb; font-weight: 600;">$&</span>');
-            
+            coloredLog = coloredLog.replace(/Epoch: [\d.]+/g, '<span class="log-epoch">$&</span>');
+
             // Loss info
-            coloredLog = coloredLog.replace(/Loss: [\d.]+/g, '<span style="color: #dc2626; font-weight: 600;">$&</span>');
-            
+            coloredLog = coloredLog.replace(/Loss: [\d.]+/g, '<span class="log-loss">$&</span>');
+
             // Gradient info
-            coloredLog = coloredLog.replace(/Grad: [\d.]+/g, '<span style="color: #ea580c; font-weight: 600;">$&</span>');
-            
+            coloredLog = coloredLog.replace(/Grad: [\d.]+/g, '<span class="log-grad">$&</span>');
+
             // Learning rate
-            coloredLog = coloredLog.replace(/LR: [\d.e-]+/g, '<span style="color: #16a34a; font-weight: 600;">$&</span>');
-            
+            coloredLog = coloredLog.replace(/LR: [\d.e-]+/g, '<span class="log-lr">$&</span>');
+
             // Runtime and speed
-            coloredLog = coloredLog.replace(/Runtime: [\d.]+s/g, '<span style="color: #7c3aed; font-weight: 500;">$&</span>');
-            coloredLog = coloredLog.replace(/Speed: [\d.]+ samples\/s/g, '<span style="color: #c2410c; font-weight: 500;">$&</span>');
+            coloredLog = coloredLog.replace(/Runtime: [\d.]+s/g, '<span class="log-runtime">$&</span>');
+            coloredLog = coloredLog.replace(/Speed: [\d.]+ samples\/s/g, '<span class="log-speed">$&</span>');
             
             return `<div class="log-entry">${coloredLog}</div>`;
         });
