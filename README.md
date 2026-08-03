@@ -23,6 +23,8 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/08/03] Migrated to vLLM v0.26.0 (V2 model runner): v2 steering API, redesigned hidden-state capture (select clauses, labeled rows, per-request capture), and our new [documentation site](https://zju-real.github.io/EasySteer/latest/)
+- [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
 - [2026/03/31] Initial support for vLLM v0.17.1, with server-level steering and CUDA graph support
 - [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/).
 - [2026/02/15] We've added OpenAI-compatible API support for steering vectors
@@ -40,7 +42,7 @@
 
 ## About
 
-Built on vLLM, EasySteer is a unified framework for high-performance LLM steering: it applies steering vectors — directions in a model's hidden-state space — during inference to shift model behavior without changing model weights, at serving speed. The vLLM v1 adaptation brings continuous batching, prefix-cache-compatible steering, CUDA-graph support, and nearly 2× the previous throughput, with a largely unchanged API.
+Built on vLLM, EasySteer is a unified framework for high-performance LLM steering: it applies steering vectors — directions in a model's hidden-state space — during inference to shift model behavior without changing model weights, at serving speed. The current release tracks vLLM v0.26.0 on the V2 model runner, with continuous batching, prefix-cache-compatible steering, CUDA-graph support, the declarative v2 steering API (`SteeringSpec`/`ApplySpec`), and a redesigned hidden-state capture pipeline (source-side selection, labeled rows, per-request capture).
 
 - **High Performance**: 10.8-22.3× faster than existing frameworks through vLLM integration
 - **Modular Design**: Pluggable interfaces for custom steering algorithms without modifying core code

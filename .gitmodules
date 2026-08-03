@@ -1,3 +1,4 @@
 [submodule "vllm-steer"]
 	path = vllm-steer
 	url = https://github.com/ZJU-REAL/EasySteer-vllm-v1
+	branch = migrate-v0.26.0

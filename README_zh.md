@@ -23,6 +23,8 @@
 <a id="news"></a>
 ## 新闻 🔥
 
+- [2026/08/03] 迁移至 vLLM v0.26.0（V2 模型运行器）：v2 干预 API、重新设计的隐状态捕获（选择子句、行标签、按请求捕获），并上线了[文档站](https://zju-real.github.io/EasySteer/latest/)
+- [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
 - [2026/03/31] 初步支持 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速
 - [2026/02/16] 我们在 Hugging Face Spaces 上发布了 [轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 供快速体验。完整版功能请参考 [Web 演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)
 - [2026/02/15] 新增 OpenAI 兼容 API，支持通过 HTTP 接口使用干预向量
@@ -40,7 +42,7 @@
 
 ## 关于 EasySteer
 
-EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。vLLM v1 适配带来了连续批处理、兼容前缀缓存的干预、CUDA 图支持，吞吐量较上一版本接近翻倍，且 API 基本保持一致。
+EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。当前版本基于 vLLM v0.26.0（V2 模型运行器），提供连续批处理、兼容前缀缓存的干预、CUDA 图支持、声明式 v2 干预 API（`SteeringSpec`/`ApplySpec`），以及重新设计的隐状态捕获管线（源侧选择、行标签、按请求捕获）。
 
 - **高性能**: 通过对接 vLLM，实现 10.8-22.3× 的速度提升
 - **模块化设计**: 插拔式接口，便于在不改动核心代码的情况下扩展自定义算法

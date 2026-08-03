@@ -5,3 +5,6 @@ easysteer.egg-info/
 
 # Regenerable capture artifact; 128MB exceeds GitHub's file limit
 replications/sake/edit_uk_capital_to_paris.pkl
+
+# MkDocs local build output
+site/
