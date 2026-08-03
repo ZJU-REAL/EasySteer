@@ -1315,15 +1315,15 @@
 <p>EasySteer ships as two packages installed from one repository: the vLLM fork
 (<code>vllm-steer/</code>) and the <code>easysteer</code> Python package.</p>
 <h2 id="recommended-precompiled-vllm-wheel">Recommended: precompiled vLLM wheel<a class="headerlink" href="#recommended-precompiled-vllm-wheel" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>easysteer<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.10<span class="w"> </span>-y
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>easysteer<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>-y
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>conda<span class="w"> </span>activate<span class="w"> </span>easysteer
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>git<span class="w"> </span>clone<span class="w"> </span>--recurse-submodules<span class="w"> </span>https://github.com/ZJU-REAL/EasySteer.git
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nb">cd</span><span class="w"> </span>EasySteer/vllm-steer
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># EasySteer tracks the vLLM v0.17.1 release commit; pin it so the</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># EasySteer tracks the vLLM v0.26.0 release commit; pin it so the</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># precompiled kernels match.</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nb">export</span><span class="w"> </span><span class="nv">VLLM_PRECOMPILED_WHEEL_COMMIT</span><span class="o">=</span>95c0f928cdeeaa21c4906e73cee6a156e1b3b995
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nb">export</span><span class="w"> </span><span class="nv">VLLM_PRECOMPILED_WHEEL_COMMIT</span><span class="o">=</span>568afb3a13806beb53bb2e6bd518269357b237c0
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nv">VLLM_USE_PRECOMPILED</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--editable<span class="w"> </span>.
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">cd</span><span class="w"> </span>..
@@ -1349,6 +1349,13 @@
 </code></pre></div>
 <p>A full source build can take from ~20 minutes (128 cores) to several hours.</p>
 <h2 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The published image (<code>xuhaolei/easysteer</code>, tag <code>v0.17.1</code>) predates the
+vLLM v0.26.0 migration — it runs the previous engine and v1-era APIs.
+A refreshed image is planned; until then, prefer the wheel install
+above for current features.</p>
+</div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>xuhaolei/easysteer:latest
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
