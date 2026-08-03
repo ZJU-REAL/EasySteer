@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Capture coverage and reductions under chunked prefill.
 
-Covers: positions='all' captures every prompt token exactly once across
+Covers: reduce='all' captures every prompt token exactly once across
 chunks (129-token prompt, 64-token budget -> chunks 64/64/1) plus one
-row per decode forward; positions='last' stores one row per logical
+row per decode forward; reduce='last' stores one row per logical
 step (final prompt chunk + each decode step), not one per chunk,
 including the 1-token-prompt edge case.
 """
@@ -35,8 +35,8 @@ def rpc(llm, method, *args, **kwargs):
     return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
 
 
-def capture_rows(llm, prompt_ids, positions):
-    rpc(llm, "start_capture", "hidden_states", layers=[0], positions=positions)
+def capture_rows(llm, prompt_ids, reduce):
+    rpc(llm, "start_capture", "hidden_states", layers=[0], reduce=reduce)
     try:
         llm.generate(
             TokensPrompt(prompt_token_ids=list(prompt_ids)), SP, use_tqdm=False
@@ -48,7 +48,7 @@ def capture_rows(llm, prompt_ids, positions):
 
 
 @pytest.mark.parametrize(
-    "prompt_ids, positions, expected",
+    "prompt_ids, reduce, expected",
     [
         # 129 prompt tokens (each captured once across chunks) + 3 decode
         pytest.param(PROMPT_LONG, "all", 132, id="all-covers-chunks-and-decode"),
@@ -58,8 +58,8 @@ def capture_rows(llm, prompt_ids, positions):
         pytest.param([100], "last", 4, id="last-one-token-prompt"),
     ],
 )
-def test_capture_rows_under_chunked_prefill(llm, prompt_ids, positions, expected):
-    rows = capture_rows(llm, prompt_ids, positions)
+def test_capture_rows_under_chunked_prefill(llm, prompt_ids, reduce, expected):
+    rows = capture_rows(llm, prompt_ids, reduce)
     assert rows == expected, (
-        f"positions={positions!r} captured {rows} rows, want {expected}"
+        f"reduce={reduce!r} captured {rows} rows, want {expected}"
     )
