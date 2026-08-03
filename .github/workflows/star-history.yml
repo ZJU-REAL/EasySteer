@@ -1,0 +1,45 @@
+name: star-history
+
+# GitHub's stargazers API now requires an authorized token, which broke
+# third-party chart embeds (star-history.com). We render the chart ourselves
+# with the repo token and serve it from the gh-pages site; the README embeds
+# https://zju-real.github.io/EasySteer/star-history.svg.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Render star history SVG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python .github/scripts/star_history.py \
+            --repo "${{ github.repository }}" \
+            --out gh-pages/star-history.svg
+
+      - name: Publish to gh-pages
+        run: |
+          cd gh-pages
+          if git diff --quiet -- star-history.svg; then
+            echo "chart unchanged; nothing to publish"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add star-history.svg
+          git commit -m "Update star history chart"
+          git push origin gh-pages
