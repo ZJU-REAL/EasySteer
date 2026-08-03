@@ -1361,9 +1361,11 @@ with a <a href="../steering/"><code>SteeringSpec</code></a>.</p>
 <a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="n">reft_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;results/emoji_style&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="applying-the-trained-intervention">Applying the trained intervention<a class="headerlink" href="#applying-the-trained-intervention" title="Permanent link">&para;</a></h2>
-<p>The saved representation is loaded at inference through the steering engine — e.g. with
-<code>VectorSpec(source="results/emoji_style", algorithm="loreft", ...)</code> for LoReFT-format
-files. See the <a href="../steering/">Steering guide</a> for the spec language and the
+<p>The saved representation is interpreted client-side by the payload adapter and passed
+to the engine as canonical data — e.g.
+<code>VectorSpec(data=easysteer.vectors.from_pyreft("results/emoji_style"), algorithm="loreft", ...)</code>
+(<code>source=</code> paths are only accepted for the engine's own formats, such as GGUF).
+See the <a href="../steering/">Steering guide</a> for the spec language and the
 <a href="../../replications/">LoReFT replication</a> for a complete train-then-steer
 notebook.</p>
 <!-- TODO: document the full easysteer.reft API surface (interventions, data modules,
