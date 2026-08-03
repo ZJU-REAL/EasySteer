@@ -1,0 +1,5 @@
+Vendored from https://github.com/narayann7/star-history-action
+Commit: c2061675dacbf6f35d116e556015b8905843387f
+License: MIT (see LICENSE). The renderer/vendor tree is star-history code
+(MIT, see renderer/vendor/LICENSE and renderer/NOTICE.md).
+Audited at vendoring time: token is env-only and sent only to api.github.com.

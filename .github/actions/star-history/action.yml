@@ -1,0 +1,154 @@
+name: 'Star History Action'
+description: 'Render a self-updating star history chart and commit it into your README. Unofficial star-history helper action.'
+author: 'narayann7'
+
+branding:
+  icon: 'star'
+  color: 'yellow'
+
+inputs:
+  repos:
+    description: 'Comma-separated owner/repo list. Defaults to the current repository. Only repos the token owns or collaborates on will work.'
+    required: false
+    default: ${{ github.repository }}
+  output-dir:
+    description: 'Directory where generated chart files (per-theme SVGs and a single PNG) are written.'
+    required: false
+    default: 'assets/star-history'
+  token:
+    description: 'GitHub token used for the stargazers API. Defaults to the automatic Actions token. Supply a PAT secret if the default lacks access.'
+    required: false
+    default: ${{ github.token }}
+  type:
+    description: 'Chart mode: Date or Timeline.'
+    required: false
+    default: 'Date'
+  themes:
+    description: 'Comma-separated themes to render: light, dark.'
+    required: false
+    default: 'light,dark'
+  width:
+    description: 'Image width in pixels.'
+    required: false
+    default: '800'
+  font-family:
+    description: 'Optional Google Fonts family applied to the PNG chart (e.g. "Patrick Hand"). Empty uses the bundled Comic Neue. Affects the PNG only; GitHub strips fonts from README-embedded SVGs regardless.'
+    required: false
+    default: ''
+  update-readme:
+    description: 'Rewrite the README between the star-history marker comments to point at the newest chart. Requires the markers to exist.'
+    required: false
+    default: 'true'
+  readme:
+    description: 'Path to the README to update when update-readme is true.'
+    required: false
+    default: 'README.md'
+  readme-format:
+    description: 'README embed style: "picture" (SVG <picture>, GitHub dark/light) or "png" (plain-markdown absolute-URL PNG, renders on npm/pub.dev).'
+    required: false
+    default: 'picture'
+  commit:
+    description: 'Whether to commit and push the generated files.'
+    required: false
+    default: 'true'
+  commit-message:
+    description: 'Commit message used when committing generated files.'
+    required: false
+    default: 'chore: update star history [skip ci]'
+
+outputs:
+  files:
+    description: 'Newline-separated list of generated chart file paths (SVGs and the PNG).'
+    value: ${{ steps.render.outputs.files }}
+  changed:
+    description: 'Whether the chart changed this run (true/false).'
+    value: ${{ steps.render.outputs.changed }}
+  light:
+    description: 'Path to the newest light-theme SVG (or the first theme).'
+    value: ${{ steps.render.outputs.light }}
+  dark:
+    description: 'Path to the newest dark-theme SVG, if a dark theme was rendered.'
+    value: ${{ steps.render.outputs.dark }}
+  png:
+    description: 'Path to the generated PNG chart (single file, rendered from the first configured theme).'
+    value: ${{ steps.render.outputs.png }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+
+    - name: Install renderer dependencies
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: npm ci --prefix "$ACTION_PATH/renderer" --no-audit --no-fund
+
+    - name: Render star history charts
+      id: render
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        REPOS: ${{ inputs.repos }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        TYPE: ${{ inputs.type }}
+        THEMES: ${{ inputs.themes }}
+        WIDTH: ${{ inputs.width }}
+        FONT_FAMILY: ${{ inputs.font-family }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/scripts/render-charts.sh"
+
+    - name: Update README embed
+      if: ${{ inputs.update-readme == 'true' && steps.render.outputs.changed == 'true' }}
+      shell: bash
+      env:
+        README: ${{ inputs.readme }}
+        LIGHT: ${{ steps.render.outputs.light }}
+        DARK: ${{ steps.render.outputs.dark }}
+        PNG: ${{ steps.render.outputs.png }}
+        README_FORMAT: ${{ inputs.readme-format }}
+        REPO: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        python3 "$ACTION_PATH/scripts/readme-embed.py"
+
+    - name: Commit generated charts
+      if: ${{ inputs.commit == 'true' && steps.render.outputs.changed == 'true' }}
+      shell: bash
+      env:
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        README: ${{ inputs.readme }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        git add "$OUTPUT_DIR" "$README" 2>/dev/null || git add "$OUTPUT_DIR"
+        if git diff --cached --quiet; then
+          echo "No staged changes to commit."
+          exit 0
+        fi
+
+        git commit -m "$COMMIT_MESSAGE"
+
+        # Rebase onto any commits that landed while this run was working, so the
+        # push does not fail with a non-fast-forward error.
+        branch="$(git rev-parse --abbrev-ref HEAD)"
+        if [ "$branch" = "HEAD" ]; then
+          echo "::error::Detached HEAD; cannot push. Trigger this action on push/schedule/workflow_dispatch (not pull_request)."
+          exit 1
+        fi
+        if ! git pull --rebase origin "$branch"; then
+          echo "::error::Rebase onto origin/$branch failed. Aborting rather than pushing an inconsistent state."
+          git rebase --abort 2>/dev/null || true
+          exit 1
+        fi
+        git push origin "HEAD:$branch"

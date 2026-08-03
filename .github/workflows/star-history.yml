@@ -1,9 +1,10 @@
 name: star-history
 
 # GitHub's stargazers API now requires an authorized token, which broke
-# third-party chart embeds (star-history.com). We render the chart ourselves
-# with the repo token and serve it from the gh-pages site; the README embeds
-# https://zju-real.github.io/EasySteer/star-history.svg.
+# third-party chart embeds (star-history.com). We render the classic chart
+# ourselves with the vendored star-history renderer (.github/actions/star-history,
+# see its PROVENANCE) and serve it from the gh-pages site; the README embeds
+# https://zju-real.github.io/EasySteer/star-history-{light,dark}.svg.
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -12,7 +13,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/star-history.yml"
-      - ".github/scripts/star_history.py"
+      - ".github/actions/star-history/**"
 
 permissions:
   contents: write
@@ -28,20 +29,23 @@ jobs:
           ref: gh-pages
           path: gh-pages
 
-      - name: Render star history SVG
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python .github/scripts/star_history.py \
-            --repo "${{ github.repository }}" \
-            --out gh-pages/star-history.svg
+      # Renders into the gh-pages checkout so the .star-history.sig change
+      # marker persists between runs. The vendored action never commits or
+      # touches the README; publishing stays in our own step below.
+      - name: Render star history charts
+        uses: ./.github/actions/star-history
+        with:
+          output-dir: gh-pages
+          commit: "false"
+          update-readme: "false"
 
       - name: Publish to gh-pages
         run: |
           cd gh-pages
-          git add star-history.svg
-          # --cached sees new files too, unlike a plain diff
-          if git diff --cached --quiet -- star-history.svg; then
+          rm -f star-history.svg  # legacy pre-vendored chart
+          git add -A -- star-history.svg star-history-light.svg \
+            star-history-dark.svg star-history.png .star-history.sig
+          if git diff --cached --quiet; then
             echo "chart unchanged; nothing to publish"
             exit 0
           fi

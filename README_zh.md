@@ -189,6 +189,12 @@ LLM 干预技术具有双重用途。EasySteer 主要作为推进模型安全研
 
 ## Star History
 
-<!-- Rendered daily by .github/workflows/star-history.yml; the stargazers API
+<!-- Rendered daily by .github/workflows/star-history.yml using the vendored
+     star-history renderer (.github/actions/star-history); the stargazers API
      requires repo-authorized tokens now, so third-party embeds no longer work. -->
-[![Star History Chart](https://zju-real.github.io/EasySteer/star-history.svg)](https://github.com/ZJU-REAL/EasySteer/stargazers)
+<a href="https://github.com/ZJU-REAL/EasySteer/stargazers">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://zju-real.github.io/EasySteer/star-history-dark.svg">
+    <img alt="Star History Chart" src="https://zju-real.github.io/EasySteer/star-history-light.svg">
+  </picture>
+</a>
