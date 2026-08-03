@@ -65,6 +65,8 @@ EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一
 
 ### 安装
 
+开发安装（可编辑模式，推荐用于持续开发）：
+
 ```bash
 conda create -n easysteer python=3.12 -y
 conda activate easysteer
@@ -83,7 +85,7 @@ cd ..
 pip install --editable .
 ```
 
-没有适用于你平台的预编译 wheel，或想使用容器？请参阅[安装指南](https://zju-real.github.io/EasySteer/latest/getting-started/installation/)中的源码编译与 Docker 方案。
+赶时间？还有**快速安装**方案（官方 `vllm==0.26.0` wheel + 分支文件覆盖，即我们在实验室服务器上的部署方式），以及源码编译与 Docker 方案：见[安装指南](https://zju-real.github.io/EasySteer/latest/getting-started/installation/)。
 
 ### 30 秒示例
 

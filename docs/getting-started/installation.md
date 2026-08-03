@@ -1,9 +1,16 @@
 # Installation
 
 EasySteer ships as two packages installed from one repository: the vLLM fork
-(`vllm-steer/`) and the `easysteer` Python package.
+(`vllm-steer/`) and the `easysteer` Python package. Pick one of two routes:
 
-## Recommended: precompiled vLLM wheel
+- **Development install** — editable checkouts of both packages; changes to
+  the fork or to `easysteer` take effect immediately. Use this if you plan to
+  develop, debug, or track the repository.
+- **Quick install** — stock vLLM wheel plus a file overlay of the fork's
+  Python changes. Fastest way to a working environment (this is how we set up
+  lab servers); not editable.
+
+## Route 1: development install (recommended for ongoing work)
 
 ```bash
 conda create -n easysteer python=3.12 -y
@@ -20,6 +27,34 @@ VLLM_USE_PRECOMPILED=1 pip install --editable .
 cd ..
 pip install --editable .
 ```
+
+## Route 2: quick install (prebuilt wheel + fork overlay)
+
+The fork's changes against upstream vLLM v0.26.0 are pure Python, so you can
+install the official wheel and overlay the fork's files onto it — no build,
+no editable checkouts:
+
+```bash
+conda create -n easysteer python=3.12 -y
+conda activate easysteer
+
+# Official vLLM wheel (kernels prebuilt)
+pip install vllm==0.26.0
+
+# Overlay the fork's Python files onto the installed package
+git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
+rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+
+# EasySteer package
+git clone https://github.com/ZJU-REAL/EasySteer.git
+pip install ./EasySteer
+```
+
+!!! warning
+    The overlay is not tracked by pip: reinstalling or upgrading `vllm`
+    silently reverts it (re-run the rsync afterwards), and `pip show vllm`
+    still reports the stock package. For anything long-lived, prefer Route 1.
 
 ## Fallback: build vLLM from source
 

@@ -65,6 +65,8 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 
 ### Installation
 
+Development install (editable, recommended for ongoing work):
+
 ```bash
 conda create -n easysteer python=3.12 -y
 conda activate easysteer
@@ -83,7 +85,7 @@ cd ..
 pip install --editable .
 ```
 
-No precompiled wheel for your platform, or prefer a container? See the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/) for the build-from-source and Docker routes.
+In a hurry? There is also a **quick install** (official `vllm==0.26.0` wheel + a file overlay of the fork — how we set up lab servers), plus build-from-source and Docker routes: see the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/).
 
 ### A 30-Second Example
 
