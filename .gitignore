@@ -2,3 +2,6 @@ __pycache__/
 .idea/
 /temp/
 easysteer.egg-info/
+
+# Regenerable capture artifact; 128MB exceeds GitHub's file limit
+replications/sake/edit_uk_capital_to_paris.pkl
