@@ -45,7 +45,8 @@ matches; exclusions always subtract.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `source` | `None` | Path to the vector file. Required for every algorithm except `moe_router` with explicit `expert_ids`. Plain path only — no `"path\|algo"`. |
+| `source` | `None` | Path to a vector file in a format EasySteer itself defines (its GGUF export; the `moe_router` JSON). For third-party checkpoint formats use `data` instead. Plain path only — no `"path\|algo"`. |
+| `data` | `None` | An in-memory payload (see [Steering with your own tensors](#steering-with-your-own-tensors)). Mutually exclusive with `source`. |
 | `algorithm` | `"direct"` | Registry key: `direct`, `linear`, `loreft`, `lm_steer`, `erase`, `replace`, `concept_replace`, `moe_router`. |
 | `scale` | `1.0` | Scale factor (negative suppresses the direction). |
 | `layers` | `None` | Layer indices to apply to; `None` lets the file decide. |
@@ -53,6 +54,40 @@ matches; exclusions always subtract.
 | `apply` | — | **Required** `ApplySpec`. |
 | `params` | `{}` | Algorithm-specific parameters, validated per algorithm; unknown keys are rejected. Only `moe_router` takes params: `expert_ids`, `mode`, `lambda`, `topk`. |
 | `name` | `None` | Label used in logs only (not identity). |
+
+## Steering with your own tensors
+
+The engine loads only formats whose schema EasySteer defines. Everything else —
+pyreft checkpoints, LM-Steer `.pt` files, pickled transport maps, or tensors you
+just computed — is passed in memory through `VectorSpec(data=...)` using the
+canonical payload structures:
+
+| Payload | Algorithms | Shape |
+|---|---|---|
+| `DirectionVector({layer: vec})` | `direct`, `erase`, `replace` | one 1-D vector per layer |
+| `LinearMap(weight, bias=None)` | `linear` | one affine map, applied to each `layers` entry |
+| `LowRankProjector(p1, p2)` | `lm_steer` | low-rank update factors, applied to each `layers` entry |
+| `ReftIntervention(rotate, weight, bias=None, layer=None)` | `loreft` | LoReFT intervention; `layer` from the checkpoint wins |
+| `ConceptPair(h1=..., h2=...)` | `concept_replace` | named roles — steer toward `h1`, away from `h2` |
+
+```python
+from vllm.steer_vectors import ApplySpec, DirectionVector, SteeringSpec, VectorSpec
+
+# Any tensor you have — numpy or torch — becomes steerable directly:
+spec = SteeringSpec(vectors=[VectorSpec(
+    data=DirectionVector({10: my_vector}),
+    scale=2.0,
+    apply=ApplySpec(phases=["prompt", "generation"]),
+)])
+```
+
+Payloads are validated at construction (shapes, finiteness, role names) and
+identified engine-side by a content hash, so identical payloads share one
+resident copy regardless of how many requests carry them. `easysteer.vectors`
+ships adapters for the common third-party layouts (`from_pyreft`,
+`from_lm_steer`, `from_linear_transport`, `from_pt_direction`, `from_gguf`),
+and `easysteer.vectors.from_control_vector(cv)` steers an extraction result
+with no GGUF round-trip.
 
 ## `SteeringSpec`: vectors + conflict policy
 

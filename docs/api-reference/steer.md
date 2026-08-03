@@ -31,3 +31,20 @@ Analysis-based extraction of steering vectors from captured hidden states.
 <!-- TODO: add the extractor classes (DiffMeanExtractor, PCAExtractor, LATExtractor,
 LinearProbeExtractor, SAEFeatureExplorer) and accumulators once their docstrings are
 reviewed. -->
+
+## Payload adapters (`easysteer.vectors`)
+
+Client-side adapters from third-party checkpoint formats to the canonical
+steering payloads passed via `VectorSpec(data=...)`.
+
+::: easysteer.vectors.from_control_vector
+
+::: easysteer.vectors.from_gguf
+
+::: easysteer.vectors.from_pt_direction
+
+::: easysteer.vectors.from_pyreft
+
+::: easysteer.vectors.from_lm_steer
+
+::: easysteer.vectors.from_linear_transport
