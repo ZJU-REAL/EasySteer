@@ -14,7 +14,6 @@ control_vector = extract_diffmean_control_vector(
     all_hidden_states=all_hidden_states,  # nested [samples][layer][token]
     positive_indices=[0, 1, 2, 3],
     negative_indices=[4, 5, 6, 7],
-    model_type="qwen2.5",
     token_pos=-1,       # which token's activation to use
     normalize=True,
 )

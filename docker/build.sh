@@ -36,9 +36,9 @@ cd vllm-steer
 
 # Temporarily patch Dockerfile:
 # 1) Override version string
-sed -i.bak 's/ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+csrc.build"/ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.17.1+easysteer"/' docker/Dockerfile
+sed -i.bak 's/ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0+csrc.build"/ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.26.0+easysteer"/' docker/Dockerfile
 # 2) Set version in the 'build' stage (csrc-build already has it from step 1)
-sed -i '/^FROM base AS build/a ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.17.1+easysteer"' docker/Dockerfile
+sed -i '/^FROM base AS build/a ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.26.0+easysteer"' docker/Dockerfile
 # 3) Use Chinese Ubuntu mirrors to avoid proxy 502 errors
 sed -i '/^RUN apt-get update/i RUN sed -i "s|http://archive.ubuntu.com|http://mirrors.aliyun.com|g; s|http://security.ubuntu.com|http://mirrors.aliyun.com|g" /etc/apt/sources.list' docker/Dockerfile
 
@@ -46,7 +46,7 @@ docker build \
   ${PROXY_ARGS} \
   --build-arg PYTHON_VERSION=3.10 \
   --build-arg VLLM_USE_PRECOMPILED=1 \
-  --build-arg VLLM_MERGE_BASE_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995 \
+  --build-arg VLLM_MERGE_BASE_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0 \
   --build-arg GIT_REPO_CHECK=0 \
   --target vllm-openai \
   -t vllm-steer:base \

@@ -44,7 +44,7 @@ if USE_API:
     print(f"🌐 API mode enabled (DEMO_MODE={_demo_mode})")
 else:
     from vllm import LLM, SamplingParams
-    from vllm.steer_vectors.request import SteerVectorRequest, VectorConfig
+    from vllm.steer_vectors import SteeringSpec
     print(f"🖥️  GPU mode (DEMO_MODE={_demo_mode})")
 
 # ===== Configuration =====
@@ -56,20 +56,6 @@ llm_instance = None
 
 # Global ID counter (same pattern as frontend/core/id_generator.py)
 _global_id_counter = 1
-
-def generate_unique_id() -> int:
-    """Generate a unique positive integer ID using a global counter."""
-    global _global_id_counter
-    uid = _global_id_counter
-    _global_id_counter += 1
-    if _global_id_counter > 2147483647:
-        _global_id_counter = 1
-    return uid
-
-def generate_unique_name(prefix: str = "steer_vector") -> str:
-    """Generate a unique name based on timestamp."""
-    return f"{prefix}_{int(time.time() * 1000000)}"
-
 
 # ===== Config Loading =====
 def load_configs() -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -165,8 +151,7 @@ def format_prompt(instruction: str) -> str:
     """Format instruction with Qwen2.5 chat template."""
     return f"<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n"
 
-
-# ===== API Mode Helpers =====
+# ===== Steering Spec Builders (v2 wire format, both modes) =====
 def _resolve_path(relative_path: str) -> str:
     """In API mode, convert a relative vector path to an absolute server path."""
     if USE_API and VECTOR_BASE_PATH:
@@ -174,169 +159,144 @@ def _resolve_path(relative_path: str) -> str:
     return relative_path
 
 
-def _build_sv_dict_from_config(sv: Dict[str, Any], scale_override: float | None = None) -> dict:
-    """Build a steer_vector_request dict (for extra_body) from a single-vector config."""
-    scale = scale_override if scale_override is not None else float(sv.get("scale", 1.0))
-    result: dict = {
-        "steer_vector_local_path": _resolve_path(sv["path"]),
+# Data-only algorithms: the engine no longer loads their files by path;
+# the easysteer payload adapters interpret them client-side.
+_DATA_ONLY_ALGORITHMS = ("linear", "lm_steer", "loreft")
+
+
+def _apply_clauses(prefill_tokens, prefill_positions, generate_tokens):
+    """Translate the legacy config trigger fields into v2 apply clauses.
+
+    Same mapping as frontend/core/steer_request_builder.py: -1 in a
+    token list means "every token of that phase"; no fields at all
+    means both phases unfiltered.
+    """
+    if prefill_tokens is None and prefill_positions is None and generate_tokens is None:
+        return [{"phases": ["prompt", "generation"]}]
+    want_prompt = prefill_tokens is not None or prefill_positions is not None
+    if prefill_tokens is not None and -1 in prefill_tokens:
+        prefill_tokens = None
+        prefill_positions = None
+    want_generation = generate_tokens is not None
+    if generate_tokens is not None and -1 in generate_tokens:
+        generate_tokens = None
+    if (want_prompt and want_generation and prefill_positions is None
+            and prefill_tokens == generate_tokens):
+        clause = {"phases": ["prompt", "generation"]}
+        if prefill_tokens:
+            clause["tokens"] = prefill_tokens
+        return [clause]
+    clauses = []
+    if want_prompt:
+        clause = {"phases": ["prompt"]}
+        if prefill_tokens:
+            clause["tokens"] = prefill_tokens
+        if prefill_positions:
+            clause["positions"] = prefill_positions
+        clauses.append(clause)
+    if want_generation:
+        clause = {"phases": ["generation"]}
+        if generate_tokens:
+            clause["tokens"] = generate_tokens
+        clauses.append(clause)
+    return clauses
+
+
+def _b64_payload_wire(payload) -> dict:
+    """Payload wire with tensor bytes base64-encoded for JSON transport
+    (the engine's wire decoder is base64-tolerant)."""
+    import base64
+
+    wire = payload.to_wire()
+    wire["tensors"] = {
+        name: {"shape": t["shape"],
+               "data": base64.b64encode(t["data"]).decode("ascii")}
+        for name, t in wire["tensors"].items()
+    }
+    return wire
+
+
+def _vector_source(algorithm: str, path: str) -> dict:
+    """source= for engine formats; data= payload for data-only algorithms."""
+    if algorithm not in _DATA_ONLY_ALGORITHMS:
+        return {"source": _resolve_path(path)}
+    try:
+        import easysteer.vectors as vec
+    except ImportError as e:
+        raise RuntimeError(
+            f"algorithm {algorithm!r} needs the easysteer payload adapters "
+            "(server-side loading of these files by path was removed); "
+            "run this demo config in GPU mode or install easysteer"
+        ) from e
+    adapter = {"linear": vec.from_linear_transport,
+               "lm_steer": vec.from_lm_steer,
+               "loreft": vec.from_pyreft}[algorithm]
+    payload = adapter(path)
+    return {"data": _b64_payload_wire(payload) if USE_API else payload}
+
+
+def _vector_wires(vc, scale_override=None):
+    """One legacy config entry -> v2 vector wire dicts (one per clause)."""
+    algorithm = vc.get("algorithm", "direct")
+    scale = scale_override if scale_override is not None else float(vc.get("scale", 1.0))
+    base = {
+        **_vector_source(algorithm, vc["path"]),
         "scale": scale,
-        "algorithm": sv.get("algorithm", "direct"),
+        "algorithm": algorithm,
+        "normalize": bool(vc.get("normalize", False)),
     }
-    if sv.get("target_layers"):
-        result["target_layers"] = parse_int_list(sv["target_layers"])
-    if sv.get("prefill_trigger_tokens"):
-        result["prefill_trigger_tokens"] = parse_int_list(sv["prefill_trigger_tokens"])
-    if sv.get("prefill_trigger_positions"):
-        result["prefill_trigger_positions"] = parse_int_list(sv["prefill_trigger_positions"])
-    if sv.get("generate_trigger_tokens"):
-        result["generate_trigger_tokens"] = parse_int_list(sv["generate_trigger_tokens"])
-    if sv.get("normalize"):
-        result["normalize"] = sv["normalize"]
-    if sv.get("debug"):
-        result["debug"] = sv["debug"]
-    return result
+    if vc.get("target_layers"):
+        base["layers"] = parse_int_list(str(vc["target_layers"]))
+
+    def _field(name):
+        return parse_int_list(str(vc[name])) if vc.get(name) else None
+
+    return [
+        {**base, "apply": clause}
+        for clause in _apply_clauses(
+            _field("prefill_trigger_tokens"),
+            _field("prefill_trigger_positions"),
+            _field("generate_trigger_tokens"),
+        )
+    ]
 
 
-def _build_mv_dict_from_config(config: Dict[str, Any]) -> dict:
-    """Build a steer_vector_request dict (for extra_body) from a multi-vector config."""
-    sv = config["steer_vector"]
-    vector_configs = []
+def build_single_spec_wire(config, scale_override=None) -> dict:
+    """v2 SteeringSpec wire for a single-vector config."""
+    return {"vectors": _vector_wires(config["steer_vector"],
+                                     scale_override=scale_override)}
+
+
+def build_multi_spec_wire(config) -> dict:
+    """v2 SteeringSpec wire for a multi-vector config."""
+    vectors = []
     for vc in config["vector_configs"]:
-        vc_dict: dict = {
-            "path": _resolve_path(vc["path"]),
-            "scale": float(vc.get("scale", 1.0)),
-            "algorithm": vc.get("algorithm", "direct"),
-        }
-        if vc.get("target_layers"):
-            vc_dict["target_layers"] = parse_int_list(vc["target_layers"])
-        if vc.get("prefill_trigger_tokens"):
-            vc_dict["prefill_trigger_tokens"] = parse_int_list(vc["prefill_trigger_tokens"])
-        if vc.get("prefill_trigger_positions"):
-            vc_dict["prefill_trigger_positions"] = parse_int_list(vc["prefill_trigger_positions"])
-        if vc.get("generate_trigger_tokens"):
-            vc_dict["generate_trigger_tokens"] = parse_int_list(vc["generate_trigger_tokens"])
-        if vc.get("normalize"):
-            vc_dict["normalize"] = vc["normalize"]
-        vector_configs.append(vc_dict)
+        vectors.extend(_vector_wires(vc))
     return {
-        "vector_configs": vector_configs,
-        "conflict_resolution": sv.get("conflict_resolution", "sequential"),
+        "vectors": vectors,
+        "conflict": config["steer_vector"].get("conflict_resolution", "sequential"),
     }
 
 
-def _build_baseline_sv_dict(config: Dict[str, Any]) -> dict:
-    """Build a baseline (scale=0) steer_vector_request dict for API mode."""
-    if "vector_configs" in config:
-        first_vec = config["vector_configs"][0]
-        d: dict = {
-            "steer_vector_local_path": _resolve_path(first_vec["path"]),
-            "scale": 0.0,
-            "algorithm": first_vec.get("algorithm", "direct"),
-        }
-        if first_vec.get("target_layers"):
-            d["target_layers"] = parse_int_list(first_vec["target_layers"])
-        else:
-            d["target_layers"] = [0]
-        return d
-    else:
-        return _build_sv_dict_from_config(config["steer_vector"], scale_override=0.0)
+def _local_spec(wire):
+    """Materialize a wire dict into a SteeringSpec for llm.generate."""
+    return SteeringSpec.model_validate(wire)
 
 
-def _api_generate(prompt: str, config: Dict[str, Any], sv_dict: dict) -> str:
-    """Call the remote vLLM server via OpenAI-compatible API."""
+def _api_generate(prompt: str, config, spec_wire) -> str:
+    """Call the remote vLLM server; spec_wire=None means no steering."""
     sampling = config["sampling"]
+    extra_body = {"repetition_penalty": float(sampling.get("repetition_penalty", 1.1))}
+    if spec_wire is not None:
+        extra_body["steering"] = spec_wire
     response = _api_client.chat.completions.create(
         model=API_MODEL_NAME,
         messages=[{"role": "system", "content": ""}, {"role": "user", "content": prompt}],
         max_tokens=int(sampling.get("max_tokens", 128)),
         temperature=float(sampling.get("temperature", 0.0)),
-        extra_body={
-            "steer_vector_request": sv_dict,
-            "repetition_penalty": float(sampling.get("repetition_penalty", 1.1)),
-        },
+        extra_body=extra_body,
     )
     return response.choices[0].message.content
-
-
-# ===== Request Building – Local Mode (matches inference_api.py pattern) =====
-def build_baseline_request(config: Dict[str, Any]) -> "SteerVectorRequest":
-    """Build a baseline (scale=0) request from config."""
-    sv = config["steer_vector"]
-    
-    # Determine vector path and algorithm
-    if "vector_configs" in config:
-        # Multi-vector: use first vector for baseline
-        first_vec = config["vector_configs"][0]
-        vector_path = first_vec["path"]
-        algorithm = first_vec.get("algorithm", "direct")
-        target_layers = parse_int_list(first_vec.get("target_layers", "0")) if first_vec.get("target_layers") else [0]
-    else:
-        # Single-vector
-        vector_path = sv["path"]
-        algorithm = sv.get("algorithm", "direct")
-        target_layers = parse_int_list(sv.get("target_layers", "0")) if sv.get("target_layers") else [0]
-    
-    return SteerVectorRequest(
-        steer_vector_name=generate_unique_name("baseline"),
-        steer_vector_int_id=generate_unique_id(),
-        steer_vector_local_path=vector_path,
-        scale=0.0,
-        target_layers=target_layers,
-        algorithm=algorithm
-    )
-
-
-def build_single_vector_request(config: Dict[str, Any], scale_override: float | None = None) -> "SteerVectorRequest":
-    """Build a single-vector steering request from config (same pattern as inference_api.py)."""
-    sv = config["steer_vector"]
-    scale = scale_override if scale_override is not None else float(sv.get("scale", 1.0))
-    
-    target_layers = parse_int_list(sv["target_layers"]) if sv.get("target_layers") else None
-    prefill_trigger_tokens = parse_int_list(sv["prefill_trigger_tokens"]) if sv.get("prefill_trigger_tokens") else None
-    prefill_trigger_positions = parse_int_list(sv["prefill_trigger_positions"]) if sv.get("prefill_trigger_positions") else None
-    generate_trigger_tokens = parse_int_list(sv["generate_trigger_tokens"]) if sv.get("generate_trigger_tokens") else None
-    
-    return SteerVectorRequest(
-        steer_vector_name=generate_unique_name(sv.get("name", "steer")),
-        steer_vector_int_id=generate_unique_id(),
-        steer_vector_local_path=sv["path"],
-        scale=scale,
-        target_layers=target_layers,
-        algorithm=sv.get("algorithm", "direct"),
-        prefill_trigger_tokens=prefill_trigger_tokens,
-        prefill_trigger_positions=prefill_trigger_positions,
-        generate_trigger_tokens=generate_trigger_tokens,
-        normalize=sv.get("normalize", False),
-        debug=sv.get("debug", False)
-    )
-
-
-def build_multi_vector_request(config: Dict[str, Any]) -> "SteerVectorRequest":
-    """Build a multi-vector steering request from config (same pattern as inference_api.py)."""
-    sv = config["steer_vector"]
-    
-    # Convert dict configs to VectorConfig objects (same as SteerRequestBuilder.build_multi_vector_request)
-    vector_config_objects = []
-    for vec_config in config["vector_configs"]:
-        vc = VectorConfig(
-            path=vec_config["path"],
-            scale=float(vec_config.get("scale", 1.0)),
-            target_layers=parse_int_list(vec_config["target_layers"]) if vec_config.get("target_layers") else None,
-            prefill_trigger_positions=parse_int_list(vec_config["prefill_trigger_positions"]) if vec_config.get("prefill_trigger_positions") else None,
-            prefill_trigger_tokens=parse_int_list(vec_config["prefill_trigger_tokens"]) if vec_config.get("prefill_trigger_tokens") else None,
-            generate_trigger_tokens=parse_int_list(vec_config["generate_trigger_tokens"]) if vec_config.get("generate_trigger_tokens") else None,
-            algorithm=vec_config.get("algorithm", "direct"),
-            normalize=vec_config.get("normalize", False)
-        )
-        vector_config_objects.append(vc)
-    
-    return SteerVectorRequest(
-        steer_vector_name=generate_unique_name(sv.get("name", "multi_vector")),
-        steer_vector_int_id=generate_unique_id(),
-        vector_configs=vector_config_objects,
-        conflict_resolution=sv.get("conflict_resolution", "sequential"),
-        debug=sv.get("debug", False)
-    )
 
 
 # ===== Generation Functions =====
@@ -351,10 +311,10 @@ def generate_single(config_name: str, prompt: str, scale: float, progress=gr.Pro
         if USE_API:
             # ---- API mode ----
             progress(0.2, desc="Calling API (baseline)...")
-            baseline_text = _api_generate(prompt, config, _build_baseline_sv_dict(config))
+            baseline_text = _api_generate(prompt, config, None)
 
             progress(0.6, desc="Calling API (steered)...")
-            steered_text = _api_generate(prompt, config, _build_sv_dict_from_config(config["steer_vector"], scale_override=scale))
+            steered_text = _api_generate(prompt, config, build_single_spec_wire(config, scale_override=scale))
         else:
             # ---- Local mode ----
             progress(0, desc="Loading model...")
@@ -368,11 +328,11 @@ def generate_single(config_name: str, prompt: str, scale: float, progress=gr.Pro
             )
 
             progress(0.3, desc="Generating baseline...")
-            baseline_out = llm.generate(formatted_prompt, steer_vector_request=build_baseline_request(config), sampling_params=sampling_params)
+            baseline_out = llm.generate(formatted_prompt, sampling_params=sampling_params)
             baseline_text = baseline_out[0].outputs[0].text
 
             progress(0.6, desc="Generating steered output...")
-            steered_out = llm.generate(formatted_prompt, steer_vector_request=build_single_vector_request(config, scale_override=scale), sampling_params=sampling_params)
+            steered_out = llm.generate(formatted_prompt, steering=_local_spec(build_single_spec_wire(config, scale_override=scale)), sampling_params=sampling_params)
             steered_text = steered_out[0].outputs[0].text
 
         progress(1.0, desc="Complete!")
@@ -391,10 +351,10 @@ def generate_multi(config_name: str, prompt: str, progress=gr.Progress()) -> Tup
         if USE_API:
             # ---- API mode ----
             progress(0.2, desc="Calling API (baseline)...")
-            baseline_text = _api_generate(prompt, config, _build_baseline_sv_dict(config))
+            baseline_text = _api_generate(prompt, config, None)
 
             progress(0.6, desc="Calling API (multi-vector steered)...")
-            steered_text = _api_generate(prompt, config, _build_mv_dict_from_config(config))
+            steered_text = _api_generate(prompt, config, build_multi_spec_wire(config))
         else:
             # ---- Local mode ----
             progress(0, desc="Loading model...")
@@ -408,11 +368,11 @@ def generate_multi(config_name: str, prompt: str, progress=gr.Progress()) -> Tup
             )
 
             progress(0.3, desc="Generating baseline...")
-            baseline_out = llm.generate(formatted_prompt, steer_vector_request=build_baseline_request(config), sampling_params=sampling_params)
+            baseline_out = llm.generate(formatted_prompt, sampling_params=sampling_params)
             baseline_text = baseline_out[0].outputs[0].text
 
             progress(0.6, desc="Generating multi-vector steered output...")
-            steered_out = llm.generate(formatted_prompt, steer_vector_request=build_multi_vector_request(config), sampling_params=sampling_params)
+            steered_out = llm.generate(formatted_prompt, steering=_local_spec(build_multi_spec_wire(config)), sampling_params=sampling_params)
             steered_text = steered_out[0].outputs[0].text
 
         progress(1.0, desc="Complete!")

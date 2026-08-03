@@ -78,9 +78,11 @@ reft_model.save("results/emoji_style")
 
 ## Applying the trained intervention
 
-The saved representation is loaded at inference through the steering engine — e.g. with
-`VectorSpec(source="results/emoji_style", algorithm="loreft", ...)` for LoReFT-format
-files. See the [Steering guide](steering.md) for the spec language and the
+The saved representation is interpreted client-side by the payload adapter and passed
+to the engine as canonical data — e.g.
+`VectorSpec(data=easysteer.vectors.from_pyreft("results/emoji_style"), algorithm="loreft", ...)`
+(`source=` paths are only accepted for the engine's own formats, such as GGUF).
+See the [Steering guide](steering.md) for the spec language and the
 [LoReFT replication](../replications/index.md) for a complete train-then-steer
 notebook.
 

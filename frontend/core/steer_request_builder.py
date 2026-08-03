@@ -30,6 +30,26 @@ from vllm.steer_vectors.api import ApplySpec, SteeringSpec, VectorSpec
 
 logger = logging.getLogger(__name__)
 
+
+def _vector_source_kwargs(algorithm: str, path: str) -> Dict[str, Any]:
+    """File-format handling per algorithm.
+
+    Data-only algorithms (linear, lm_steer, loreft) no longer accept a
+    ``source`` path — the engine only loads its own formats. Interpret
+    the user's file client-side with the easysteer payload adapters and
+    pass the canonical payload via ``data=``.
+    """
+    if algorithm in ("linear", "lm_steer", "loreft"):
+        import easysteer.vectors as vec
+
+        adapter = {
+            "linear": vec.from_linear_transport,
+            "lm_steer": vec.from_lm_steer,
+            "loreft": vec.from_pyreft,
+        }[algorithm]
+        return {"data": adapter(path)}
+    return {"source": path}
+
 # v1 sentinel inside a trigger-token list meaning "all tokens of this phase".
 ALL_TOKENS_SENTINEL = -1
 
@@ -109,7 +129,7 @@ def build_single_vector_spec(
     )
     vectors = [
         VectorSpec(
-            source=vector_path,
+            **_vector_source_kwargs(algorithm, vector_path),
             scale=scale,
             layers=target_layers or None,
             algorithm=algorithm,
@@ -150,12 +170,13 @@ def build_multi_vector_spec(
             prefill_trigger_positions=config.get("prefill_trigger_positions"),
             generate_trigger_tokens=config.get("generate_trigger_tokens"),
         ):
+            algorithm = config.get("algorithm", "direct")
             vectors.append(
                 VectorSpec(
-                    source=path,
+                    **_vector_source_kwargs(algorithm, path),
                     scale=config.get("scale", 1.0),
                     layers=config.get("target_layers") or None,
-                    algorithm=config.get("algorithm", "direct"),
+                    algorithm=algorithm,
                     normalize=config.get("normalize", False),
                     apply=apply_spec,
                 )
