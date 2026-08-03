@@ -1,0 +1,38 @@
+{
+  "bos_token_id": 151646,
+  "eos_token_id": 151643,
+  "intervention_constant_sources": [
+    true
+  ],
+  "intervention_dimensions": [
+    1536
+  ],
+  "intervention_types": [
+    "<class 'easysteer.reft.pyreft.reft.algorithms.loreft.LoreftIntervention'>"
+  ],
+  "mode": "parallel",
+  "pad_token_id": 151643,
+  "representations": [
+    [
+      8,
+      "block_output",
+      "pos",
+      1,
+      4,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  ],
+  "sorted_keys": [
+    "layer_8_comp_block_output_unit_pos_nunit_1#0"
+  ],
+  "transformers_version": "5.14.1",
+  "use_cache": false
+}
