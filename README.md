@@ -85,7 +85,24 @@ cd ..
 pip install --editable .
 ```
 
-In a hurry? There is also a **quick install** (official `vllm==0.26.0` wheel + a file overlay of the fork — how we set up lab servers), plus build-from-source and Docker routes: see the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/).
+Quick install (prebuilt wheel + fork overlay) — installs the official vLLM wheel and applies the fork's Python changes on top, with no compilation and no editable checkouts:
+
+```bash
+conda create -n easysteer python=3.12 -y
+conda activate easysteer
+
+# Official vLLM wheel, then overlay the fork's Python files
+pip install vllm==0.26.0
+git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
+rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+
+# EasySteer package
+git clone https://github.com/ZJU-REAL/EasySteer.git
+pip install ./EasySteer
+```
+
+Note that reinstalling or upgrading `vllm` reverts the overlay; re-apply the `rsync` step afterwards. For caveats, build-from-source, and Docker, see the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/).
 
 ### A 30-Second Example
 

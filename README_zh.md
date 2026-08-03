@@ -85,7 +85,24 @@ cd ..
 pip install --editable .
 ```
 
-赶时间？还有**快速安装**方案（官方 `vllm==0.26.0` wheel + 分支文件覆盖，即我们在实验室服务器上的部署方式），以及源码编译与 Docker 方案：见[安装指南](https://zju-real.github.io/EasySteer/latest/getting-started/installation/)。
+快速安装（预编译 wheel + 分支覆盖）——安装官方 vLLM wheel，并将分支的 Python 改动覆盖其上，无需编译、无需可编辑安装：
+
+```bash
+conda create -n easysteer python=3.12 -y
+conda activate easysteer
+
+# 官方 vLLM wheel，然后覆盖分支的 Python 文件
+pip install vllm==0.26.0
+git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
+rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+
+# EasySteer 包
+git clone https://github.com/ZJU-REAL/EasySteer.git
+pip install ./EasySteer
+```
+
+注意：重装或升级 `vllm` 会还原该覆盖，需重新执行 `rsync` 一步。完整说明、源码编译与 Docker 方案见[安装指南](https://zju-real.github.io/EasySteer/latest/getting-started/installation/)。
 
 ### 30 秒示例
 

@@ -7,8 +7,7 @@ EasySteer ships as two packages installed from one repository: the vLLM fork
   the fork or to `easysteer` take effect immediately. Use this if you plan to
   develop, debug, or track the repository.
 - **Quick install** — stock vLLM wheel plus a file overlay of the fork's
-  Python changes. Fastest way to a working environment (this is how we set up
-  lab servers); not editable.
+  Python changes. The fastest way to a working environment; not editable.
 
 ## Route 1: development install (recommended for ongoing work)
 
