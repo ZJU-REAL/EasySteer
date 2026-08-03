@@ -6,15 +6,15 @@ EasySteer ships as two packages installed from one repository: the vLLM fork
 ## Recommended: precompiled vLLM wheel
 
 ```bash
-conda create -n easysteer python=3.10 -y
+conda create -n easysteer python=3.12 -y
 conda activate easysteer
 
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
-# EasySteer tracks the vLLM v0.17.1 release commit; pin it so the
+# EasySteer tracks the vLLM v0.26.0 release commit; pin it so the
 # precompiled kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995
+export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 cd ..
@@ -46,6 +46,12 @@ pip install -e .
 A full source build can take from ~20 minutes (128 cores) to several hours.
 
 ## Docker
+
+!!! note
+    The published image (`xuhaolei/easysteer`, tag `v0.17.1`) predates the
+    vLLM v0.26.0 migration — it runs the previous engine and v1-era APIs.
+    A refreshed image is planned; until then, prefer the wheel install
+    above for current features.
 
 ```bash
 docker pull xuhaolei/easysteer:latest

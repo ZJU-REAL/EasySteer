@@ -66,7 +66,7 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 ### Installation
 
 ```bash
-conda create -n easysteer python=3.10 -y
+conda create -n easysteer python=3.12 -y
 conda activate easysteer
 
 # Clone the repository (with submodules)
@@ -74,8 +74,8 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
-# EasySteer tracks the vLLM v0.17.1 release commit; pin it so the kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995
+# EasySteer tracks the vLLM v0.26.0 release commit; pin it so the kernels match.
+export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # Install EasySteer
