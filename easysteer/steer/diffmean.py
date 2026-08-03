@@ -3,17 +3,38 @@ Difference of Means Extractor
 """
 
 import numpy as np
-from tqdm.auto import tqdm
+
+from .accumulators import DiffMeanAccumulator
+from .base_extractor import BaseExtractor
 from .utils import (
     StatisticalControlVector,
+    _metadata,
     derive_negative_indices,
-    extract_token_hiddens,
 )
 
 
-class DiffMeanExtractor:
+class DiffMeanExtractor(BaseExtractor):
     """Difference of means method for control vector extraction"""
-    
+
+    method = "diffmean"
+    progress_desc = "Computing DiffMean directions"
+
+    @staticmethod
+    def _direction(pos_rows, neg_rows, *, layer):
+        """Mean positive activation minus mean negative activation.
+
+        Args:
+            pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
+            neg_rows (np.ndarray): Negative activations, `(n_neg, dim)`.
+            layer (int): Layer key (unused; uniform hook signature).
+
+        Returns:
+            tuple[np.ndarray, dict]: The mean-difference direction and
+                no per-layer extras.
+        """
+        del layer  # DiffMean has no per-layer state to report.
+        return np.mean(pos_rows, axis=0) - np.mean(neg_rows, axis=0), {}
+
     @staticmethod
     def extract(
         all_hidden_states,
@@ -51,38 +72,14 @@ class DiffMeanExtractor:
             negative_indices = derive_negative_indices(
                 len(all_hidden_states), positive_indices
             )
-
-        positive_hiddens, negative_hiddens = extract_token_hiddens(
-            all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
-        )
-
-        directions = {}
-
-        for layer in tqdm(positive_hiddens.keys(), desc="Computing DiffMean directions"):
-            mean_positive = np.mean(positive_hiddens[layer], axis=0)
-            mean_negative = np.mean(negative_hiddens[layer], axis=0)
-            direction = mean_positive - mean_negative
-
-            if normalize:
-                norm = np.linalg.norm(direction)
-                if norm > 0:
-                    direction = direction / norm
-
-            directions[layer] = direction.astype(np.float32)
-
-        metadata = {
-            "normalize": normalize,
-            "token_pos": token_pos,
-            "n_positive": len(positive_indices),
-            "n_negative": len(negative_indices)
-        }
-        
-        return StatisticalControlVector(
+        return DiffMeanExtractor._extract_template(
+            all_hidden_states,
+            positive_indices,
+            negative_indices,
             model_type=model_type,
-            method="diffmean",
-            directions=directions,
-            metadata=metadata
-        ) 
+            normalize=normalize,
+            token_pos=token_pos,
+        )
 
     @staticmethod
     def from_moments(
@@ -93,29 +90,42 @@ class DiffMeanExtractor:
     ) -> StatisticalControlVector:
         """Build a diffmean vector from streaming moment accumulators.
 
-        pos_moments/neg_moments are MomentsAccumulator instances
-        (easysteer.steer.accumulators) fed per-category rows layer by
-        layer; equivalent to extract() on the same rows.
+        Equivalent to `extract()` on the same rows; the per-layer math
+        delegates to `DiffMeanAccumulator.direction`.
+
+        Args:
+            pos_moments (MomentsAccumulator): Accumulator fed the
+                positive rows layer by layer
+                (easysteer.steer.accumulators).
+            neg_moments (MomentsAccumulator): Accumulator fed the
+                negative rows layer by layer.
+            model_type (str): Model type name recorded in the result.
+            normalize (bool): Normalize each direction to unit L2 norm.
+
+        Returns:
+            StatisticalControlVector: The extracted control vector.
+
+        Raises:
+            ValueError: If the accumulators share no layers.
         """
-        directions = {}
         layers = sorted(set(pos_moments.layers) & set(neg_moments.layers))
         if not layers:
             raise ValueError("accumulators share no layers")
-        for layer in layers:
-            d = pos_moments.mean(layer) - neg_moments.mean(layer)
-            if normalize:
-                norm = np.linalg.norm(d)
-                if norm > 0:
-                    d = d / norm
-            directions[layer] = d.astype(np.float32)
+        accumulator = DiffMeanAccumulator()
+        accumulator.pos = pos_moments
+        accumulator.neg = neg_moments
+        directions = {
+            layer: accumulator.direction(layer, normalize=normalize)
+            for layer in layers
+        }
         return StatisticalControlVector(
             model_type=model_type,
             method="diffmean",
             directions=directions,
-            metadata={
-                "normalized": normalize,
-                "num_positive": int(max(pos_moments.count.values())),
-                "num_negative": int(max(neg_moments.count.values())),
-                "streaming": True,
-            },
+            metadata=_metadata(
+                normalize=normalize,
+                n_positive=int(max(pos_moments.count.values())),
+                n_negative=int(max(neg_moments.count.values())),
+                streaming=True,
+            ),
         )

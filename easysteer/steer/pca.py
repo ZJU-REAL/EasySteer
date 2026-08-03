@@ -2,19 +2,115 @@
 Principal Component Analysis Extractor
 """
 
-import numpy as np
-import torch
-from sklearn.decomposition import PCA
-from tqdm.auto import tqdm
-from .utils import StatisticalControlVector
-
 import logging
+
+import numpy as np
+from sklearn.decomposition import PCA
+
+from .base_extractor import BaseExtractor
+from .utils import (
+    StatisticalControlVector,
+    _metadata,
+    correct_sign,
+    derive_negative_indices,
+    l2_normalize,
+)
+
 logger = logging.getLogger(__name__)
 
+_PCA_LOG_LABELS = {
+    "standard": "PCA",
+    "center": "PCA on centered data",
+    "diff": "PCA on differences",
+}
 
-class PCAExtractor:
+
+def _fit_first_component(activations):
+    """Fit `PCA(n_components=1)` and return its first component.
+
+    Args:
+        activations (np.ndarray): Row matrix to decompose,
+            `(n_rows, dim)`.
+
+    Returns:
+        tuple[np.ndarray, float]: The first principal component and
+            its explained-variance ratio.
+    """
+    pca = PCA(n_components=1)
+    pca.fit(activations)
+    return pca.components_[0], float(pca.explained_variance_ratio_[0])
+
+
+class PCAExtractor(BaseExtractor):
     """Principal Component Analysis method for control vector extraction"""
-    
+
+    method = "pca"
+    progress_desc = "Computing PCA directions"
+
+    @staticmethod
+    def _direction(pos_rows, neg_rows, *, layer, method, correct_direction):
+        """First principal component of the variant-specific rows.
+
+        Args:
+            pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
+            neg_rows (np.ndarray | None): Negative activations,
+                `(n_neg, dim)`; None for the "standard" variant.
+            layer (int): Layer key, used for logging.
+            method (str): PCA variant: "standard", "diff" or "center".
+            correct_direction (bool): Flip the component if needed so
+                it points from the negative toward the positive
+                samples (variants with negatives only).
+
+        Returns:
+            tuple[np.ndarray, dict]: The component and its explained
+                variance under the `"explained_variance"` key.
+        """
+        if method == "standard":
+            # Plain PCA over positive samples only
+            activations = (
+                pos_rows
+                if isinstance(pos_rows, np.ndarray)
+                else np.vstack(pos_rows)
+            )
+        elif method == "center":
+            # Centered PCA: truncate to equal numbers of positives and
+            # negatives, then center each pair on its midpoint.
+            min_samples = min(len(pos_rows), len(neg_rows))
+            pos = pos_rows[:min_samples]
+            neg = neg_rows[:min_samples]
+            centers = (pos + neg) / 2
+            activations = np.vstack([pos - centers, neg - centers])
+        else:  # "diff" — extract() validated the variant name.
+            # Difference of each positive/negative pair.
+            min_samples = min(len(pos_rows), len(neg_rows))
+            differences = [
+                pos_rows[i] - neg_rows[i] for i in range(min_samples)
+            ]
+            # Extra positives are paired with the negative mean.
+            if len(pos_rows) > min_samples:
+                neg_mean = np.mean(neg_rows, axis=0)
+                differences.extend(
+                    row - neg_mean for row in pos_rows[min_samples:]
+                )
+            # Extra negatives are paired with the positive mean.
+            if len(neg_rows) > min_samples:
+                pos_mean = np.mean(pos_rows, axis=0)
+                differences.extend(
+                    pos_mean - row for row in neg_rows[min_samples:]
+                )
+            activations = np.vstack(differences)
+
+        component, variance = _fit_first_component(activations)
+        logger.info(
+            f"Layer {layer}: {_PCA_LOG_LABELS[method]} explains "
+            f"{variance:.5%} of the variance"
+        )
+
+        if correct_direction and neg_rows is not None:
+            component = correct_sign(component, pos_rows, neg_rows)
+
+        return component, {"explained_variance": variance}
+
     @staticmethod
     def extract(
         all_hidden_states,
@@ -75,9 +171,7 @@ class PCAExtractor:
                 f"component (n_components=1)"
             )
 
-        from .utils import derive_negative_indices, extract_token_hiddens
-
-        if method in ["diff", "center"]:
+        if method in ("diff", "center"):
             if negative_indices is None:
                 negative_indices = derive_negative_indices(
                     len(all_hidden_states), positive_indices
@@ -87,135 +181,26 @@ class PCAExtractor:
                     f"PCA method {method!r} requires negative samples, "
                     f"but none were provided or derivable"
                 )
+            extraction_negatives = None  # Extract the negatives too.
+        else:
+            extraction_negatives = []  # "standard" ignores negatives.
 
-        directions = {}
-        explained_variance = {}
-
-        positive_hiddens, negative_hiddens = extract_token_hiddens(
-            all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
-        )
-
-        for layer in tqdm(list(positive_hiddens.keys()), desc="Computing PCA directions"):
-            if method == "standard":
-                # Plain PCA over positive samples only
-                all_activations = positive_hiddens[layer]
-
-                if not isinstance(all_activations, np.ndarray):
-                    all_activations = np.vstack(all_activations)
-
-                pca = PCA(n_components=1)
-                pca.fit(all_activations)
-
-                first_component = pca.components_[0]
-                variance_explained = pca.explained_variance_ratio_[0]
-
-                logger.info(f"Layer {layer}: PCA explains {variance_explained:.5%} of the variance")
-
-            elif method == "center":
-                # Centered PCA (requires positive and negative samples)
-                pos_activations = positive_hiddens[layer]  # [n_pos, hidden_dim]
-                neg_activations = negative_hiddens[layer]  # [n_neg, hidden_dim]
-
-                # Truncate to equal numbers of positives and negatives
-                min_samples = min(len(pos_activations), len(neg_activations))
-                pos_activations = pos_activations[:min_samples]
-                neg_activations = neg_activations[:min_samples]
-
-                # Center each pair on its positive/negative midpoint
-                centers = (pos_activations + neg_activations) / 2
-
-                centered_pos = pos_activations - centers
-                centered_neg = neg_activations - centers
-
-                all_activations = np.vstack([centered_pos, centered_neg])
-
-                pca = PCA(n_components=1)
-                pca.fit(all_activations)
-
-                first_component = pca.components_[0]
-                variance_explained = pca.explained_variance_ratio_[0]
-
-                logger.info(f"Layer {layer}: PCA on centered data explains {variance_explained:.5%} of the variance")
-
-            elif method == "diff":
-                # Difference PCA (requires positive and negative samples)
-                pos_activations = positive_hiddens[layer]  # [n_pos, hidden_dim]
-                neg_activations = negative_hiddens[layer]  # [n_neg, hidden_dim]
-
-                # Difference of each positive/negative pair
-                min_samples = min(len(pos_activations), len(neg_activations))
-                differences = []
-
-                for i in range(min_samples):
-                    diff = pos_activations[i] - neg_activations[i]
-                    differences.append(diff)
-
-                # Extra positives are paired with the negative mean
-                if len(pos_activations) > min_samples:
-                    neg_mean = np.mean(neg_activations, axis=0)
-                    for i in range(min_samples, len(pos_activations)):
-                        diff = pos_activations[i] - neg_mean
-                        differences.append(diff)
-
-                # Extra negatives are paired with the positive mean
-                if len(neg_activations) > min_samples:
-                    pos_mean = np.mean(pos_activations, axis=0)
-                    for i in range(min_samples, len(neg_activations)):
-                        diff = pos_mean - neg_activations[i]
-                        differences.append(diff)
-
-                all_activations = np.vstack(differences)
-
-                pca = PCA(n_components=1)
-                pca.fit(all_activations)
-
-                first_component = pca.components_[0]
-                variance_explained = pca.explained_variance_ratio_[0]
-
-                logger.info(f"Layer {layer}: PCA on differences explains {variance_explained:.5%} of the variance")
-
-            # Direction correction (point from negatives toward positives)
-            if correct_direction and method in ["diff", "center"]:
-                pos_activations_layer = positive_hiddens[layer]
-                neg_activations_layer = negative_hiddens[layer]
-
-                vec_norm = np.linalg.norm(first_component)
-                if vec_norm > 1e-6:  # Avoid division by zero
-                    # Project activations onto the principal component
-                    proj_pos = (pos_activations_layer @ first_component) / vec_norm
-                    proj_neg = (neg_activations_layer @ first_component) / vec_norm
-
-                    # A lower mean positive projection means the
-                    # direction is inverted; flip it.
-                    if np.mean(proj_pos) < np.mean(proj_neg):
-                        first_component *= -1
-                        logger.info(f"Layer {layer}: Direction corrected (flipped)")
-
-            if normalize:
-                norm = np.linalg.norm(first_component)
-                if norm > 0:
-                    first_component = first_component / norm
-
-            directions[layer] = first_component.astype(np.float32)
-            explained_variance[layer] = float(variance_explained)
-
-        metadata = {
-            "normalize": normalize,
-            "n_components": 1,
-            "method": method,
-            "correct_direction": correct_direction,
-            "token_pos": token_pos,
-            "n_positive": len(positive_indices),
-            "n_negative": len(negative_indices) if negative_indices else 0,
-            "explained_variance": explained_variance
-        }
-        
-        return StatisticalControlVector(
+        return PCAExtractor._extract_template(
+            all_hidden_states,
+            positive_indices,
+            negative_indices,
             model_type=model_type,
+            normalize=normalize,
+            token_pos=token_pos,
+            extraction_negatives=extraction_negatives,
+            opts={"method": method, "correct_direction": correct_direction},
+            extra_metadata={
+                "n_components": 1,
+                "method": method,
+                "correct_direction": correct_direction,
+            },
             method=f"pca_{method}",
-            directions=directions,
-            metadata=metadata
-        ) 
+        )
 
     @staticmethod
     def from_moments(
@@ -227,12 +212,27 @@ class PCAExtractor:
     ) -> StatisticalControlVector:
         """Standard PCA from a streaming second-moment accumulator.
 
-        moments must be a MomentsAccumulator(track_second_moment=True)
-        fed the positive rows; the direction per layer is the top
-        eigenvector of the covariance. When pos_moments/neg_moments
-        (first-moment accumulators) are given, the sign is corrected so
-        the direction points from the negative mean to the positive
-        mean, matching extract(method="standard", correct_direction).
+        The direction per layer is the top eigenvector of the
+        covariance. When ``pos_moments``/``neg_moments`` are given, the
+        sign is corrected so the direction points from the negative
+        mean to the positive mean, matching
+        `extract(method="standard", correct_direction=True)`.
+
+        Args:
+            moments (MomentsAccumulator): Accumulator with
+                ``track_second_moment=True`` fed the positive rows.
+            model_type (str): Model type name recorded in the result.
+            normalize (bool): Normalize each direction to unit L2 norm.
+            pos_moments (MomentsAccumulator | None): First-moment
+                accumulator of the positive rows, for sign correction.
+            neg_moments (MomentsAccumulator | None): First-moment
+                accumulator of the negative rows, for sign correction.
+
+        Returns:
+            StatisticalControlVector: The extracted control vector.
+
+        Raises:
+            ValueError: If ``moments`` holds no layers.
         """
         directions = {}
         variance = {}
@@ -249,17 +249,21 @@ class PCAExtractor:
                 if float(gap @ direction) < 0:
                     direction = -direction
             if normalize:
-                norm = np.linalg.norm(direction)
-                if norm > 0:
-                    direction = direction / norm
+                direction = l2_normalize(direction)
             directions[layer] = direction.astype(np.float32)
         return StatisticalControlVector(
             model_type=model_type,
             method="pca_standard",
             directions=directions,
-            metadata={
-                "normalized": normalize,
-                "explained_variance": variance,
-                "streaming": True,
-            },
+            metadata=_metadata(
+                normalize=normalize,
+                n_positive=int(max(moments.count.values())),
+                n_negative=(
+                    int(max(neg_moments.count.values()))
+                    if neg_moments is not None
+                    else 0
+                ),
+                explained_variance=variance,
+                streaming=True,
+            ),
         )

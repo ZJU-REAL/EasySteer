@@ -17,7 +17,12 @@ from .diffmean import DiffMeanExtractor
 from .pca import PCAExtractor
 from .lat import LATExtractor
 from .linear_probe import LinearProbeExtractor
-from .sae import SAEFeatureExplorer, search_sae_features, get_sae_feature_explanation, extract_sae_decoder_vector
+from .sae import (
+    SAEFeatureExplorer,
+    search_sae_features,
+    get_sae_feature_explanation,
+    extract_sae_decoder_vector,
+)
 from .unified_interface import (
     extract_statistical_control_vector,
     extract_diffmean_control_vector,

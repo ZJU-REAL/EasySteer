@@ -2,20 +2,119 @@
 Linear Probe Extractor
 """
 
+import logging
+
 import numpy as np
-import torch
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from tqdm.auto import tqdm
-from .utils import StatisticalControlVector
 
-import logging
+from .base_extractor import BaseExtractor
+from .utils import StatisticalControlVector, derive_negative_indices
+
 logger = logging.getLogger(__name__)
 
 
-class LinearProbeExtractor:
+def _build_classifier(penalty, C):
+    """Construct the LogisticRegression for the requested penalty.
+
+    Args:
+        penalty (str | None): Effective sklearn penalty: "l1", "l2",
+            "elasticnet", or None for an unregularized fit.
+        C (float): Inverse regularization strength.
+
+    Returns:
+        LogisticRegression: The configured (unfitted) classifier.
+    """
+    if penalty == "elasticnet":
+        return LogisticRegression(
+            penalty=penalty,
+            C=C,
+            l1_ratio=0.5,  # elasticnet l1/l2 mixing ratio
+            solver="saga",
+            max_iter=1000,
+            random_state=42,
+        )
+    if penalty is None:
+        return LogisticRegression(
+            penalty=None,
+            solver="lbfgs",
+            max_iter=1000,
+            random_state=42,
+        )
+    solver = "liblinear" if penalty == "l1" else "lbfgs"
+    return LogisticRegression(
+        penalty=penalty,
+        C=C,
+        solver=solver,
+        max_iter=1000,
+        random_state=42,
+    )
+
+
+class LinearProbeExtractor(BaseExtractor):
     """Linear Probe method for control vector extraction"""
-    
+
+    method = "linear_probe"
+    progress_desc = "Computing LinearProbe directions"
+
+    @staticmethod
+    def _direction(pos_rows, neg_rows, *, layer, penalty, C, standardize):
+        """Logistic-regression weights separating positives from negatives.
+
+        Args:
+            pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
+            neg_rows (np.ndarray): Negative activations, `(n_neg, dim)`.
+            layer (int): Layer key, used for logging and errors.
+            penalty (str | None): Effective sklearn penalty; None means
+                no regularization.
+            C (float): Inverse regularization strength.
+            standardize (bool): Standardize features before fitting.
+
+        Returns:
+            tuple[np.ndarray, dict]: The classifier weights and the
+                training accuracy under the `"classification_scores"`
+                key.
+
+        Raises:
+            RuntimeError: If the classifier fit fails.
+        """
+        features = np.vstack([pos_rows, neg_rows])
+        labels = np.hstack([
+            np.ones(len(pos_rows)),  # positive samples labeled 1
+            np.zeros(len(neg_rows)),  # negative samples labeled 0
+        ])
+
+        if standardize:
+            features = StandardScaler().fit_transform(features)
+
+        clf = _build_classifier(penalty, C)
+        try:
+            clf.fit(features, labels)
+        except Exception as e:
+            raise RuntimeError(
+                f"linear probe fit failed for layer {layer}: {e}"
+            ) from e
+
+        # The classifier weights point toward the positive class
+        direction = clf.coef_[0]  # [hidden_dim]
+        train_score = float(clf.score(features, labels))
+
+        # Check weight sparsity (relevant for L1 regularization)
+        non_zero_weights = np.count_nonzero(direction)
+        sparsity_ratio = 1.0 - (non_zero_weights / len(direction))
+        logger.info(
+            f"Layer {layer}: accuracy {train_score:.4f}, sparsity "
+            f"{sparsity_ratio:.3f} ({non_zero_weights}/{len(direction)} "
+            f"non-zero weights)"
+        )
+        if non_zero_weights == 0:
+            logger.warning(
+                f"Layer {layer}: all weights are zero; consider "
+                f"adjusting the regularization parameters."
+            )
+
+        return direction, {"classification_scores": train_score}
+
     @staticmethod
     def extract(
         all_hidden_states,
@@ -58,8 +157,6 @@ class LinearProbeExtractor:
         Returns:
             StatisticalControlVector: The extracted control vector.
         """
-        from .utils import derive_negative_indices, extract_token_hiddens
-
         if negative_indices is None:
             negative_indices = derive_negative_indices(
                 len(all_hidden_states), positive_indices
@@ -84,7 +181,7 @@ class LinearProbeExtractor:
             "l1": "l1",
             "l2": "l2",
             "elasticnet": "elasticnet",
-            "none": None
+            "none": None,
         }
         if regularization not in penalty_map:
             raise ValueError(
@@ -106,108 +203,18 @@ class LinearProbeExtractor:
         )
         logger.info(f"Regularization: {regularization}, C: {C}")
 
-        directions = {}
-        model_scores = {}
-
-        positive_hiddens, negative_hiddens = extract_token_hiddens(
-            all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
-        )
-
-        for layer in tqdm(
-            list(positive_hiddens.keys()), desc="Computing LinearProbe directions"
-        ):
-            X_pos = positive_hiddens[layer]  # [n_positive, hidden_dim]
-            X_neg = negative_hiddens[layer]  # [n_negative, hidden_dim]
-
-            X = np.vstack([X_pos, X_neg])  # [n_total, hidden_dim]
-            y = np.hstack([
-                np.ones(len(X_pos)),   # positive samples labeled 1
-                np.zeros(len(X_neg))   # negative samples labeled 0
-            ])
-
-            if standardize:
-                scaler = StandardScaler()
-                X = scaler.fit_transform(X)
-
-            if penalty == "elasticnet":
-                clf = LogisticRegression(
-                    penalty=penalty,
-                    C=C,
-                    l1_ratio=0.5,  # elasticnet l1/l2 mixing ratio
-                    solver="saga",
-                    max_iter=1000,
-                    random_state=42
-                )
-            elif penalty is None:
-                clf = LogisticRegression(
-                    penalty=None,
-                    solver="lbfgs",
-                    max_iter=1000,
-                    random_state=42
-                )
-            else:
-                solver = "liblinear" if penalty == "l1" else "lbfgs"
-                clf = LogisticRegression(
-                    penalty=penalty,
-                    C=C,
-                    solver=solver,
-                    max_iter=1000,
-                    random_state=42
-                )
-            
-            try:
-                clf.fit(X, y)
-            except Exception as e:
-                raise RuntimeError(
-                    f"linear probe fit failed for layer {layer}: {e}"
-                ) from e
-
-            # The classifier weights point toward the positive class
-            direction = clf.coef_[0]  # [hidden_dim]
-
-            train_score = clf.score(X, y)
-            model_scores[layer] = float(train_score)
-
-            # Check weight sparsity (relevant for L1 regularization)
-            non_zero_weights = np.count_nonzero(direction)
-            sparsity_ratio = 1.0 - (non_zero_weights / len(direction))
-
-            logger.info(
-                f"Layer {layer}: accuracy {train_score:.4f}, sparsity "
-                f"{sparsity_ratio:.3f} ({non_zero_weights}/{len(direction)} "
-                f"non-zero weights)"
-            )
-
-            if non_zero_weights == 0:
-                logger.warning(
-                    f"Layer {layer}: all weights are zero; consider "
-                    f"adjusting the regularization parameters."
-                )
-
-            if normalize:
-                norm = np.linalg.norm(direction)
-                if norm > 0:
-                    direction = direction / norm
-                else:
-                    logger.warning(f"Layer {layer}: cannot normalize a zero vector")
-
-            directions[layer] = direction.astype(np.float32)
-
-        metadata = {
-            "normalize": normalize,
-            "token_pos": token_pos,
-            # The effective penalty; "none" stands for penalty=None
-            "regularization": "none" if penalty is None else penalty,
-            "C": C,
-            "standardize": standardize,
-            "n_positive": len(positive_indices),
-            "n_negative": len(negative_indices),
-            "classification_scores": model_scores
-        }
-        
-        return StatisticalControlVector(
+        return LinearProbeExtractor._extract_template(
+            all_hidden_states,
+            positive_indices,
+            negative_indices,
             model_type=model_type,
-            method="linear_probe",
-            directions=directions,
-            metadata=metadata
-        ) 
+            normalize=normalize,
+            token_pos=token_pos,
+            opts={"penalty": penalty, "C": C, "standardize": standardize},
+            extra_metadata={
+                # The effective penalty; "none" stands for penalty=None
+                "regularization": "none" if penalty is None else penalty,
+                "C": C,
+                "standardize": standardize,
+            },
+        )

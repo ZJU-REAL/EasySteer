@@ -2,19 +2,98 @@
 Linear Algebraic Technique (LAT) Extractor
 """
 
-import numpy as np
-import torch
-from sklearn.decomposition import PCA
-from tqdm.auto import tqdm
-from .utils import StatisticalControlVector
-
 import logging
+
+import numpy as np
+from sklearn.decomposition import PCA
+
+from .base_extractor import BaseExtractor
+from .utils import (
+    StatisticalControlVector,
+    correct_sign,
+    derive_negative_indices,
+)
+
 logger = logging.getLogger(__name__)
 
 
-class LATExtractor:
+class LATExtractor(BaseExtractor):
     """Linear Algebraic Technique (LAT) method for control vector extraction"""
-    
+
+    method = "lat"
+    progress_desc = "Computing LAT directions"
+
+    @staticmethod
+    def _direction(pos_rows, neg_rows, *, layer, n_components,
+                   correct_direction):
+        """PCA over normalized differences of randomly paired rows.
+
+        Args:
+            pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
+            neg_rows (np.ndarray | None): Negative activations,
+                `(n_neg, dim)`, or None in positive-only mode; when
+                present they join the pairing pool and drive the
+                direction correction.
+            layer (int): Layer key, used for logging.
+            n_components (int): Number of PCA components to fit; only
+                the first component is used as the direction.
+            correct_direction (bool): Flip the component if needed so
+                it points from the negative toward the positive
+                samples (requires negatives).
+
+        Returns:
+            tuple[np.ndarray, dict]: The component and its explained
+                variance under the `"explained_variance"` key.
+        """
+        activations = (
+            pos_rows if neg_rows is None else np.vstack([pos_rows, neg_rows])
+        )
+
+        # LAT: pair activations at random and take differences
+        logger.info(
+            f"Layer {layer}: Shuffling {activations.shape[0]} activations"
+        )
+        # Permute a copy: never mutate the caller-visible array.
+        activations = np.random.permutation(activations)
+        length = activations.shape[0] // 2
+        differences = activations[:length] - activations[length : length * 2]
+
+        logger.info(
+            f"Layer {layer}: Shuffled and diff'd: {differences.shape[0]} pairs"
+        )
+        logger.info(
+            f"Layer {layer}: Potential NaNs: {np.isnan(differences).sum()}"
+        )
+        logger.info(
+            f"Layer {layer}: Potential Infs: {np.isinf(differences).sum()}"
+        )
+        logger.info(
+            f"Layer {layer}: Range: {differences.min()} to "
+            f"{differences.max()}"
+        )
+
+        # Normalize the differences, guarding against zero norms
+        norms = np.linalg.norm(differences, axis=1, keepdims=True)
+        differences = np.where(norms == 0, 0, differences / norms)
+
+        pca = PCA(
+            n_components=min(
+                n_components + 1, differences.shape[0], differences.shape[1]
+            )
+        )
+        pca.fit(differences)
+
+        component = pca.components_[0]
+        variance = float(pca.explained_variance_ratio_[0])
+        logger.info(
+            f"Layer {layer}: LAT explains {variance:.5%} of the variance"
+        )
+
+        if correct_direction and neg_rows is not None:
+            component = correct_sign(component, pos_rows, neg_rows)
+
+        return component, {"explained_variance": variance}
+
     @staticmethod
     def extract(
         all_hidden_states,
@@ -61,132 +140,48 @@ class LATExtractor:
         Returns:
             StatisticalControlVector: The extracted control vector.
         """
-        from .utils import derive_negative_indices, extract_token_hiddens
-
         if use_positive_only:
-            sample_indices = positive_indices
+            n_samples = len(positive_indices)
+            extraction_negatives = []  # Negatives never enter the pool.
         else:
             if negative_indices is None:
                 negative_indices = derive_negative_indices(
                     len(all_hidden_states), positive_indices
                 )
-            sample_indices = positive_indices + negative_indices
+            n_samples = len(positive_indices) + len(negative_indices)
+            extraction_negatives = None  # Extract the negatives too.
 
-        # LAT needs enough samples to form pairs for a meaningful PCA
-        total_samples = len(sample_indices)
-        min_pairs_needed = 2  # PCA needs at least 2 pairs
-        max_pairs_possible = total_samples // 2
-
-        if total_samples < 4:
+        # LAT needs enough samples to form pairs for a meaningful PCA:
+        # 4 samples yield the minimum of 2 difference pairs.
+        if n_samples < 4:
             raise ValueError(
                 f"The LAT method needs at least 4 samples to produce "
                 f"2 difference pairs for a valid PCA, but only "
-                f"{total_samples} were provided. Add more samples or "
+                f"{n_samples} were provided. Add more samples or "
                 f"use another method (e.g. DiffMean)."
             )
 
-        if max_pairs_possible < min_pairs_needed:
-            raise ValueError(
-                f"The LAT method needs at least {min_pairs_needed} "
-                f"sample pairs for PCA, but {total_samples} samples "
-                f"can produce at most {max_pairs_possible}. Add more "
-                f"samples or use another method."
-            )
-
         logger.info(
-            f"LAT: using {total_samples} samples, producing "
-            f"{max_pairs_possible} difference pairs"
+            f"LAT: using {n_samples} samples, producing "
+            f"{n_samples // 2} difference pairs"
         )
 
-        directions = {}
-        explained_variance = {}
-
-        if use_positive_only:
-            positive_hiddens, _ = extract_token_hiddens(
-                all_hidden_states, sample_indices, [], token_pos=token_pos
-            )
-        else:
-            positive_hiddens, negative_hiddens = extract_token_hiddens(
-                all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
-            )
-            # Merge positive and negative samples
-            combined_hiddens = {}
-            for layer in positive_hiddens.keys():
-                combined_hiddens[layer] = np.vstack([positive_hiddens[layer], negative_hiddens[layer]])
-            positive_hiddens = combined_hiddens
-        
-        for layer in tqdm(list(positive_hiddens.keys()), desc="Computing LAT directions"):
-            all_activations = positive_hiddens[layer]
-            
-            # LAT: pair activations at random and take differences
-            logger.info(f"Layer {layer}: Shuffling {all_activations.shape[0]} activations")
-            # Permute a copy: never mutate the caller-visible array.
-            all_activations = np.random.permutation(all_activations)
-            length = all_activations.shape[0] // 2
-            differences = all_activations[:length] - all_activations[length:length * 2]
-            
-            logger.info(f"Layer {layer}: Shuffled and diff'd: {differences.shape[0]} pairs")
-            logger.info(f"Layer {layer}: Potential NaNs: {np.isnan(differences).sum()}")
-            logger.info(f"Layer {layer}: Potential Infs: {np.isinf(differences).sum()}")
-            logger.info(f"Layer {layer}: Range: {differences.min()} to {differences.max()}")
-            
-            # Normalize the differences, guarding against zero norms
-            norms = np.linalg.norm(differences, axis=1, keepdims=True)
-            differences = np.where(norms == 0, 0, differences / norms)
-
-            pca = PCA(n_components=min(n_components + 1, differences.shape[0], differences.shape[1]))
-            pca.fit(differences)
-
-            first_component = pca.components_[0]
-            variance_explained = pca.explained_variance_ratio_[0]
-            
-            logger.info(f"Layer {layer}: LAT explains {variance_explained:.5%} of the variance")
-            
-            # Direction correction (point from negatives toward positives)
-            if correct_direction and not use_positive_only and negative_indices is not None and len(negative_indices) > 0:
-                # Re-extract positive/negative activations for correction
-                pos_hiddens_orig, neg_hiddens_orig = extract_token_hiddens(
-                    all_hidden_states, positive_indices, negative_indices, token_pos=token_pos
-                )
-
-                pos_activations_layer = pos_hiddens_orig[layer]
-                neg_activations_layer = neg_hiddens_orig[layer]
-
-                vec_norm = np.linalg.norm(first_component)
-                if vec_norm > 1e-6:  # Avoid division by zero
-                    # Project activations onto the principal component
-                    proj_pos = (pos_activations_layer @ first_component) / vec_norm
-                    proj_neg = (neg_activations_layer @ first_component) / vec_norm
-
-                    # A lower mean positive projection means the
-                    # direction is inverted; flip it.
-                    if np.mean(proj_pos) < np.mean(proj_neg):
-                        first_component *= -1
-                        logger.info(f"Layer {layer}: Direction corrected (flipped)")
-            
-            if normalize:
-                norm = np.linalg.norm(first_component)
-                if norm > 0:
-                    first_component = first_component / norm
-            
-            directions[layer] = first_component.astype(np.float32)
-            explained_variance[layer] = float(variance_explained)
-        
-        metadata = {
-            "normalize": normalize,
-            "n_components": n_components,
-            "use_positive_only": use_positive_only,
-            "correct_direction": correct_direction,
-            "token_pos": token_pos,
-            "n_samples": len(sample_indices),
-            "n_positive": len(positive_indices),
-            "n_negative": len(negative_indices) if negative_indices else 0,
-            "explained_variance": explained_variance
-        }
-        
-        return StatisticalControlVector(
+        return LATExtractor._extract_template(
+            all_hidden_states,
+            positive_indices,
+            negative_indices,
             model_type=model_type,
-            method="lat",
-            directions=directions,
-            metadata=metadata
-        ) 
+            normalize=normalize,
+            token_pos=token_pos,
+            extraction_negatives=extraction_negatives,
+            opts={
+                "n_components": n_components,
+                "correct_direction": correct_direction,
+            },
+            extra_metadata={
+                "n_components": n_components,
+                "use_positive_only": use_positive_only,
+                "correct_direction": correct_direction,
+                "n_samples": n_samples,
+            },
+        )

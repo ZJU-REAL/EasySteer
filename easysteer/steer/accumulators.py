@@ -9,9 +9,11 @@ corpus streams through in chunks; `from_moments` constructors on the
 extractors turn the accumulated statistics into control vectors.
 """
 
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
+
+from .utils import l2_normalize
 
 
 class MomentsAccumulator:
@@ -30,8 +32,10 @@ class MomentsAccumulator:
 
     def update(self, layer: int, rows) -> None:
         """Add rows (n, dim) of one layer (torch tensor or ndarray)."""
+        # Duck-typed tensor handling (as in TopKCountAccumulator), so
+        # the module needs no torch import of its own.
         x = np.asarray(
-            rows.detach().to(dtype=__import__("torch").float32).cpu().numpy()
+            rows.detach().float().cpu().numpy()
             if hasattr(rows, "detach")
             else rows,
             dtype=np.float64,
@@ -84,11 +88,21 @@ class DiffMeanAccumulator:
         (self.pos if positive else self.neg).update(layer, rows)
 
     def direction(self, layer: int, normalize: bool = True) -> np.ndarray:
+        """One layer's mean(pos) - mean(neg) direction.
+
+        `DiffMeanExtractor.from_moments` delegates its per-layer math
+        here, so both public entry points share this computation.
+
+        Args:
+            layer (int): Layer key to compute the direction for.
+            normalize (bool): Normalize the direction to unit L2 norm.
+
+        Returns:
+            np.ndarray: The float32 direction vector.
+        """
         d = self.pos.mean(layer) - self.neg.mean(layer)
         if normalize:
-            norm = np.linalg.norm(d)
-            if norm > 0:
-                d = d / norm
+            d = l2_normalize(d)
         return d.astype(np.float32)
 
 

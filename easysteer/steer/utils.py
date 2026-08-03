@@ -6,16 +6,12 @@ Contains the StatisticalControlVector class and shared helpers
 import dataclasses
 import os
 import warnings
-from pathlib import Path
 
 import gguf
 import numpy as np
 import torch
 
 import logging
-logging.basicConfig(format='%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-    datefmt='%Y-%m-%d:%H:%M:%S',
-    level=logging.WARN)
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +44,9 @@ class StatisticalControlVector:
                     # Handle nested dictionaries like explained_variance
                     for subkey, subvalue in value.items():
                         if isinstance(subvalue, (int, float)):
-                            writer.add_float32(f"{arch}.{key}.{subkey}", float(subvalue))
+                            writer.add_float32(
+                                f"{arch}.{key}.{subkey}", float(subvalue)
+                            )
         
         for layer in self.directions.keys():
             writer.add_tensor(f"direction.{layer}", self.directions[layer])
@@ -70,7 +68,8 @@ class StatisticalControlVector:
             arch = str(bytes(archf.parts[-1]), encoding="utf-8", errors="replace")
             if arch != "controlvector":
                 warnings.warn(
-                    f".gguf file with architecture {arch!r} does not appear to be a control vector!"
+                    f".gguf file with architecture {arch!r} does not "
+                    f"appear to be a control vector!"
                 )
 
         modelf = reader.get_field("controlvector.model_hint")
@@ -87,8 +86,11 @@ class StatisticalControlVector:
         metadata = {}
         
         # Extract metadata
+        skipped_suffixes = (".model_hint", ".method", ".layer_count")
         for field_name, field in reader.fields.items():
-            if field_name.startswith("controlvector.") and not field_name.endswith((".model_hint", ".method", ".layer_count")):
+            if field_name.startswith("controlvector.") and not (
+                field_name.endswith(skipped_suffixes)
+            ):
                 key = field_name.replace("controlvector.", "")
                 if field.types == [gguf.GGMLQuantizationType.F32]:
                     metadata[key] = float(field.parts[0])
@@ -106,7 +108,79 @@ class StatisticalControlVector:
                 )
             directions[layer] = tensor.data
 
-        return cls(model_type=model_hint, method=method, directions=directions, metadata=metadata)
+        return cls(
+            model_type=model_hint,
+            method=method,
+            directions=directions,
+            metadata=metadata,
+        )
+
+
+def l2_normalize(v):
+    """Scale a vector to unit L2 norm.
+
+    Args:
+        v (np.ndarray): Vector to normalize.
+
+    Returns:
+        np.ndarray: `v / ||v||`, or ``v`` unchanged when its norm is 0.
+    """
+    norm = np.linalg.norm(v)
+    if norm > 0:
+        return v / norm
+    return v
+
+
+def correct_sign(component, pos_rows, neg_rows):
+    """Point ``component`` from the negative toward the positive samples.
+
+    Both row sets are projected onto ``component``; when the mean
+    positive projection falls below the mean negative projection the
+    direction is inverted, so the negated component is returned.
+
+    Args:
+        component (np.ndarray): Candidate direction, shape `(dim,)`.
+        pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
+        neg_rows (np.ndarray): Negative activations, `(n_neg, dim)`.
+
+    Returns:
+        np.ndarray: ``component``, or its negation if it pointed from
+            the positive toward the negative samples.
+    """
+    vec_norm = np.linalg.norm(component)
+    if vec_norm <= 1e-6:  # A near-zero vector has no meaningful sign.
+        return component
+    proj_pos = (pos_rows @ component) / vec_norm
+    proj_neg = (neg_rows @ component) / vec_norm
+    if np.mean(proj_pos) < np.mean(proj_neg):
+        logger.info("Direction corrected (flipped)")
+        return -component
+    return component
+
+
+def _metadata(*, normalize, n_positive, n_negative, **extra):
+    """Build the canonical extractor metadata dict.
+
+    Every extraction path — batch `extract()` and streaming
+    `from_moments()` — reports sample counts and normalization under
+    one vocabulary: ``normalize``/``n_positive``/``n_negative``.
+
+    Args:
+        normalize (bool): Whether directions were L2-normalized.
+        n_positive (int): Number of positive samples (or rows).
+        n_negative (int): Number of negative samples (or rows).
+        **extra (Any): Method-specific entries appended verbatim.
+
+    Returns:
+        dict: Metadata dict for a StatisticalControlVector.
+    """
+    metadata = {
+        "normalize": normalize,
+        "n_positive": n_positive,
+        "n_negative": n_negative,
+    }
+    metadata.update(extra)
+    return metadata
 
 
 def derive_negative_indices(n_samples, positive_indices):
@@ -126,6 +200,75 @@ def derive_negative_indices(n_samples, positive_indices):
     """
     positive = set(positive_indices)
     return [i for i in range(n_samples) if i not in positive]
+
+
+def _tokens_to_numpy(token_sequence):
+    """Convert a per-token sequence to a list of numpy arrays.
+
+    Args:
+        token_sequence (Sequence): Hidden states of one layer of one
+            sample, as tensors or numpy arrays.
+
+    Returns:
+        list[np.ndarray]: One float numpy array per token.
+    """
+    return [
+        t.cpu().float().numpy() if torch.is_tensor(t) else t
+        for t in token_sequence
+    ]
+
+
+def _extreme_norm_token(argfn):
+    """Build a reducer picking the token whose L2 norm wins ``argfn``.
+
+    Args:
+        argfn (Callable): `np.argmax` or `np.argmin`.
+
+    Returns:
+        Callable: Reducer mapping a token sequence to the token with
+            the largest (argmax) or smallest (argmin) L2 norm.
+    """
+
+    def reducer(token_sequence):
+        tokens = _tokens_to_numpy(token_sequence)
+        norms = [np.linalg.norm(t) for t in tokens]
+        return tokens[argfn(norms)]
+
+    return reducer
+
+
+_TOKEN_REDUCERS = {
+    "first": lambda seq: seq[0],
+    "last": lambda seq: seq[-1],
+    "mean": lambda seq: np.mean(np.stack(_tokens_to_numpy(seq)), axis=0),
+    "max": _extreme_norm_token(np.argmax),
+    "min": _extreme_norm_token(np.argmin),
+}
+
+
+def extract_token_from_sequence(token_sequence, pos):
+    """Reduce a per-token sequence to one hidden-state row.
+
+    Args:
+        token_sequence (Sequence): Hidden states of one layer of one
+            sample, as tensors or numpy arrays.
+        pos (int | str): An int index (e.g. -1 for the last token), or
+            one of "first", "last", "mean" (average over tokens),
+            "max"/"min" (token with the largest/smallest L2 norm).
+
+    Returns:
+        np.ndarray | torch.Tensor: The selected or aggregated row.
+
+    Raises:
+        ValueError: If ``pos`` is neither an int nor a known reducer
+            name.
+    """
+    if isinstance(pos, int):
+        return token_sequence[pos]
+    reducer = _TOKEN_REDUCERS.get(pos)
+    if reducer is None:
+        raise ValueError(f"Unsupported token_pos: {pos}")
+    return reducer(token_sequence)
 
 
 def extract_token_hiddens(
@@ -172,57 +315,10 @@ def extract_token_hiddens(
     if layer_keys is None:
         layer_keys = list(range(n_layers))
 
-    positive_hiddens = {layer: [] for layer in layer_keys}
-    negative_hiddens = {layer: [] for layer in layer_keys}
-
-    def extract_token_from_sequence(token_sequence, pos):
-        """Extract the token at the requested position from a sequence"""
-        if isinstance(pos, int):
-            return token_sequence[pos]
-        elif pos == "first":
-            return token_sequence[0]
-        elif pos == "last":
-            return token_sequence[-1]
-        elif pos == "mean":
-            tokens = np.stack([t.cpu().float().numpy() if torch.is_tensor(t) else t for t in token_sequence])
-            return np.mean(tokens, axis=0)
-        elif pos == "max":
-            # Token with the largest L2 norm
-            norms = []
-            tokens = []
-            for t in token_sequence:
-                if torch.is_tensor(t):
-                    t = t.cpu().float().numpy()
-                tokens.append(t)
-                norms.append(np.linalg.norm(t))
-            max_idx = np.argmax(norms)
-            return tokens[max_idx]
-        elif pos == "min":
-            # Token with the smallest L2 norm
-            norms = []
-            tokens = []
-            for t in token_sequence:
-                if torch.is_tensor(t):
-                    t = t.cpu().float().numpy()
-                tokens.append(t)
-                norms.append(np.linalg.norm(t))
-            min_idx = np.argmin(norms)
-            return tokens[min_idx]
-        else:
-            raise ValueError(f"Unsupported token_pos: {pos}")
-
-    for sample_idx in positive_indices:
-        sample_hiddens = all_hidden_states[sample_idx]
-        for layer_pos, layer_key in enumerate(layer_keys):
-            token_hidden = extract_token_from_sequence(
-                sample_hiddens[layer_pos], token_pos
-            )
-            if torch.is_tensor(token_hidden):
-                token_hidden = token_hidden.cpu().float().numpy()
-            positive_hiddens[layer_key].append(token_hidden)
-
-    if negative_indices:
-        for sample_idx in negative_indices:
+    def collect(indices):
+        """Gather one token row per sample for each layer key."""
+        hiddens = {layer: [] for layer in layer_keys}
+        for sample_idx in indices:
             sample_hiddens = all_hidden_states[sample_idx]
             for layer_pos, layer_key in enumerate(layer_keys):
                 token_hidden = extract_token_from_sequence(
@@ -230,7 +326,11 @@ def extract_token_hiddens(
                 )
                 if torch.is_tensor(token_hidden):
                     token_hidden = token_hidden.cpu().float().numpy()
-                negative_hiddens[layer_key].append(token_hidden)
+                hiddens[layer_key].append(token_hidden)
+        return hiddens
+
+    positive_hiddens = collect(positive_indices)
+    negative_hiddens = collect(negative_indices or [])
 
     positive_hiddens = {k: np.vstack(v) for k, v in positive_hiddens.items()}
     if negative_indices and any(negative_hiddens.values()):
