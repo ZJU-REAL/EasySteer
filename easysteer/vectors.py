@@ -80,9 +80,9 @@ def from_control_vector(cv: Any) -> DirectionVector:
 
 def from_gguf(path: str) -> DirectionVector:
     """Payload from an EasySteer GGUF export (``direction.<layer>``)."""
-    from easysteer.steer.utils import import_gguf
+    from easysteer.steer.utils import StatisticalControlVector
 
-    return from_control_vector(import_gguf(path))
+    return from_control_vector(StatisticalControlVector.import_gguf(path))
 
 
 def from_pyreft(path: str) -> DirectionVector | ReftIntervention:

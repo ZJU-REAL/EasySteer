@@ -32,7 +32,7 @@ ENGINE_KWARGS = dict(
 
 TEXT = "The capital of France is"
 SP = SamplingParams(temperature=0.0, max_tokens=24, ignore_eos=True)
-LAYERS = [10]
+LAYERS = list(range(10, 26))
 APPLY = ApplySpec(phases=["prompt", "generation"])
 
 
@@ -53,8 +53,8 @@ def test_data_matches_source_byte_identical(llm):
     import easysteer.vectors as vec
 
     payload = vec.from_gguf(DENSE_VECTOR)
-    via_source = gen(llm, steering_spec(scale=0.5, layers=tuple(LAYERS)))
-    via_data = gen(llm, data_spec(payload, scale=0.5))
+    via_source = gen(llm, steering_spec(scale=2.0, layers=tuple(LAYERS)))
+    via_data = gen(llm, data_spec(payload, scale=2.0))
     unsteered = gen(llm, None)
     assert via_data == via_source, (
         "data= must reproduce source= byte-for-byte for the same vector"
@@ -67,8 +67,8 @@ def test_identical_payloads_reproduce(llm):
     the same output (they share a fingerprint and thus one slot)."""
     import easysteer.vectors as vec
 
-    a = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=0.5))
-    b = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=0.5))
+    a = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=2.0))
+    b = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=2.0))
     assert a == b
 
 
@@ -76,10 +76,12 @@ def test_from_control_vector_no_disk(llm):
     import easysteer.vectors as vec
 
     class FakeCV:
-        directions = {10: np.ones(1536, dtype=np.float32) * 0.01}
+        directions = {
+            la: np.ones(1536, dtype=np.float32) * 0.02 for la in LAYERS
+        }
 
     payload = vec.from_control_vector(FakeCV())
-    steered = gen(llm, data_spec(payload, scale=4.0))
+    steered = gen(llm, data_spec(payload, scale=8.0))
     unsteered = gen(llm, None)
     assert steered != unsteered
 

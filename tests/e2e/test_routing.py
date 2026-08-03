@@ -77,16 +77,33 @@ def two_vector_spec():
     )
 
 
-def test_single_layer_pt_vector_through_engine(llm, plain, tmp_path):
-    """Single-layer .pt formats need target_layers forwarded through the
-    vector store at admission (regression: the store used to load with
-    target_layers=None, which single-layer loaders reject)."""
+def test_pt_direction_payload_through_engine(llm, plain, tmp_path):
+    """A .pt direction file steers through the client adapter + data=
+    payload path (the engine no longer loads .pt files itself)."""
     import torch
+
+    import easysteer.vectors as vec
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
     pt = str(tmp_path / "direction.pt")
     torch.save(torch.randn(1536) * 0.02, pt)
-    out = gen(llm, [PROMPT], steering_spec(source=pt, scale=8.0, layers=[10]))[0]
-    assert out != plain, "engine-path .pt steering had no effect"
+    spec = SteeringSpec(vectors=[VectorSpec(
+        data=vec.from_pt_direction(pt, layers=[10]),
+        scale=8.0,
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    )])
+    out = gen(llm, [PROMPT], spec)[0]
+    assert out != plain, "data= payload steering had no effect"
+
+
+def test_wrong_source_format_rejected_at_admission(llm):
+    """A non-GGUF source is rejected client-side with a clean error —
+    it must never reach the worker (a worker-side load failure would
+    kill the EngineCore)."""
+    import pytest
+
+    with pytest.raises(Exception, match="data="):
+        gen(llm, [PROMPT], steering_spec(source="v.pt", scale=1.0, layers=[10]))
 
 
 class TestMultiVector:
