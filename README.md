@@ -65,6 +65,25 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 
 ### Installation
 
+Quick install (prebuilt wheel + fork overlay) — installs the official vLLM wheel and applies the fork's Python changes on top, with no compilation and no editable checkouts:
+
+```bash
+conda create -n easysteer python=3.12 -y
+conda activate easysteer
+
+# Official vLLM wheel, then overlay the fork's Python files
+pip install vllm==0.26.0
+git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
+rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+
+# EasySteer package
+git clone https://github.com/ZJU-REAL/EasySteer.git
+pip install ./EasySteer
+```
+
+Note that reinstalling or upgrading `vllm` reverts the overlay; re-apply the `rsync` step afterwards.
+
 Development install (editable, recommended for ongoing work):
 
 ```bash
@@ -85,24 +104,7 @@ cd ..
 pip install --editable .
 ```
 
-Quick install (prebuilt wheel + fork overlay) — installs the official vLLM wheel and applies the fork's Python changes on top, with no compilation and no editable checkouts:
-
-```bash
-conda create -n easysteer python=3.12 -y
-conda activate easysteer
-
-# Official vLLM wheel, then overlay the fork's Python files
-pip install vllm==0.26.0
-git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
-VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
-rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
-
-# EasySteer package
-git clone https://github.com/ZJU-REAL/EasySteer.git
-pip install ./EasySteer
-```
-
-Note that reinstalling or upgrading `vllm` reverts the overlay; re-apply the `rsync` step afterwards. For caveats, build-from-source, and Docker, see the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/).
+For full details, build-from-source, and Docker, see the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/).
 
 ### A 30-Second Example
 
@@ -187,4 +189,6 @@ We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing 
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ZJU-REAL/EasySteer&type=Date)](https://star-history.com/#ZJU-REAL/EasySteer&Date)
+<!-- Rendered daily by .github/workflows/star-history.yml; the stargazers API
+     requires repo-authorized tokens now, so third-party embeds no longer work. -->
+[![Star History Chart](https://zju-real.github.io/EasySteer/star-history.svg)](https://github.com/ZJU-REAL/EasySteer/stargazers)

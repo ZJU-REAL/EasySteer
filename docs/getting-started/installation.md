@@ -3,31 +3,13 @@
 EasySteer ships as two packages installed from one repository: the vLLM fork
 (`vllm-steer/`) and the `easysteer` Python package. Pick one of two routes:
 
+- **Quick install** — stock vLLM wheel plus a file overlay of the fork's
+  Python changes. The fastest way to a working environment; not editable.
 - **Development install** — editable checkouts of both packages; changes to
   the fork or to `easysteer` take effect immediately. Use this if you plan to
   develop, debug, or track the repository.
-- **Quick install** — stock vLLM wheel plus a file overlay of the fork's
-  Python changes. The fastest way to a working environment; not editable.
 
-## Route 1: development install (recommended for ongoing work)
-
-```bash
-conda create -n easysteer python=3.12 -y
-conda activate easysteer
-
-git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
-cd EasySteer/vllm-steer
-
-# EasySteer tracks the vLLM v0.26.0 release commit; pin it so the
-# precompiled kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
-VLLM_USE_PRECOMPILED=1 pip install --editable .
-
-cd ..
-pip install --editable .
-```
-
-## Route 2: quick install (prebuilt wheel + fork overlay)
+## Route 1: quick install (prebuilt wheel + fork overlay)
 
 The fork's changes against upstream vLLM v0.26.0 are pure Python, so you can
 install the official wheel and overlay the fork's files onto it — no build,
@@ -53,7 +35,25 @@ pip install ./EasySteer
 !!! warning
     The overlay is not tracked by pip: reinstalling or upgrading `vllm`
     silently reverts it (re-run the rsync afterwards), and `pip show vllm`
-    still reports the stock package. For anything long-lived, prefer Route 1.
+    still reports the stock package. For anything long-lived, prefer Route 2.
+
+## Route 2: development install (recommended for ongoing work)
+
+```bash
+conda create -n easysteer python=3.12 -y
+conda activate easysteer
+
+git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
+cd EasySteer/vllm-steer
+
+# EasySteer tracks the vLLM v0.26.0 release commit; pin it so the
+# precompiled kernels match.
+export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
+VLLM_USE_PRECOMPILED=1 pip install --editable .
+
+cd ..
+pip install --editable .
+```
 
 ## Fallback: build vLLM from source
 
