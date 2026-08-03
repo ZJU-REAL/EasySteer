@@ -774,10 +774,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#legacy-helpers" class="md-nav__link">
+  <a href="#compatibility-wrappers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Legacy helpers
+        Compatibility wrappers
       
     </span>
   </a>
@@ -1354,10 +1354,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#legacy-helpers" class="md-nav__link">
+  <a href="#compatibility-wrappers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Legacy helpers
+        Compatibility wrappers
       
     </span>
   </a>
@@ -1481,16 +1481,14 @@ position — the only correct grouping under continuous batching.</p>
 <p>Pass <code>stream="router_logits"</code> to <code>hs.capture()</code> on an MoE model to capture per-token
 router logits instead of hidden states (used e.g. by the
 <a href="../../replications/">SteerMoE replication</a>).</p>
-<h2 id="legacy-helpers">Legacy helpers<a class="headerlink" href="#legacy-helpers" title="Permanent link">&para;</a></h2>
-<p><code>get_all_hidden_states</code> (embed task), <code>get_all_hidden_states_generate</code>,
-<code>get_moe_router_logits</code>, and <code>get_moe_router_logits_generate</code> predate <code>capture()</code> and
-return nested <code>[sample][layer]</code> lists. They remain exported; prefer <code>capture()</code> for new
-code — it is exact under continuous batching and supports select clauses.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Engine-side, the capture package's canonical import path is <code>vllm.capture</code>;
-<code>vllm.hidden_states</code> is a covered back-compat alias.</p>
-</div>
+<h2 id="compatibility-wrappers">Compatibility wrappers<a class="headerlink" href="#compatibility-wrappers" title="Permanent link">&para;</a></h2>
+<p><code>get_all_hidden_states_generate</code> and <code>get_moe_router_logits_generate</code> predate
+<code>capture()</code> and keep their original nested-list signatures, but are now thin
+wrappers over it — splitting is always exact and label-driven. Prefer
+<code>capture()</code> for new code; it additionally exposes select clauses, layer
+subsets and per-sample metadata. The embed-task variants
+(<code>get_all_hidden_states</code>, <code>get_moe_router_logits</code>) and the <code>vllm.hidden_states</code>
+alias package were removed.</p>
 <!-- TODO: document capture of multimodal (VLM) prompts and streaming/chunked capture
 sessions in more depth. -->
 
