@@ -26,13 +26,16 @@ class HiddenStatesCaptureGenerate:
         pass
     
     def get_all_hidden_states_generate(
-        self, 
-        llm: Any, 
+        self,
+        llm: Any,
         prompts: Union[List[str], List[Dict[str, Any]]],
         max_tokens: int = 1,
         split_by_samples: bool = True,
         token_ids: Optional[List[int]] = None,
         positions: Optional[List[int]] = None,
+        layers: Optional[List[int]] = None,
+        dtype: Optional[str] = None,
+        select: Optional[Union[dict, Any]] = None,
         **generate_kwargs
     ) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
         """
@@ -92,7 +95,14 @@ class HiddenStatesCaptureGenerate:
             self._selection = {"token_ids": token_ids, "positions": positions}
         try:
             # Step 1: Enable hidden states capture via RPC
-            self._enable_capture(llm, token_ids=token_ids, positions=positions)
+            self._enable_capture(
+                llm,
+                token_ids=token_ids,
+                positions=positions,
+                layers=layers,
+                dtype=dtype,
+                select=select,
+            )
             
             # Step 2: Run generation (只生成max_tokens个token来触发forward)
             from vllm import SamplingParams
@@ -112,13 +122,13 @@ class HiddenStatesCaptureGenerate:
             # 生成 - prompts可以是List[str]或List[Dict]（多模态）
             outputs = llm.generate(prompts, sampling_params)
             
-            # Step 3: Get captured hidden states via RPC
-            all_hidden_states = self._get_captured_states(llm)
-            
+            # Step 3: Get captured hidden states (+ row labels) via RPC
+            all_hidden_states, meta = self._get_captured_states(llm)
+
             # Step 4: Split by samples if requested
             if split_by_samples:
                 samples_hidden_states = self._split_hidden_states_by_samples(
-                    all_hidden_states, outputs
+                    all_hidden_states, outputs, meta
                 )
                 return samples_hidden_states, outputs
             else:
@@ -133,44 +143,58 @@ class HiddenStatesCaptureGenerate:
         llm: Any,
         token_ids: Optional[List[int]] = None,
         positions: Optional[List[int]] = None,
+        layers: Optional[List[int]] = None,
+        dtype: Optional[str] = None,
+        select: Optional[Union[dict, Any]] = None,
     ) -> None:
         """Enable hidden states capture via RPC.
 
-        token_ids / positions enable source-side row selection: only
-        matching rows are captured on the engine side (union of the two
-        filters), so unneeded positions never leave the GPU.
+        select (a SelectSpec or its to_wire() dict) enables source-side
+        row selection with the shared steering where-clause language;
+        token_ids / positions are legacy sugar for the same thing. Only
+        matching rows are captured on the engine side, so unneeded
+        positions never leave the GPU. layers restricts captured
+        layers; dtype sets the storage dtype (e.g. 'float16').
         """
         kwargs = {}
         if token_ids is not None:
             kwargs["token_ids"] = list(token_ids)
         if positions is not None:
             kwargs["positions"] = list(positions)
+        if layers is not None:
+            kwargs["layers"] = list(layers)
+        if dtype is not None:
+            kwargs["dtype"] = dtype
+        if select is not None:
+            kwargs["select"] = (
+                select if isinstance(select, dict) else select.to_wire()
+            )
         llm.llm_engine.engine_core.collective_rpc(
             "enable_hidden_states_capture", kwargs=kwargs or None
         )
     
-    def _get_captured_states(self, llm: Any) -> List[torch.Tensor]:
+    def _get_captured_states(
+        self, llm: Any
+    ) -> Tuple[List[torch.Tensor], Optional[Any]]:
         """
-        Get captured hidden states from workers via RPC.
-        
+        Get captured hidden states and their row labels via RPC.
+
         Returns:
-            List of tensors, one per layer, ordered by layer index.
-            Each tensor has shape (total_tokens, hidden_size).
+            (layers, meta): layers is a list of tensors ordered by layer
+            index, each (total_rows, hidden_size); meta labels each row
+            with (request id, absolute position, token id), or None when
+            the engine could not label rows.
         """
-        # Import deserialization utility from vLLM
-        from vllm.hidden_states import deserialize_hidden_states
-        
-        # Call RPC to get serialized hidden states
+        from vllm.hidden_states import deserialize_captured
+
         results = llm.llm_engine.engine_core.collective_rpc("get_captured_hidden_states")
-        
-        # Deserialize to dict[layer_id, tensor]
-        hidden_states_dict = deserialize_hidden_states(results[0])
-        
-        # Convert dict to list ordered by layer_id
+        hidden_states_dict, meta_dict = deserialize_captured(results[0])
+
         sorted_layer_ids = sorted(hidden_states_dict.keys())
         hidden_states_list = [hidden_states_dict[layer_id] for layer_id in sorted_layer_ids]
-        
-        return hidden_states_list
+        # Row labels are identical across layers; keep one copy.
+        meta = meta_dict[sorted_layer_ids[0]] if meta_dict else None
+        return hidden_states_list, meta
     
     def _cleanup(self, llm: Any) -> None:
         """Cleanup: disable capture and clear memory."""
@@ -183,62 +207,142 @@ class HiddenStatesCaptureGenerate:
     def _split_hidden_states_by_samples(
         self,
         all_hidden_states: List[torch.Tensor],
-        outputs: Any
+        outputs: Any,
+        meta: Optional[Any] = None,
     ) -> List[List[torch.Tensor]]:
         """
         Split concatenated hidden states by samples.
-        
+
+        With row labels (meta) the split is exact: each row is assigned
+        to its owning request and ordered by sequence position. This is
+        the only correct split under continuous batching — decode-step
+        rows of concurrent requests interleave in the store, so
+        contiguous length-based splitting misattributes rows whenever
+        more than one request generates at a time. The length-based
+        path remains only as a fallback for engines that could not
+        label rows, and warns.
+
         Args:
             all_hidden_states: List of tensors [layer_idx], each shape (total_tokens, hidden_size)
             outputs: vLLM RequestOutput objects
-            
+            meta: CaptureMeta row labels (req_ids/positions per row) or None
+
         Returns:
             List of lists: [sample_idx][layer_idx], each shape (seq_len, hidden_size)
         """
         if not all_hidden_states or not outputs:
             return []
-        
+
+        if meta is not None:
+            return self._split_by_meta(all_hidden_states, outputs, meta)
+
+        logger.warning(
+            "Capture returned no row labels; falling back to contiguous "
+            "length-based splitting, which misattributes rows when "
+            "multiple requests generate concurrently."
+        )
+
         # Get sample lengths from outputs
         if getattr(self, "_selection", None) is not None:
             sample_lengths = self._selected_sample_lengths(outputs)
         else:
             sample_lengths = self._estimate_sample_lengths(outputs)
-        
+
         if not sample_lengths:
             # Fallback: return all as one sample
             return [all_hidden_states]
-        
+
         # Verify total length matches
         total_length = sum(sample_lengths)
         actual_length = all_hidden_states[0].shape[0] if all_hidden_states else 0
-        
+
         if total_length != actual_length:
             # Adjust last sample length to match
             diff = actual_length - total_length
             sample_lengths[-1] += diff
-        
+
         # Split hidden states by samples
         samples_hidden_states = []
         start_idx = 0
-        
+
         for sample_length in sample_lengths:
             if sample_length <= 0:
                 continue
-            
+
             end_idx = start_idx + sample_length
-            
+
             # Collect all layers for this sample
             sample_all_layers = []
             for layer_hidden_states in all_hidden_states:
                 sample_layer_hidden_states = layer_hidden_states[start_idx:end_idx]
                 sample_all_layers.append(sample_layer_hidden_states)
-            
+
             samples_hidden_states.append(sample_all_layers)
             start_idx = end_idx
-            
+
             if start_idx >= actual_length:
                 break
-        
+
+        return samples_hidden_states
+
+    def _split_by_meta(
+        self,
+        all_hidden_states: List[torch.Tensor],
+        outputs: Any,
+        meta: Any,
+    ) -> List[List[torch.Tensor]]:
+        """Exact per-sample split using engine row labels.
+
+        Rows are grouped by their owning request id and sorted by
+        absolute position (stored order already increases per sample;
+        the sort makes it invariant). Unknown request ids in the labels
+        mean the store held rows from outside this generate call —
+        that is a caller error (stale store), so it raises.
+        """
+        from vllm.hidden_states import match_capture_request_id
+
+        row_indices: Dict[str, List[int]] = {}
+        for row, rid in enumerate(meta.req_ids):
+            row_indices.setdefault(rid, []).append(row)
+
+        # Labels carry engine-internal ids ({client_id}-{8 hex}); resolve
+        # each to exactly one output, failing loudly on stale stores or
+        # ambiguous (duplicate) client request ids.
+        label_to_output: Dict[str, str] = {}
+        for label in row_indices:
+            matches = [
+                o.request_id
+                for o in outputs
+                if match_capture_request_id(label, o.request_id)
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"Captured rows labelled {label!r} match "
+                    f"{len(matches)} requests of this call "
+                    f"({matches!r}); the capture store is stale or "
+                    "client request ids are duplicated."
+                )
+            label_to_output[label] = matches[0]
+
+        output_rows: Dict[str, List[int]] = {}
+        for label, rows in row_indices.items():
+            output_rows.setdefault(label_to_output[label], []).extend(rows)
+
+        positions = meta.positions
+        samples_hidden_states = []
+        for output in outputs:
+            rows = output_rows.get(output.request_id, [])
+            if rows:
+                order = sorted(rows, key=lambda r: int(positions[r]))
+                idx = torch.tensor(order, dtype=torch.long)
+                sample_all_layers = [
+                    layer_tensor[idx] for layer_tensor in all_hidden_states
+                ]
+            else:
+                sample_all_layers = [
+                    layer_tensor[:0] for layer_tensor in all_hidden_states
+                ]
+            samples_hidden_states.append(sample_all_layers)
         return samples_hidden_states
     
     def _selected_sample_lengths(self, outputs: Any) -> List[int]:
@@ -319,6 +423,9 @@ def get_all_hidden_states_generate(
     split_by_samples: bool = True,
     token_ids: Optional[List[int]] = None,
     positions: Optional[List[int]] = None,
+    layers: Optional[List[int]] = None,
+    dtype: Optional[str] = None,
+    select: Optional[Union[dict, Any]] = None,
     **generate_kwargs
 ) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
     """
@@ -343,6 +450,11 @@ def get_all_hidden_states_generate(
         token_ids: 仅捕获输入token id在此集合中的行（源侧过滤，
             提示词与生成token都参与匹配；与positions取并集）
         positions: 仅捕获这些绝对位置的行（负数从提示词末尾解析）
+        layers: 仅捕获这些层（None为全部层）
+        dtype: 引擎侧存储dtype（如 'float16'，None保持模型dtype）
+        select: SelectSpec（或其to_wire()字典）——与steering共享的
+            where-clause选择语言（phases/tokens/positions/排除/窗口），
+            比token_ids/positions更完整；两者不能同时使用
         **generate_kwargs: 传递给llm.generate()的额外参数
         
     Returns:
@@ -402,6 +514,8 @@ def get_all_hidden_states_generate(
     capture = HiddenStatesCaptureGenerate()
     return capture.get_all_hidden_states_generate(
         llm, prompts, max_tokens, split_by_samples,
-        token_ids=token_ids, positions=positions, **generate_kwargs
+        token_ids=token_ids, positions=positions,
+        layers=layers, dtype=dtype, select=select,
+        **generate_kwargs
     )
 

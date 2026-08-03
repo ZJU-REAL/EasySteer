@@ -310,3 +310,71 @@ class TestTriggerControllerIntegration:
         )
         assert not ctrl.is_global_only_config()
         assert ctrl.has_any_triggers()
+
+
+class TestSelectSpec:
+    """SelectSpec is the shared selection language; ApplySpec is its
+    steering-facing name and capture consumes the same wire form."""
+
+    def test_apply_spec_is_a_select_spec(self):
+        from vllm.steer_vectors.api import SelectSpec
+
+        assert issubclass(ApplySpec, SelectSpec)
+
+    def test_wire_roundtrip(self):
+        from vllm.steer_vectors.api import SelectSpec
+
+        spec = SelectSpec(
+            phases=["generation"],
+            tokens=[5, 7],
+            exclude_positions=[-1],
+            generation_window=(0, 4),
+        )
+        rebuilt = SelectSpec.from_wire(spec.to_wire())
+        assert rebuilt.to_wire() == spec.to_wire()
+
+    def test_from_wire_rejects_unknown_fields(self):
+        from vllm.steer_vectors.api import SelectSpec
+
+        with pytest.raises(ValueError, match="unknown selection fields"):
+            SelectSpec.from_wire({"phases": ["prompt"], "tokns": [1]})
+
+    def test_from_wire_validates_clause(self):
+        from vllm.steer_vectors.api import SelectSpec
+
+        with pytest.raises(ValidationError):
+            SelectSpec.from_wire({"phases": [], "tokens": None})
+
+
+class TestCaptureStreamConfigSelection:
+    """StreamConfig translates legacy kwargs into a SelectSpec clause
+    and validates select= at enable time."""
+
+    def test_legacy_kwargs_translate_to_select(self):
+        from vllm.capture.session import StreamConfig
+
+        config = StreamConfig(positions=[0, -1], token_ids=[42])
+        assert config.selects_rows
+        assert config.select["phases"] == ["prompt", "generation"]
+        assert config.select["tokens"] == [42]
+        assert config.select["positions"] == [0, -1]
+
+    def test_select_clause_validated(self):
+        from vllm.capture.session import StreamConfig
+
+        with pytest.raises(ValueError, match="unknown selection fields"):
+            StreamConfig(select={"phase": ["prompt"]})
+
+    def test_select_conflicts_with_legacy_kwargs(self):
+        from vllm.capture.session import StreamConfig
+
+        with pytest.raises(ValueError, match="legacy"):
+            StreamConfig(
+                select={"phases": ["prompt"]}, token_ids=[1]
+            )
+
+    def test_select_conflicts_with_reductions(self):
+        from vllm.capture.session import StreamConfig
+
+        with pytest.raises(ValueError, match="last"):
+            StreamConfig(select={"phases": ["prompt"]}, positions="last")

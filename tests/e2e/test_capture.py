@@ -242,3 +242,140 @@ class TestWireEncoding:
             rest = rpc(llm, "fetch_captured", "hidden_states", clear=True)
         assert 3 not in rest and 7 not in rest, "fetched layers must clear"
         assert len(rest) == NUM_LAYERS - 2
+
+
+class TestSelectClause:
+    """The shared SelectSpec where-clause drives capture selection."""
+
+    def test_prompt_phase_only(self, llm):
+        prompt_len = len(llm.get_tokenizer().encode(TEXT))
+        with capturing(llm, "hidden_states", layers=[10],
+                       select={"phases": ["prompt"]}):
+            generate(llm)
+            hs = fetch(llm)
+        assert hs[10].shape[0] == prompt_len
+
+    def test_generation_phase_only(self, llm):
+        with capturing(llm, "hidden_states", layers=[10],
+                       select={"phases": ["generation"]}):
+            generate(llm)
+            hs = fetch(llm)
+        assert hs[10].shape[0] == SP.max_tokens - 1
+
+    def test_exclusions_subtract(self, llm, expected_rows):
+        with capturing(llm, "hidden_states", layers=[10],
+                       select={"phases": ["prompt", "generation"],
+                               "exclude_positions": [0]}):
+            generate(llm)
+            hs = fetch(llm)
+        assert hs[10].shape[0] == expected_rows - 1
+
+    def test_generation_window(self, llm):
+        with capturing(llm, "hidden_states", layers=[10],
+                       select={"phases": ["generation"],
+                               "window": [0, 2]}):
+            generate(llm)
+            hs = fetch(llm)
+        assert hs[10].shape[0] == 2
+
+    def test_malformed_select_rejected_at_enable(self, llm):
+        with pytest.raises(Exception, match="unknown selection fields"):
+            rpc(llm, "start_capture", "hidden_states",
+                select={"phasez": ["prompt"]})
+        rpc(llm, "stop_capture", "hidden_states")
+
+
+class TestLabeledRows:
+    """Every captured row carries (request id, position, token id)."""
+
+    def test_single_request_labels(self, llm, expected_rows):
+        from vllm.hidden_states import (
+            deserialize_captured,
+            match_capture_request_id,
+        )
+
+        with capturing(llm, "hidden_states", layers=[10]):
+            out = generate(llm)
+            raw = rpc(llm, "fetch_captured", "hidden_states")
+        tensors, meta = deserialize_captured(raw)
+        assert meta is not None, "engine must label rows"
+        labels = meta[10]
+        assert len(labels) == expected_rows
+        # Labels carry the engine-internal id: {client_id}-{8 hex}.
+        assert len(set(labels.req_ids)) == 1
+        assert match_capture_request_id(labels.req_ids[0], out.request_id)
+        assert labels.positions.tolist() == list(range(expected_rows))
+        assert labels.token_ids.tolist() == encoded_ids(out)
+
+    def test_concurrent_requests_attribution(self, llm):
+        """THE regression test for continuous-batching capture: rows of
+        concurrently-generating requests interleave in the store, and
+        the labels must attribute every row to its true request.
+        (Length-based contiguous splitting silently misattributes.)"""
+        from vllm.hidden_states import (
+            deserialize_captured,
+            match_capture_request_id,
+        )
+
+        prompts = [
+            "The capital of France is",
+            "One two three four five six seven",
+            "Hi",
+        ]
+        with capturing(llm, "hidden_states", layers=[10]):
+            outs = llm.generate(prompts, sampling_params=SP, use_tqdm=False)
+            raw = rpc(llm, "fetch_captured", "hidden_states")
+        tensors, meta = deserialize_captured(raw)
+        assert meta is not None
+        labels = meta[10]
+
+        by_req = {}
+        for row, rid in enumerate(labels.req_ids):
+            by_req.setdefault(rid, []).append(row)
+        # One internal-id label group per request, each resolving to
+        # exactly one output.
+        resolved = {}
+        for label in by_req:
+            matches = [
+                o.request_id
+                for o in outs
+                if match_capture_request_id(label, o.request_id)
+            ]
+            assert len(matches) == 1, f"label {label} matched {matches}"
+            resolved[matches[0]] = label
+        assert set(resolved) == {o.request_id for o in outs}
+
+        for out in outs:
+            rows = sorted(
+                by_req[resolved[out.request_id]],
+                key=lambda r: int(labels.positions[r]),
+            )
+            expected = encoded_ids(out)
+            got = [int(labels.token_ids[r]) for r in rows]
+            assert got == expected, (
+                f"row attribution wrong for {out.request_id}: "
+                f"{len(got)} rows vs {len(expected)} encoded tokens"
+            )
+            positions = [int(labels.positions[r]) for r in rows]
+            assert positions == list(range(len(expected)))
+
+    def test_client_split_uses_labels(self, llm):
+        """The easysteer client splits by labels, exactly, under
+        concurrent generation."""
+        import easysteer.hidden_states as hs
+
+        prompts = [
+            "The capital of France is",
+            "One two three four five six seven",
+            "Hi",
+        ]
+        states, outs = hs.get_all_hidden_states_generate(
+            llm, prompts, max_tokens=SP.max_tokens,
+            layers=[10], ignore_eos=True,
+        )
+        assert len(states) == len(outs)
+        for sample, out in zip(states, outs):
+            expected = len(encoded_ids(out))
+            assert sample[0].shape[0] == expected, (
+                f"sample rows {sample[0].shape[0]} != encoded {expected}"
+            )
