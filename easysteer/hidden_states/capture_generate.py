@@ -31,6 +31,8 @@ class HiddenStatesCaptureGenerate:
         prompts: Union[List[str], List[Dict[str, Any]]],
         max_tokens: int = 1,
         split_by_samples: bool = True,
+        token_ids: Optional[List[int]] = None,
+        positions: Optional[List[int]] = None,
         **generate_kwargs
     ) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
         """
@@ -85,9 +87,12 @@ class HiddenStatesCaptureGenerate:
             ...     split_by_samples=True
             ... )
         """
+        self._selection = None
+        if token_ids is not None or positions is not None:
+            self._selection = {"token_ids": token_ids, "positions": positions}
         try:
             # Step 1: Enable hidden states capture via RPC
-            self._enable_capture(llm)
+            self._enable_capture(llm, token_ids=token_ids, positions=positions)
             
             # Step 2: Run generation (只生成max_tokens个token来触发forward)
             from vllm import SamplingParams
@@ -123,9 +128,26 @@ class HiddenStatesCaptureGenerate:
             # Step 5: Always cleanup
             self._cleanup(llm)
     
-    def _enable_capture(self, llm: Any) -> None:
-        """Enable hidden states capture via RPC."""
-        llm.llm_engine.engine_core.collective_rpc("enable_hidden_states_capture")
+    def _enable_capture(
+        self,
+        llm: Any,
+        token_ids: Optional[List[int]] = None,
+        positions: Optional[List[int]] = None,
+    ) -> None:
+        """Enable hidden states capture via RPC.
+
+        token_ids / positions enable source-side row selection: only
+        matching rows are captured on the engine side (union of the two
+        filters), so unneeded positions never leave the GPU.
+        """
+        kwargs = {}
+        if token_ids is not None:
+            kwargs["token_ids"] = list(token_ids)
+        if positions is not None:
+            kwargs["positions"] = list(positions)
+        llm.llm_engine.engine_core.collective_rpc(
+            "enable_hidden_states_capture", kwargs=kwargs or None
+        )
     
     def _get_captured_states(self, llm: Any) -> List[torch.Tensor]:
         """
@@ -177,7 +199,10 @@ class HiddenStatesCaptureGenerate:
             return []
         
         # Get sample lengths from outputs
-        sample_lengths = self._estimate_sample_lengths(outputs)
+        if getattr(self, "_selection", None) is not None:
+            sample_lengths = self._selected_sample_lengths(outputs)
+        else:
+            sample_lengths = self._estimate_sample_lengths(outputs)
         
         if not sample_lengths:
             # Fallback: return all as one sample
@@ -216,6 +241,34 @@ class HiddenStatesCaptureGenerate:
         
         return samples_hidden_states
     
+    def _selected_sample_lengths(self, outputs: Any) -> List[int]:
+        """Per-sample captured-row counts under source-side selection.
+
+        Mirrors the engine-side union of the token_ids and positions
+        filters over each sample's encoded tokens (prompt + generated
+        minus the final token, which never re-encodes).
+        """
+        token_set = set(self._selection.get("token_ids") or [])
+        pos_list = self._selection.get("positions") or []
+        lengths = []
+        for output in outputs:
+            ids = list(output.prompt_token_ids)
+            if output.outputs and len(output.outputs[0].token_ids) > 1:
+                ids += list(output.outputs[0].token_ids)[:-1]
+            n = len(ids)
+            prompt_len = len(output.prompt_token_ids)
+            selected = {
+                i for i, tok in enumerate(ids) if tok in token_set
+            } if token_set else set()
+            for p in pos_list:
+                # Negative positions resolve from the prompt end, matching
+                # the engine-side semantics.
+                resolved = p if p >= 0 else prompt_len + p
+                if 0 <= resolved < n:
+                    selected.add(resolved)
+            lengths.append(len(selected))
+        return lengths
+
     def _estimate_sample_lengths(self, outputs: Any) -> List[int]:
         """
         Estimate the length of each sample from outputs.
@@ -264,6 +317,8 @@ def get_all_hidden_states_generate(
     prompts: Union[List[str], List[Dict[str, Any]]],
     max_tokens: int = 1,
     split_by_samples: bool = True,
+    token_ids: Optional[List[int]] = None,
+    positions: Optional[List[int]] = None,
     **generate_kwargs
 ) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
     """
@@ -285,6 +340,9 @@ def get_all_hidden_states_generate(
         split_by_samples: 是否按样本划分（默认True）
             - If True: returns List[List[Tensor]] where [sample_idx][layer_idx]
             - If False: returns List[Tensor] where [layer_idx] (concatenated)
+        token_ids: 仅捕获输入token id在此集合中的行（源侧过滤，
+            提示词与生成token都参与匹配；与positions取并集）
+        positions: 仅捕获这些绝对位置的行（负数从提示词末尾解析）
         **generate_kwargs: 传递给llm.generate()的额外参数
         
     Returns:
@@ -343,6 +401,7 @@ def get_all_hidden_states_generate(
     """
     capture = HiddenStatesCaptureGenerate()
     return capture.get_all_hidden_states_generate(
-        llm, prompts, max_tokens, split_by_samples, **generate_kwargs
+        llm, prompts, max_tokens, split_by_samples,
+        token_ids=token_ids, positions=positions, **generate_kwargs
     )
 

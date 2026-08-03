@@ -53,7 +53,13 @@ def capturing(llm, stream, **kwargs):
 
 
 def generate(llm):
-    llm.generate(TEXT, sampling_params=SP, use_tqdm=False)
+    return llm.generate(TEXT, sampling_params=SP, use_tqdm=False)[0]
+
+
+def encoded_ids(out):
+    """Token ids actually fed through the model: the prompt plus every
+    generated token except the last (sampled but never re-encoded)."""
+    return list(out.prompt_token_ids) + list(out.outputs[0].token_ids)[:-1]
 
 
 def fetch(llm):
@@ -147,3 +153,92 @@ def test_fetch_clear_resets_accumulation(llm, expected_rows):
         f"second fetch has {second[10].shape[0]} rows, want {expected_rows} "
         "(fetch did not clear)"
     )
+
+
+class TestSourceSideSelection:
+    """Row selection at the hook: unneeded positions never leave the GPU."""
+
+    def test_token_id_selection_captures_matching_rows_only(self, llm):
+        """token_ids matches the whole encoded stream: prompt rows and
+        decode rows (generated occurrences) alike."""
+        target = llm.get_tokenizer().encode(TEXT)[2]
+        with capturing(llm, "hidden_states", token_ids=[target]):
+            out = generate(llm)
+            states = fetch(llm)
+        expected = sum(1 for t in encoded_ids(out) if t == target)
+        assert expected >= 1
+        assert len(states) == NUM_LAYERS
+        for tensor in states.values():
+            assert tensor.shape[0] == expected, (
+                f"expected {expected} rows for token {target}, "
+                f"got {tensor.shape[0]}"
+            )
+
+    def test_position_list_selection(self, llm, expected_rows):
+        prompt_tokens = len(llm.get_tokenizer().encode(TEXT))
+        with capturing(llm, "hidden_states", positions=[0, -1]):
+            generate(llm)
+            states = fetch(llm)
+        # Absolute position 0 and the last prompt token (-1 resolves
+        # from the prompt end), regardless of decode steps.
+        rows = states[10].shape[0]
+        assert rows == 2, f"expected rows for positions [0, -1], got {rows}"
+        with capturing(llm, "hidden_states", positions=[0]):
+            generate(llm)
+            first_only = fetch(llm)
+        with capturing(llm, "hidden_states"):
+            generate(llm)
+            full = fetch(llm)
+        assert torch.allclose(first_only[10][0], full[10][0])
+        assert full[10].shape[0] == expected_rows
+        assert prompt_tokens >= 2
+
+    def test_selection_values_match_full_capture(self, llm):
+        target = llm.get_tokenizer().encode(TEXT)[-1]
+        with capturing(llm, "hidden_states", token_ids=[target]):
+            sel_out = generate(llm)
+            selected = fetch(llm)
+        with capturing(llm, "hidden_states"):
+            full_out = generate(llm)
+            full = fetch(llm)
+        assert encoded_ids(sel_out) == encoded_ids(full_out), (
+            "greedy runs diverged; row-for-row comparison is meaningless"
+        )
+        idx = [i for i, t in enumerate(encoded_ids(full_out)) if t == target]
+        assert torch.allclose(
+            selected[10], full[10][idx], atol=0
+        ), "selected rows must be byte-identical to the full capture's rows"
+
+    def test_selection_rejects_reduction_combination(self, llm):
+        with pytest.raises(Exception, match="last"):
+            rpc(llm, "start_capture", "hidden_states",
+                positions="last", token_ids=[1])
+        rpc(llm, "stop_capture", "hidden_states")
+
+
+class TestWireEncoding:
+    def test_bf16_raw_roundtrip(self, llm):
+        """bf16 stores ship as raw bytes (no fp32 upcast) and round-trip."""
+        with capturing(llm, "hidden_states", dtype="bfloat16",
+                       positions=[-1]):
+            generate(llm)
+            raw = rpc(llm, "fetch_captured", "hidden_states")
+        layer = raw[10]
+        assert layer["encoding"] == "raw"
+        assert layer["dtype"] == "torch.bfloat16"
+        n_vals = 1
+        for d in layer["shape"]:
+            n_vals *= d
+        assert len(layer["data"]) == 2 * n_vals, "bf16 must ship at 2 bytes/value"
+        tensor = deserialize_hidden_states(raw)[10]
+        assert tensor.dtype == torch.bfloat16
+
+    def test_per_layer_fetch(self, llm):
+        with capturing(llm, "hidden_states", positions=[-1]):
+            generate(llm)
+            part = rpc(llm, "fetch_captured", "hidden_states",
+                       layers=[3, 7], clear=True)
+            assert sorted(part) == [3, 7]
+            rest = rpc(llm, "fetch_captured", "hidden_states", clear=True)
+        assert 3 not in rest and 7 not in rest, "fetched layers must clear"
+        assert len(rest) == NUM_LAYERS - 2
