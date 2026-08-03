@@ -75,7 +75,7 @@ class TestVectorAndSteeringSpecValidation:
             VectorSpec(source=VEC, params={"beta": 1}, apply=APPLY_ALL)
 
     def test_source_required_for_non_moe(self):
-        with pytest.raises(ValidationError, match="requires a source"):
+        with pytest.raises(ValidationError, match="source file or an in-memory"):
             VectorSpec(algorithm="direct", apply=APPLY_ALL)
 
     def test_moe_requires_expert_ids_and_layers(self):
@@ -173,7 +173,7 @@ class TestEngineStructValidation:
             )
 
     def test_malformed_apply_spec_rejected(self):
-        with pytest.raises(ValueError, match="unknown keys"):
+        with pytest.raises(ValueError, match="unknown selection fields"):
             SteerVectorRequest(
                 steer_vector_name="x",
                 steer_vector_int_id=7,

@@ -58,8 +58,7 @@ def test_store_versioning(vec_path):
         d = store.get(vec_path, "direct")
         assert d is c and len(loads) == 2, "new version must be cached"
 
-        store.reload(vec_path, "direct")
-        assert len(loads) == 3, "explicit reload must force a load"
+
 
 
 def test_store_forwards_target_layers(vec_path):
@@ -99,3 +98,19 @@ def test_fingerprint_tracks_file_version(vec_path):
     assert fp2 == config_fingerprint(req()), (
         "fingerprint must be stable for the same version"
     )
+
+def test_store_inline_payloads_dedup_by_hash():
+    import numpy as np
+    import torch
+
+    from vllm.steer_vectors.payloads import DirectionVector
+
+    cfg = types.SimpleNamespace(max_steer_vectors=8, adapter_dtype=torch.float32)
+    store = VectorStore("cpu", cfg)
+    wire = DirectionVector({3: np.ones(4)}).to_wire()
+    a = store.get_inline(wire, "direct")
+    b = store.get_inline(DirectionVector({3: np.ones(4)}).to_wire(), "direct")
+    c = store.get_inline(DirectionVector({3: np.ones(4) * 2}).to_wire(), "direct")
+    assert a is b, "byte-identical payloads must share one entry"
+    assert c is not a, "different payload content must load its own entry"
+    assert set(a.layer_payloads) == {3}

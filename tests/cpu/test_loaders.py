@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Algorithm load_from_path implementations against synthetic files.
+"""Engine GGUF loading and client payload adapters against synthetic files.
 
 Covers the shared GGUF/ReFT helpers, the unified keyword signature, and
 the explicit failure paths (missing target_layers, bad MoE modes) that
@@ -18,9 +18,6 @@ import torch
 from vllm.steer_vectors.algorithms import (
     DirectAlgorithm,
     EraseAlgorithm,
-    LinearTransformAlgorithm,
-    LMSteerAlgorithm,
-    LoReFTAlgorithm,
     MoERouterAlgorithm,
     ReplaceAlgorithm,
 )
@@ -70,27 +67,25 @@ class TestGgufReaders:
             )
 
 
-class TestDirectPt:
-    @pytest.fixture()
-    def pt_path(self, tmp_path):
+class TestPayloadAdapters:
+    """Client-side adapters replace the deleted engine file heuristics."""
+
+    def test_pt_direction(self, tmp_path):
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import materialize
+
         path = os.path.join(tmp_path, "vec.pt")
         torch.save(torch.arange(8, dtype=torch.float32), path)
-        return path
+        payload = vec.from_pt_direction(path, layers=[7])
+        out = materialize(payload.to_wire(), "cpu", torch.float32, None)
+        assert set(out) == {7}
+        with pytest.raises(ValueError, match="layers"):
+            vec.from_pt_direction(path, layers=[])
 
-    def test_single_layer_pt(self, pt_path):
-        out = DirectAlgorithm.load_from_path(
-            pt_path, "cpu", config=CFG, target_layers=[7]
-        )
-        assert set(out["layer_payloads"]) == {7}
+    def test_linear_transport(self, tmp_path):
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import materialize
 
-    def test_pt_without_target_layers_rejected(self, pt_path):
-        with pytest.raises(ValueError):
-            DirectAlgorithm.load_from_path(pt_path, "cpu", config=CFG)
-
-
-class TestLinear:
-    @pytest.fixture()
-    def pkl_path(self, tmp_path):
         path = os.path.join(tmp_path, "linear.pkl")
         with open(path, "wb") as f:
             pickle.dump(
@@ -100,97 +95,94 @@ class TestLinear:
                 },
                 f,
             )
-        return path
+        payload = vec.from_linear_transport(path)
+        out = materialize(payload.to_wire(), "cpu", torch.float32, [1, 2])
+        assert set(out) == {1, 2}
+        assert out[1]["weight"].shape == (4, 4)
 
-    def test_linear_payloads(self, pkl_path):
-        out = LinearTransformAlgorithm.load_from_path(
-            pkl_path, "cpu", config=CFG, target_layers=[1, 2]
-        )
-        assert set(out["layer_payloads"]) == {1, 2}
-        assert out["layer_payloads"][1]["weight"].shape == (4, 4)
-
-    def test_linear_without_target_layers_rejected(self, pkl_path):
-        with pytest.raises(ValueError):
-            LinearTransformAlgorithm.load_from_path(pkl_path, "cpu", config=CFG)
-
-    def test_linear_missing_matrix_rejected(self, tmp_path):
-        bad_pkl = os.path.join(tmp_path, "bad.pkl")
-        with open(bad_pkl, "wb") as f:
+        bad = os.path.join(tmp_path, "bad.pkl")
+        with open(bad, "wb") as f:
             pickle.dump({"C_": 1}, f)
-        with pytest.raises(ValueError):
-            LinearTransformAlgorithm.load_from_path(
-                bad_pkl, "cpu", config=CFG, target_layers=[0]
-            )
+        with pytest.raises(ValueError, match="A_"):
+            vec.from_linear_transport(bad)
 
+    def test_lm_steer_checkpoints(self, tmp_path):
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import materialize
 
-class TestLMSteer:
-    def test_dict_checkpoint(self, tmp_path):
         path = os.path.join(tmp_path, "lms.pt")
         torch.save(
             {"projector1": torch.ones(8, 2), "projector2": torch.ones(8, 2)}, path
         )
-        out = LMSteerAlgorithm.load_from_path(
-            path, "cpu", config=CFG, target_layers=[3]
+        out = materialize(
+            vec.from_lm_steer(path).to_wire(), "cpu", torch.float32, [3]
         )
-        assert set(out["layer_payloads"]) == {3}
-        with pytest.raises(ValueError):
-            LMSteerAlgorithm.load_from_path(path, "cpu", config=CFG)
+        assert set(out) == {3}
 
-    def test_gpt2_style_list_checkpoint(self, tmp_path):
-        path = os.path.join(tmp_path, "lms_list.pt")
+        gpt2_style = os.path.join(tmp_path, "lms_list.pt")
         torch.save(
             [None, {"projector1": torch.ones(8, 2), "projector2": torch.ones(8, 2)}],
+            gpt2_style,
+        )
+        out = materialize(
+            vec.from_lm_steer(gpt2_style).to_wire(), "cpu", torch.float32, [0]
+        )
+        assert set(out) == {0}
+
+    def test_lm_steer_multivector_index_is_explicit(self, tmp_path):
+        import easysteer.vectors as vec
+
+        path = os.path.join(tmp_path, "stack.pt")
+        torch.save(
+            {
+                "projector1": torch.ones(2, 8, 2),
+                "projector2": torch.ones(2, 8, 2),
+            },
             path,
         )
-        out = LMSteerAlgorithm.load_from_path(
-            path, "cpu", config=CFG, target_layers=[0]
-        )
-        assert set(out["layer_payloads"]) == {0}
+        payload = vec.from_lm_steer(path, vector_index=1)
+        assert payload.projector1.shape == (8, 2)
+        with pytest.raises(ValueError, match="out of range"):
+            vec.from_lm_steer(path, vector_index=5)
 
 
 class TestReft:
-    def test_direct_reft_dir(self, tmp_path):
+    def test_bias_intervention_dir(self, tmp_path):
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import DirectionVector, materialize
+
         reft_dir = os.path.join(tmp_path, "reft")
         os.makedirs(reft_dir)
         with open(os.path.join(reft_dir, "reft_config.json"), "w") as f:
             json.dump({"representations": [{"layer": 3}]}, f)
         torch.save({"bias": torch.ones(8)}, os.path.join(reft_dir, "intervention.bin"))
-        out = DirectAlgorithm.load_from_path(reft_dir, "cpu", config=CFG)
-        assert set(out["layer_payloads"]) == {3}
-        with pytest.raises(ValueError):
-            DirectAlgorithm.load_from_path(
-                reft_dir, "cpu", config=CFG, target_layers=[9]
-            )
+        payload = vec.from_pyreft(reft_dir)
+        assert isinstance(payload, DirectionVector)
+        out = materialize(payload.to_wire(), "cpu", torch.float32, None)
+        assert set(out) == {3}
 
     def test_loreft_dir(self, tmp_path):
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import ReftIntervention, materialize
+
         loreft_dir = os.path.join(tmp_path, "loreft")
         os.makedirs(loreft_dir)
         with open(os.path.join(loreft_dir, "reft_config.json"), "w") as f:
             json.dump({"representations": [{"layer": 2}]}, f)
         torch.save(
             {
-                "rotate_layer.parametrizations.weight.original": torch.ones(8, 4),
-                "learned_source.weight": torch.ones(4, 8),
-                "learned_source.bias": torch.ones(4),
+                "rotate_layer": torch.ones(8, 2),
+                "learned_source.weight": torch.ones(2, 8),
+                "learned_source.bias": torch.ones(2),
             },
             os.path.join(loreft_dir, "intervention.bin"),
         )
-        out = LoReFTAlgorithm.load_from_path(loreft_dir, "cpu", config=CFG)
-        payload = out["layer_payloads"][2]
-        assert payload["rotate_layer"] is not None
-        assert payload["learned_source_weight"] is not None
-
-
-def test_concept_replace_dir(tmp_path):
-    cr_dir = os.path.join(tmp_path, "concept")
-    os.makedirs(cr_dir)
-    write_gguf(os.path.join(cr_dir, "h1.gguf"), {0: np.ones(8, dtype=np.float32)})
-    write_gguf(os.path.join(cr_dir, "h2.gguf"), {0: 3 * np.ones(8, dtype=np.float32)})
-    out = ConceptReplaceAlgorithm.load_from_path(cr_dir, "cpu", config=CFG)
-    assert set(out["layer_payloads"]) == {0}
-    assert float(out["layer_payloads"][0]["h2"][0]) == 3.0
-
-
+        payload = vec.from_pyreft(loreft_dir)
+        assert isinstance(payload, ReftIntervention)
+        assert payload.layer == 2
+        out = materialize(payload.to_wire(), "cpu", torch.float32, None)
+        assert set(out) == {2}
+        assert out[2]["rotate_layer"].shape == (8, 2)
 class TestMoeRouterJson:
     @staticmethod
     def write_moe(tmp_path, name, layer_configs):
