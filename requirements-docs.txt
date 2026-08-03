@@ -1,0 +1,7 @@
+# Documentation build requirements (see docs/README.md)
+mkdocs-material>=9.5
+mkdocstrings[python]>=0.27
+mike>=2.1
+# Note: the api-reference pages import easysteer (and vllm-steer for the
+# steering-spec page), so build docs in an environment where EasySteer is
+# installed. Pages that fail to import are the only ones affected.

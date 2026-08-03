@@ -1,0 +1,101 @@
+site_name: EasySteer
+site_description: A unified framework for high-performance and extensible LLM steering, built on vLLM.
+site_url: https://zju-real.github.io/EasySteer/
+repo_url: https://github.com/ZJU-REAL/EasySteer
+repo_name: ZJU-REAL/EasySteer
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  # TODO: add logo/favicon (figures/logo.png needs a square crop for favicon)
+  # logo: assets/logo.png
+  # favicon: assets/favicon.ico
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.action.edit
+    - content.code.copy
+    - content.tabs.link
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/installation.md
+      - getting-started/quickstart.md
+  - User Guide:
+      - user-guide/steering.md
+      - user-guide/hidden-state-capture.md
+      - user-guide/extracting-vectors.md
+      - user-guide/openai-server.md
+  - Replications:
+      - replications/index.md
+  - Developer Guide:
+      - developer-guide/testing.md
+      - developer-guide/contributing.md
+  - API Reference:
+      - api-reference/index.md
+      - api-reference/steer.md
+      - api-reference/hidden-states.md
+      - api-reference/steering-specs.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [., vllm-steer]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - toc:
+      permalink: true
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ZJU-REAL/EasySteer
+    - icon: fontawesome/solid/paper-plane
+      link: https://arxiv.org/abs/2509.25175
+
+# Only the docs/ tree is published; the top-level READMEs stay the GitHub landing page.
+exclude_docs: |
+  README.md
