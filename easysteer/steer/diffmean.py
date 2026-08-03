@@ -64,3 +64,39 @@ class DiffMeanExtractor:
             directions=directions,
             metadata=metadata
         ) 
+
+    @staticmethod
+    def from_moments(
+        pos_moments,
+        neg_moments,
+        model_type: str = "unknown",
+        normalize: bool = True,
+    ) -> StatisticalControlVector:
+        """Build a diffmean vector from streaming moment accumulators.
+
+        pos_moments/neg_moments are MomentsAccumulator instances
+        (easysteer.steer.accumulators) fed per-category rows layer by
+        layer; equivalent to extract() on the same rows.
+        """
+        directions = {}
+        layers = sorted(set(pos_moments.layers) & set(neg_moments.layers))
+        if not layers:
+            raise ValueError("accumulators share no layers")
+        for layer in layers:
+            d = pos_moments.mean(layer) - neg_moments.mean(layer)
+            if normalize:
+                norm = np.linalg.norm(d)
+                if norm > 0:
+                    d = d / norm
+            directions[layer] = d.astype(np.float32)
+        return StatisticalControlVector(
+            model_type=model_type,
+            method="diffmean",
+            directions=directions,
+            metadata={
+                "normalized": normalize,
+                "num_positive": int(max(pos_moments.count.values())),
+                "num_negative": int(max(neg_moments.count.values())),
+                "streaming": True,
+            },
+        )

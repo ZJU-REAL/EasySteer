@@ -4,6 +4,11 @@ Steering Methods Package
 """
 
 from .utils import StatisticalControlVector, extract_token_hiddens, extract_last_token_hiddens, extract_all_token_hiddens
+from .accumulators import (
+    DiffMeanAccumulator,
+    MomentsAccumulator,
+    TopKCountAccumulator,
+)
 from .diffmean import DiffMeanExtractor
 from .pca import PCAExtractor
 from .lat import LATExtractor
@@ -18,6 +23,9 @@ from .unified_interface import (
 )
 
 __all__ = [
+    "MomentsAccumulator",
+    "DiffMeanAccumulator",
+    "TopKCountAccumulator",
     # Core classes
     'StatisticalControlVector',
     

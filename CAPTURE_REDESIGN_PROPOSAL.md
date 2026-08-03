@@ -174,17 +174,28 @@ algorithms (LAT, probes) need the raw per-sample path anyway.
 
 ## 4. Phasing
 
-- **P1 (highest value, no breaking changes):** labeled rows + expose
-  `layers`/`select`/`reduce` through the client + `SelectSpec` factored out and
-  shared with steering. Kills the realignment hacks and the 99%-discard transfers.
-- **P2:** per-request `CaptureSpec`, `CaptureResult` client object, extractor input
-  rework (matrices / CaptureResult), unified layer-id indexing and defaults.
-- **P3:** streaming per-request retrieval (`CaptureRef` on `RequestOutput`,
-  inline resolver) + easysteer streaming accumulators and `from_moments`
-  extractor constructors.
+- **P1 — SHIPPED 2026-08-03** (vllm-steer `15a4854`, EasySteer `9a40308`):
+  labeled rows + `select=` through the client + `SelectSpec` shared with
+  steering. Also exposed and fixed the continuous-batching row-misattribution
+  bug (§2.2).
+- **P2 — SHIPPED 2026-08-03:** per-request `capture_select` riding the request
+  structs end-to-end (admission-validated; per-request clause overrides
+  resolved in-batch), `CaptureResult` client object (true-layer-id keyed,
+  exact label-driven per-sample views), extractors accept `CaptureResult`
+  directly. Scope note: per-request overrides carry the *select clause* only —
+  layers/dtype/budget stay stream-global (they define storage layout).
+- **P3 — SHIPPED 2026-08-03 (retrieval variant):** per-request drain
+  (`fetch_captured(req_ids=...)` with selective clear) instead of
+  `CaptureRef`-on-`RequestOutput` — the conservative fallback chosen to avoid
+  forking vLLM's output structs; revisit `CaptureRef` only if the async/server
+  path needs push-style delivery. Plus easysteer streaming accumulators
+  (`MomentsAccumulator` / `DiffMeanAccumulator` / `TopKCountAccumulator`) and
+  `from_moments` constructors (diffmean, standard PCA with sign correction),
+  equivalence-tested against the batch extractors.
 - **P4 (on demand):** safetensors spill, shm transport, additional `what=` streams
   (mlp_out/attn_out), compiled-graph capture story (upstream
-  `extract_hidden_states` KV-connector path for bulk offline extraction).
+  `extract_hidden_states` KV-connector path for bulk offline extraction),
+  `CaptureRef` push delivery.
 
 ## 5. Known constraints carried forward
 

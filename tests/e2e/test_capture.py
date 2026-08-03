@@ -379,3 +379,123 @@ class TestLabeledRows:
             assert sample[0].shape[0] == expected, (
                 f"sample rows {sample[0].shape[0]} != encoded {expected}"
             )
+
+
+class TestPerRequestSelect:
+    """capture_select rides the request: each prompt can carry its own
+    selection clause, resolved per request inside the batch."""
+
+    PROMPTS = [
+        "The capital of France is",
+        "One two three four five six seven",
+        "Hi",
+    ]
+
+    def _grouped_rows(self, labels, outs):
+        from vllm.hidden_states import match_capture_request_id
+
+        by_req = {}
+        for row, rid in enumerate(labels.req_ids):
+            by_req.setdefault(rid, []).append(row)
+        resolved = {}
+        for label, rows in by_req.items():
+            matches = [
+                o.request_id
+                for o in outs
+                if match_capture_request_id(label, o.request_id)
+            ]
+            assert len(matches) == 1
+            resolved[matches[0]] = sorted(
+                rows, key=lambda r: int(labels.positions[r])
+            )
+        return resolved
+
+    def test_per_prompt_selects_engine_side(self, llm):
+        from vllm.hidden_states import deserialize_captured
+        from vllm.steer_vectors.api import SelectSpec
+
+        first_only = SelectSpec(
+            phases=["prompt", "generation"], positions=[0]
+        ).to_wire()
+        gen_only = SelectSpec(phases=["generation"]).to_wire()
+        capture_select = [
+            {"hidden_states": first_only},
+            None,
+            {"hidden_states": gen_only},
+        ]
+        with capturing(llm, "hidden_states", layers=[10]):
+            outs = llm.generate(
+                self.PROMPTS,
+                sampling_params=SP,
+                capture_select=capture_select,
+                use_tqdm=False,
+            )
+            raw = rpc(llm, "fetch_captured", "hidden_states")
+        tensors, meta = deserialize_captured(raw)
+        assert meta is not None
+        rows = self._grouped_rows(meta[10], outs)
+        assert len(rows[outs[0].request_id]) == 1, "positions=[0] override"
+        assert len(rows[outs[1].request_id]) == len(encoded_ids(outs[1])), (
+            "no override falls back to the stream's global selection"
+        )
+        assert len(rows[outs[2].request_id]) == SP.max_tokens - 1, (
+            "generation-phase override"
+        )
+
+    def test_per_request_fetch_drains(self, llm):
+        from vllm.hidden_states import deserialize_captured
+
+        with capturing(llm, "hidden_states", layers=[10]):
+            outs = llm.generate(
+                self.PROMPTS, sampling_params=SP, use_tqdm=False
+            )
+            part_raw = rpc(
+                llm, "fetch_captured", "hidden_states",
+                req_ids=[outs[1].request_id], clear=True,
+            )
+            rest_raw = rpc(llm, "fetch_captured", "hidden_states", clear=True)
+        part, part_meta = deserialize_captured(part_raw)
+        rest, rest_meta = deserialize_captured(rest_raw)
+        assert part[10].shape[0] == len(encoded_ids(outs[1]))
+        expected_rest = sum(
+            len(encoded_ids(o)) for i, o in enumerate(outs) if i != 1
+        )
+        assert rest[10].shape[0] == expected_rest, (
+            "drained request's rows must be gone from the store"
+        )
+
+    def test_client_capture_api(self, llm):
+        import easysteer.hidden_states as hs
+        from vllm.steer_vectors.api import SelectSpec
+
+        result = hs.capture(
+            llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],
+            per_prompt_selects=[
+                SelectSpec(phases=["prompt", "generation"], positions=[0, -1]),
+                None,
+                None,
+            ],
+            ignore_eos=True,
+        )
+        assert result.layer_ids == [5, 10]
+        assert len(result) == 3
+        assert result.sample(0)[10].shape[0] == 2, "positions [0,-1] override"
+        for i in (1, 2):
+            expected = len(
+                list(result.outputs[i].prompt_token_ids)
+                + list(result.outputs[i].outputs[0].token_ids)[:-1]
+            )
+            assert result.sample(i)[10].shape[0] == expected
+            assert result.sample_token_ids(i) == (
+                list(result.outputs[i].prompt_token_ids)
+                + list(result.outputs[i].outputs[0].token_ids)[:-1]
+            )
+
+    def test_malformed_capture_select_rejected_at_admission(self, llm):
+        with pytest.raises(Exception, match="unknown selection fields"):
+            llm.generate(
+                self.PROMPTS[0],
+                sampling_params=SP,
+                capture_select={"hidden_states": {"phasez": ["prompt"]}},
+                use_tqdm=False,
+            )

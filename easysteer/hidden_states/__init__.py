@@ -27,6 +27,7 @@ Example:
 """
 
 from .capture import get_all_hidden_states, HiddenStatesCaptureV1
+from .capture_result import CaptureResult, capture
 from .capture_generate import (
     get_all_hidden_states_generate,
     HiddenStatesCaptureGenerate,
@@ -42,6 +43,8 @@ from .moe_capture_generate import (
 )
 
 __all__ = [
+    "CaptureResult",
+    "capture",
     # Hidden states (embed task)
     "get_all_hidden_states",
     "HiddenStatesCaptureV1",

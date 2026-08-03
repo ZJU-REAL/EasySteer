@@ -136,6 +136,11 @@ def extract_token_hiddens(all_hidden_states, positive_indices, negative_indices=
         tuple: (positive_hiddens, negative_hiddens)
                每个都是dict {layer: np.ndarray}，shape为(n_samples, hidden_dim)
     """
+    # CaptureResult (easysteer.hidden_states) is accepted directly; it
+    # converts to the nested [sample][layer][token] shape with exact,
+    # label-driven per-sample rows.
+    if hasattr(all_hidden_states, "to_nested"):
+        all_hidden_states = all_hidden_states.to_nested()
     if negative_indices is None:
         # 假设前半部分是positive，后半部分是negative
         n_samples = len(all_hidden_states)

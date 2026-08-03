@@ -193,3 +193,50 @@ class PCAExtractor:
             directions=directions,
             metadata=metadata
         ) 
+
+    @staticmethod
+    def from_moments(
+        moments,
+        model_type: str = "unknown",
+        normalize: bool = True,
+        pos_moments=None,
+        neg_moments=None,
+    ) -> StatisticalControlVector:
+        """Standard PCA from a streaming second-moment accumulator.
+
+        moments must be a MomentsAccumulator(track_second_moment=True)
+        fed the positive rows; the direction per layer is the top
+        eigenvector of the covariance. When pos_moments/neg_moments
+        (first-moment accumulators) are given, the sign is corrected so
+        the direction points from the negative mean to the positive
+        mean, matching extract(method="standard", correct_direction).
+        """
+        directions = {}
+        variance = {}
+        if not moments.layers:
+            raise ValueError("accumulator holds no layers")
+        for layer in moments.layers:
+            cov = moments.covariance(layer)
+            eigvals, eigvecs = np.linalg.eigh(cov)
+            direction = eigvecs[:, -1]
+            total = float(eigvals.sum())
+            variance[layer] = float(eigvals[-1] / total) if total > 0 else 0.0
+            if pos_moments is not None and neg_moments is not None:
+                gap = pos_moments.mean(layer) - neg_moments.mean(layer)
+                if float(gap @ direction) < 0:
+                    direction = -direction
+            if normalize:
+                norm = np.linalg.norm(direction)
+                if norm > 0:
+                    direction = direction / norm
+            directions[layer] = direction.astype(np.float32)
+        return StatisticalControlVector(
+            model_type=model_type,
+            method="pca_standard",
+            directions=directions,
+            metadata={
+                "normalized": normalize,
+                "explained_variance": variance,
+                "streaming": True,
+            },
+        )
