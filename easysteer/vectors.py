@@ -113,7 +113,17 @@ def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
                 weight = value
             elif key.endswith("bias"):
                 bias = value
-    if rotate is not None and weight is not None:
+    if rotate is not None and weight is None:
+        # pyreft also saves LoReFT with bare keys (weight/bias alongside
+        # rotate_layer); the rotation's presence is what marks LoReFT.
+        weight = state.get("weight")
+        bias = state.get("bias")
+    if rotate is not None:
+        if weight is None:
+            raise ValueError(
+                f"{bin_path} has a rotate_layer but no learned-source "
+                f"weight; keys: {sorted(state)}"
+            )
         return ReftIntervention(
             rotate_layer=rotate,
             learned_source_weight=weight,

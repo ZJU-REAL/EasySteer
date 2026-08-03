@@ -183,6 +183,32 @@ class TestReft:
         out = materialize(payload.to_wire(), "cpu", torch.float32, None)
         assert set(out) == {2}
         assert out[2]["rotate_layer"].shape == (8, 2)
+
+    def test_loreft_dir_bare_keys(self, tmp_path):
+        # pyreft's save() also emits LoReFT state dicts with unprefixed
+        # weight/bias next to rotate_layer.
+        import easysteer.vectors as vec
+        from vllm.steer_vectors.payloads import ReftIntervention
+
+        loreft_dir = os.path.join(tmp_path, "loreft_bare")
+        os.makedirs(loreft_dir)
+        with open(os.path.join(loreft_dir, "reft_config.json"), "w") as f:
+            json.dump({"representations": [{"layer": 8}]}, f)
+        torch.save(
+            {
+                "weight": torch.ones(2, 8),
+                "bias": torch.ones(2),
+                "rotate_layer": torch.ones(8, 2),
+            },
+            os.path.join(loreft_dir, "intervention.bin"),
+        )
+        payload = vec.from_pyreft(loreft_dir)
+        assert isinstance(payload, ReftIntervention)
+        assert payload.layer == 8
+        assert payload.learned_source_weight.shape == (2, 8)
+        assert payload.learned_source_bias.shape == (2,)
+
+
 class TestMoeRouterJson:
     @staticmethod
     def write_moe(tmp_path, name, layer_configs):
