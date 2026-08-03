@@ -40,21 +40,17 @@ on any FusedMoE architecture**:
 | Steer experts | per-model forked forward | `moe_router` algorithm, `activate`/`deactivate` modes |
 
 - `expert_detection.ipynb` — capture per-token router logits for a few
-  contrastive pairs, compute the risk difference, and write a `steermoe`
-  layer config (replicates `custom_steering.ipynb` from the official repo).
-- `steermoe_steer.ipynb` — steer with the detected experts (deactivating
-  100 digit-linked experts flips greedy counting to written number words),
-  verify the mechanism by re-capturing router logits *post-steering*
-  (deactivated experts disappear from every token's top-8), and steer
-  faithfulness both ways with the paper's released expert rankings for
-  OLMoE-1B-7B (downloaded from the official repo; Adobe Research License,
-  noncommercial research).
+  contrastive digits-vs-words pairs, compute the risk difference, and save
+  the 200 most word-linked experts as `steermoe_qwen3_words.json`
+  (replicates `custom_steering.ipynb` from the official repo).
+- `steermoe_steer.ipynb` — deactivate those experts, flipping greedy
+  counting from written words to digits, and verify the mechanism by
+  re-capturing router logits *post-steering* (deactivated experts
+  disappear from every token's top-8).
 
-Model: [`allenai/OLMoE-1B-7B-0125-Instruct`](https://huggingface.co/allenai/OLMoE-1B-7B-0125-Instruct)
-(16 MoE layers × 64 experts, top-8), one of the six models evaluated in the
-paper. The expert-ranking pickle
-`activations_[allenai--OLMoE-1B-7B-0125-Instruct]_[faithfulness].pkl` comes
-from the official repo.
+Model: [`Qwen/Qwen3-30B-A3B`](https://huggingface.co/Qwen/Qwen3-30B-A3B)
+(48 MoE layers × 128 experts, top-8), one of the models evaluated in the
+paper.
 
 A steering config is a JSON file mapping layers to expert lists:
 
@@ -67,18 +63,18 @@ A steering config is a JSON file mapping layers to expert lists:
 }
 ```
 
-(`boost`, `suppress`, `soft_hard` and `steermoe` are accepted as
-deprecated aliases of `activate`/`deactivate`.)
-
 applied per request via:
 
 ```python
-SteerVectorRequest(
-    "steer-away-from-digits", 1,
-    steer_vector_local_path="steermoe_digits.json",
-    algorithm="moe_router",
-    prefill_trigger_tokens=[-1], generate_trigger_tokens=[-1],
-)
+steering = SteeringSpec(vectors=[
+    VectorSpec(
+        source="steermoe_qwen3_words.json",
+        algorithm="moe_router",
+        layers=[...],  # the layers present in the JSON
+        apply=ApplySpec(phases=["prompt", "generation"]),
+    ),
+])
+llm.generate(prompts, params, steering=steering)
 ```
 
 Note: models whose MoE blocks fuse the gate weights into the MoE runner
