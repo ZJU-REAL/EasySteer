@@ -556,10 +556,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#recommended-precompiled-vllm-wheel" class="md-nav__link">
+  <a href="#route-1-development-install-recommended-for-ongoing-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Recommended: precompiled vLLM wheel
+        Route 1: development install (recommended for ongoing work)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#route-2-quick-install-prebuilt-wheel-fork-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route 2: quick install (prebuilt wheel + fork overlay)
       
     </span>
   </a>
@@ -1254,10 +1265,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#recommended-precompiled-vllm-wheel" class="md-nav__link">
+  <a href="#route-1-development-install-recommended-for-ongoing-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Recommended: precompiled vLLM wheel
+        Route 1: development install (recommended for ongoing work)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#route-2-quick-install-prebuilt-wheel-fork-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route 2: quick install (prebuilt wheel + fork overlay)
       
     </span>
   </a>
@@ -1313,8 +1335,16 @@
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <p>EasySteer ships as two packages installed from one repository: the vLLM fork
-(<code>vllm-steer/</code>) and the <code>easysteer</code> Python package.</p>
-<h2 id="recommended-precompiled-vllm-wheel">Recommended: precompiled vLLM wheel<a class="headerlink" href="#recommended-precompiled-vllm-wheel" title="Permanent link">&para;</a></h2>
+(<code>vllm-steer/</code>) and the <code>easysteer</code> Python package. Pick one of two routes:</p>
+<ul>
+<li><strong>Development install</strong> — editable checkouts of both packages; changes to
+  the fork or to <code>easysteer</code> take effect immediately. Use this if you plan to
+  develop, debug, or track the repository.</li>
+<li><strong>Quick install</strong> — stock vLLM wheel plus a file overlay of the fork's
+  Python changes. Fastest way to a working environment (this is how we set up
+  lab servers); not editable.</li>
+</ul>
+<h2 id="route-1-development-install-recommended-for-ongoing-work">Route 1: development install (recommended for ongoing work)<a class="headerlink" href="#route-1-development-install-recommended-for-ongoing-work" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>easysteer<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>-y
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>conda<span class="w"> </span>activate<span class="w"> </span>easysteer
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -1329,23 +1359,48 @@
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">cd</span><span class="w"> </span>..
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>pip<span class="w"> </span>install<span class="w"> </span>--editable<span class="w"> </span>.
 </code></pre></div>
+<h2 id="route-2-quick-install-prebuilt-wheel-fork-overlay">Route 2: quick install (prebuilt wheel + fork overlay)<a class="headerlink" href="#route-2-quick-install-prebuilt-wheel-fork-overlay" title="Permanent link">&para;</a></h2>
+<p>The fork's changes against upstream vLLM v0.26.0 are pure Python, so you can
+install the official wheel and overlay the fork's files onto it — no build,
+no editable checkouts:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>easysteer<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>-y
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>conda<span class="w"> </span>activate<span class="w"> </span>easysteer
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Official vLLM wheel (kernels prebuilt)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">vllm</span><span class="o">==</span><span class="m">0</span>.26.0
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Overlay the fork&#39;s Python files onto the installed package</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>git<span class="w"> </span>clone<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nv">VLLM_DIR</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import vllm, os; print(os.path.dirname(vllm.__file__))&quot;</span><span class="k">)</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>rsync<span class="w"> </span>-a<span class="w"> </span>EasySteer-vllm-v1/vllm/<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$VLLM_DIR</span><span class="s2">&quot;</span>/
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># EasySteer package</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ZJU-REAL/EasySteer.git
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>pip<span class="w"> </span>install<span class="w"> </span>./EasySteer
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The overlay is not tracked by pip: reinstalling or upgrading <code>vllm</code>
+silently reverts it (re-run the rsync afterwards), and <code>pip show vllm</code>
+still reports the stock package. For anything long-lived, prefer Route 1.</p>
+</div>
 <h2 id="fallback-build-vllm-from-source">Fallback: build vLLM from source<a class="headerlink" href="#fallback-build-vllm-from-source" title="Permanent link">&para;</a></h2>
 <p>Needed only when no precompiled wheel exists for your platform.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>EasySteer/vllm-steer
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>use_existing_torch.py
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Set your GPU architecture (e.g. &quot;8.0&quot; for A100) to speed up the build.</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TORCH_CUDA_ARCH_LIST</span><span class="o">=</span><span class="s2">&quot;8.0&quot;</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CMAKE_ARGS</span><span class="o">=</span><span class="s2">&quot;-DTORCH_CUDA_ARCH_LIST=8.0&quot;</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">VLLM_TARGET_DEVICE</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MAX_JOBS</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CMAKE_BUILD_PARALLEL_LEVEL</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements/build.txt
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--no-build-isolation<span class="w"> </span>-v
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nb">cd</span><span class="w"> </span>..
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>EasySteer/vllm-steer
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python<span class="w"> </span>use_existing_torch.py
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Set your GPU architecture (e.g. &quot;8.0&quot; for A100) to speed up the build.</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">TORCH_CUDA_ARCH_LIST</span><span class="o">=</span><span class="s2">&quot;8.0&quot;</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CMAKE_ARGS</span><span class="o">=</span><span class="s2">&quot;-DTORCH_CUDA_ARCH_LIST=8.0&quot;</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">VLLM_TARGET_DEVICE</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MAX_JOBS</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CMAKE_BUILD_PARALLEL_LEVEL</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements/build.txt
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--no-build-isolation<span class="w"> </span>-v
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nb">cd</span><span class="w"> </span>..
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div>
 <p>A full source build can take from ~20 minutes (128 cores) to several hours.</p>
 <h2 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h2>
@@ -1356,11 +1411,11 @@ vLLM v0.26.0 migration — it runs the previous engine and v1-era APIs.
 A refreshed image is planned; until then, prefer the wheel install
 above for current features.</p>
 </div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>xuhaolei/easysteer:latest
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>easysteer:latest
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>python3<span class="w"> </span>/app/easysteer/docker/docker_test.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>xuhaolei/easysteer:latest
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>easysteer:latest
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>python3<span class="w"> </span>/app/easysteer/docker/docker_test.py
 </code></pre></div>
 <!-- TODO: verify supported Python/CUDA version matrix and document it here. -->
 
