@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """Hook-based hidden-states capture on a dense model.
 
-Covers: the legacy RPC shims (enable/get/clear/disable) capture all
-layers with consistent row counts; layer-subset configs; per-sample
-'last' and 'mean' reductions; per-layer token budgets with drop
-reporting; dtype round-trips; router_logits on a dense model is empty
-(warning, not error); fetch(clear) resets accumulation.
+Covers: full-capture row counts and clear_captured; layer-subset
+configs; per-sample 'last' and 'mean' reductions; per-layer row
+budgets with drop reporting; dtype round-trips; router_logits on a
+dense model is empty (warning, not error); fetch(clear) resets
+accumulation; select clauses; row labels; per-request selection.
 
 Capture requires enforce_eager=True and prefix caching OFF (cache-hit
 tokens are never recomputed, so they cannot be captured).
@@ -18,11 +18,16 @@ import pytest
 import torch
 from vllm import SamplingParams
 
-# vllm.hidden_states is a backward-compatibility alias of vllm.capture;
-# imported on purpose so the alias stays covered.
-from vllm.hidden_states import deserialize_hidden_states
+from vllm.capture import deserialize_captured
 
 from helpers import DENSE_MODEL
+
+
+def sel(**filters):
+    """SelectSpec wire dict over both phases (the common test clause)."""
+    from vllm.steer_vectors.api import SelectSpec
+
+    return SelectSpec(phases=["prompt", "generation"], **filters).to_wire()
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
@@ -63,7 +68,7 @@ def encoded_ids(out):
 
 
 def fetch(llm):
-    return deserialize_hidden_states(rpc(llm, "fetch_captured", "hidden_states"))
+    return deserialize_captured(rpc(llm, "fetch_captured", "hidden_states"))[0]
 
 
 @pytest.fixture(scope="module")
@@ -73,18 +78,20 @@ def expected_rows(llm):
     return prompt_tokens + SP.max_tokens - 1
 
 
-def test_legacy_rpc_flow_captures_all_layers(llm, expected_rows):
-    """Legacy enable/get/clear/disable shims capture every layer fully."""
-    rpc(llm, "enable_hidden_states_capture")
-    try:
+def test_full_capture_all_layers_and_clear(llm, expected_rows):
+    """A bare stream captures every layer fully; clear_captured drops
+    rows while keeping the stream enabled."""
+    with capturing(llm, "hidden_states"):
         generate(llm)
-        hs = deserialize_hidden_states(rpc(llm, "get_captured_hidden_states"))
-        rpc(llm, "clear_hidden_states")
-    finally:
-        rpc(llm, "disable_hidden_states_capture")
+        hs = deserialize_captured(
+            rpc(llm, "fetch_captured", "hidden_states", clear=False)
+        )[0]
+        rpc(llm, "clear_captured", "hidden_states")
+        after = rpc(llm, "fetch_captured", "hidden_states")
     assert len(hs) == NUM_LAYERS, f"captured {len(hs)} layers, want {NUM_LAYERS}"
     rows = {t.shape[0] for t in hs.values()}
     assert rows == {expected_rows}, f"rows={rows}, want {{{expected_rows}}}"
+    assert after == {}, "clear_captured must drop all stored rows"
 
 
 def test_layer_subset_captures_only_those_layers(llm):
@@ -94,8 +101,8 @@ def test_layer_subset_captures_only_those_layers(llm):
     assert sorted(captured) == [5, 10], f"got layers {sorted(captured)}"
 
 
-def test_positions_last_one_row_per_step(llm):
-    with capturing(llm, "hidden_states", layers=[10], positions="last"):
+def test_reduce_last_one_row_per_step(llm):
+    with capturing(llm, "hidden_states", layers=[10], reduce="last"):
         generate(llm)
         hs = fetch(llm)
     assert hs[10].shape[0] == SP.max_tokens, (
@@ -104,12 +111,12 @@ def test_positions_last_one_row_per_step(llm):
     )
 
 
-def test_positions_mean_same_rows_different_values(llm):
+def test_reduce_mean_same_rows_different_values(llm):
     """'mean' has the same per-step row count as 'last' but other values."""
-    with capturing(llm, "hidden_states", layers=[10], positions="last"):
+    with capturing(llm, "hidden_states", layers=[10], reduce="last"):
         generate(llm)
         last = fetch(llm)
-    with capturing(llm, "hidden_states", layers=[10], positions="mean"):
+    with capturing(llm, "hidden_states", layers=[10], reduce="mean"):
         generate(llm)
         mean = fetch(llm)
     assert mean[10].shape[0] == SP.max_tokens, f"rows={mean[10].shape[0]}"
@@ -118,8 +125,8 @@ def test_positions_mean_same_rows_different_values(llm):
     )
 
 
-def test_max_tokens_budget_caps_rows_and_reports_drops(llm):
-    with capturing(llm, "hidden_states", layers=[10], max_tokens=5):
+def test_budget_rows_caps_rows_and_reports_drops(llm):
+    with capturing(llm, "hidden_states", layers=[10], budget_rows=5):
         generate(llm)
         status = rpc(llm, "capture_status", "hidden_states")
         capped = fetch(llm)
@@ -162,7 +169,7 @@ class TestSourceSideSelection:
         """token_ids matches the whole encoded stream: prompt rows and
         decode rows (generated occurrences) alike."""
         target = llm.get_tokenizer().encode(TEXT)[2]
-        with capturing(llm, "hidden_states", token_ids=[target]):
+        with capturing(llm, "hidden_states", select=sel(tokens=[target])):
             out = generate(llm)
             states = fetch(llm)
         expected = sum(1 for t in encoded_ids(out) if t == target)
@@ -176,14 +183,14 @@ class TestSourceSideSelection:
 
     def test_position_list_selection(self, llm, expected_rows):
         prompt_tokens = len(llm.get_tokenizer().encode(TEXT))
-        with capturing(llm, "hidden_states", positions=[0, -1]):
+        with capturing(llm, "hidden_states", select=sel(positions=[0, -1])):
             generate(llm)
             states = fetch(llm)
         # Absolute position 0 and the last prompt token (-1 resolves
         # from the prompt end), regardless of decode steps.
         rows = states[10].shape[0]
         assert rows == 2, f"expected rows for positions [0, -1], got {rows}"
-        with capturing(llm, "hidden_states", positions=[0]):
+        with capturing(llm, "hidden_states", select=sel(positions=[0])):
             generate(llm)
             first_only = fetch(llm)
         with capturing(llm, "hidden_states"):
@@ -195,7 +202,7 @@ class TestSourceSideSelection:
 
     def test_selection_values_match_full_capture(self, llm):
         target = llm.get_tokenizer().encode(TEXT)[-1]
-        with capturing(llm, "hidden_states", token_ids=[target]):
+        with capturing(llm, "hidden_states", select=sel(tokens=[target])):
             sel_out = generate(llm)
             selected = fetch(llm)
         with capturing(llm, "hidden_states"):
@@ -210,9 +217,9 @@ class TestSourceSideSelection:
         ), "selected rows must be byte-identical to the full capture's rows"
 
     def test_selection_rejects_reduction_combination(self, llm):
-        with pytest.raises(Exception, match="last"):
+        with pytest.raises(Exception, match="reduc"):
             rpc(llm, "start_capture", "hidden_states",
-                positions="last", token_ids=[1])
+                reduce="last", select=sel(tokens=[1]))
         rpc(llm, "stop_capture", "hidden_states")
 
 
@@ -220,7 +227,7 @@ class TestWireEncoding:
     def test_bf16_raw_roundtrip(self, llm):
         """bf16 stores ship as raw bytes (no fp32 upcast) and round-trip."""
         with capturing(llm, "hidden_states", dtype="bfloat16",
-                       positions=[-1]):
+                       select=sel(positions=[-1])):
             generate(llm)
             raw = rpc(llm, "fetch_captured", "hidden_states")
         layer = raw[10]
@@ -230,11 +237,11 @@ class TestWireEncoding:
         for d in layer["shape"]:
             n_vals *= d
         assert len(layer["data"]) == 2 * n_vals, "bf16 must ship at 2 bytes/value"
-        tensor = deserialize_hidden_states(raw)[10]
+        tensor = deserialize_captured(raw)[0][10]
         assert tensor.dtype == torch.bfloat16
 
     def test_per_layer_fetch(self, llm):
-        with capturing(llm, "hidden_states", positions=[-1]):
+        with capturing(llm, "hidden_states", select=sel(positions=[-1])):
             generate(llm)
             part = rpc(llm, "fetch_captured", "hidden_states",
                        layers=[3, 7], clear=True)
@@ -289,7 +296,7 @@ class TestLabeledRows:
     """Every captured row carries (request id, position, token id)."""
 
     def test_single_request_labels(self, llm, expected_rows):
-        from vllm.hidden_states import (
+        from vllm.capture import (
             deserialize_captured,
             match_capture_request_id,
         )
@@ -312,7 +319,7 @@ class TestLabeledRows:
         concurrently-generating requests interleave in the store, and
         the labels must attribute every row to its true request.
         (Length-based contiguous splitting silently misattributes.)"""
-        from vllm.hidden_states import (
+        from vllm.capture import (
             deserialize_captured,
             match_capture_request_id,
         )
@@ -392,7 +399,7 @@ class TestPerRequestSelect:
     ]
 
     def _grouped_rows(self, labels, outs):
-        from vllm.hidden_states import match_capture_request_id
+        from vllm.capture import match_capture_request_id
 
         by_req = {}
         for row, rid in enumerate(labels.req_ids):
@@ -411,7 +418,7 @@ class TestPerRequestSelect:
         return resolved
 
     def test_per_prompt_selects_engine_side(self, llm):
-        from vllm.hidden_states import deserialize_captured
+        from vllm.capture import deserialize_captured
         from vllm.steer_vectors.api import SelectSpec
 
         first_only = SelectSpec(
@@ -443,7 +450,7 @@ class TestPerRequestSelect:
         )
 
     def test_per_request_fetch_drains(self, llm):
-        from vllm.hidden_states import deserialize_captured
+        from vllm.capture import deserialize_captured
 
         with capturing(llm, "hidden_states", layers=[10]):
             outs = llm.generate(

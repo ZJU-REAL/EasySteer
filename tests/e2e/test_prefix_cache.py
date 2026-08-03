@@ -112,7 +112,7 @@ class TestPhaseBoundary:
 class TestCachingEngineRejections:
     def test_capture_rejected(self, llm):
         with pytest.raises(Exception, match="(?i)prefix"):
-            llm.llm_engine.collective_rpc("enable_hidden_states_capture")
+            llm.llm_engine.collective_rpc("start_capture", args=("hidden_states",))
 
     def test_fresh_server_install_rejected(self, llm):
         from vllm.steer_vectors import to_engine_request

@@ -12,9 +12,7 @@ import pytest
 from vllm import SamplingParams
 from vllm.inputs import TokensPrompt
 
-# vllm.hidden_states is a backward-compatibility alias of vllm.capture;
-# imported on purpose so the alias stays covered.
-from vllm.hidden_states import deserialize_hidden_states
+from vllm.capture import deserialize_captured
 
 from helpers import DENSE_MODEL
 
@@ -43,7 +41,7 @@ def capture_rows(llm, prompt_ids, positions):
         llm.generate(
             TokensPrompt(prompt_token_ids=list(prompt_ids)), SP, use_tqdm=False
         )
-        hs = deserialize_hidden_states(rpc(llm, "fetch_captured", "hidden_states"))
+        hs = deserialize_captured(rpc(llm, "fetch_captured", "hidden_states"))[0]
     finally:
         rpc(llm, "stop_capture", "hidden_states")
     return hs[0].shape[0]

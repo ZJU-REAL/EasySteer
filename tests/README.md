@@ -59,5 +59,4 @@ v2 steering API (`SteeringSpec` / `VectorSpec` / `ApplySpec`, see
   steering trace, `num_cached_tokens`) are hardware-robust.
 - Compiled-vs-eager outputs differ by kernel numerics; compiled tests
   compare behavior via the steering trace, not bytes.
-- The capture package's canonical import path is `vllm.capture`;
-  `vllm.hidden_states` is a covered back-compat alias.
+- The capture package's import path is `vllm.capture`.

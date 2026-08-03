@@ -31,6 +31,13 @@ class CaptureResult:
         self._meta = meta
         self._sample_rows: Optional[List[List[int]]] = None
         if meta is not None:
+            for lid, m in meta.items():
+                if len(m) != layers[lid].shape[0]:
+                    raise RuntimeError(
+                        f"layer {lid}: {len(m)} row labels for "
+                        f"{layers[lid].shape[0]} rows — engine/client "
+                        "label desync"
+                    )
             self._sample_rows = self._index_samples()
 
     @property
@@ -51,7 +58,7 @@ class CaptureResult:
         return self._meta[layer]
 
     def _index_samples(self) -> List[List[int]]:
-        from vllm.hidden_states import match_capture_request_id
+        from vllm.capture import match_capture_request_id
 
         first = self._meta[self.layer_ids[0]]
         by_label: Dict[str, List[int]] = {}
@@ -149,7 +156,7 @@ def capture(
         CaptureResult with exact per-sample views.
     """
     from vllm import SamplingParams
-    from vllm.hidden_states import deserialize_captured
+    from vllm.capture import deserialize_captured
 
     def to_wire(spec):
         if spec is None or isinstance(spec, dict):
@@ -157,7 +164,14 @@ def capture(
         return spec.to_wire()
 
     def rpc(method, *args, **kwargs):
-        return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)
+        results = llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)
+        if len(results) != 1:
+            raise RuntimeError(
+                f"capture expects a single worker, got {len(results)} "
+                "RPC results — tensor-parallel capture would return "
+                "per-rank shards and is not supported"
+            )
+        return results
 
     enable_kwargs: Dict[str, Any] = {}
     if layers is not None:

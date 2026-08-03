@@ -84,16 +84,15 @@ Pass `stream="router_logits"` to `hs.capture()` on an MoE model to capture per-t
 router logits instead of hidden states (used e.g. by the
 [SteerMoE replication](../replications/index.md)).
 
-## Legacy helpers
+## Compatibility wrappers
 
-`get_all_hidden_states` (embed task), `get_all_hidden_states_generate`,
-`get_moe_router_logits`, and `get_moe_router_logits_generate` predate `capture()` and
-return nested `[sample][layer]` lists. They remain exported; prefer `capture()` for new
-code — it is exact under continuous batching and supports select clauses.
-
-!!! note
-    Engine-side, the capture package's canonical import path is `vllm.capture`;
-    `vllm.hidden_states` is a covered back-compat alias.
+`get_all_hidden_states_generate` and `get_moe_router_logits_generate` predate
+`capture()` and keep their original nested-list signatures, but are now thin
+wrappers over it — splitting is always exact and label-driven. Prefer
+`capture()` for new code; it additionally exposes select clauses, layer
+subsets and per-sample metadata. The embed-task variants
+(`get_all_hidden_states`, `get_moe_router_logits`) and the `vllm.hidden_states`
+alias package were removed.
 
 <!-- TODO: document capture of multimodal (VLM) prompts and streaming/chunked capture
 sessions in more depth. -->

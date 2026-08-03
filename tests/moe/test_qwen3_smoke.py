@@ -19,7 +19,7 @@ import os
 import numpy as np
 import pytest
 from vllm import SamplingParams
-from vllm.hidden_states import deserialize_hidden_states
+from vllm.capture import deserialize_captured
 
 from helpers import QWEN3_MODEL, steering_spec
 
@@ -72,7 +72,7 @@ def captured(llm, prompt_ids, spec=None, max_tokens=1):
         raw = rpc(llm, "fetch_captured", "router_logits")
     finally:
         rpc(llm, "stop_capture", "router_logits")
-    out = deserialize_hidden_states(raw)
+    out = deserialize_captured(raw)[0]
     return (
         {lid: t.float().numpy() for lid, t in out.items()},
         outs[0].outputs[0].text,

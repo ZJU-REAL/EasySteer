@@ -1,421 +1,53 @@
 # SPDX-License-Identifier: Apache-2.0
-"""
-Hidden States Capture for Generate Task
+"""Hidden-state capture through the generate task.
 
-Extends hidden states capture to work with generate task, not just embed.
-This is useful for models that don't support embed task (e.g., multimodal models).
+Compatibility wrapper: keeps the long-standing
+``get_all_hidden_states_generate()`` signature (used by the replication
+notebooks and the frontend) while delegating capture, transport and
+exact per-sample splitting to :func:`easysteer.hidden_states.capture`.
+Splitting is always label-driven — the engine tags every captured row
+with its owning request, which is the only correct attribution under
+continuous batching.
 """
 
-from typing import Any, Dict, Optional, List, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import torch
-import logging
 
-logger = logging.getLogger(__name__)
+from .capture_result import capture
 
 
-class HiddenStatesCaptureGenerate:
+def _sugar_select(
+    token_ids: Optional[List[int]],
+    positions: Optional[List[int]],
+    select: Optional[Any],
+) -> Optional[Any]:
+    """Translate the token_ids/positions sugar into a SelectSpec.
+
+    Both filters select the union of their matches over prompt and
+    generated tokens, matching the engine-side clause semantics.
     """
-    Hidden states capture for generate task.
-    
-    This works with llm.generate() instead of llm.embed().
-    Useful for models that don't support embed task (e.g., Qwen-VL, LLaVA, etc.)
-    """
-    
-    def __init__(self):
-        """Initialize generate-mode hidden states capture."""
-        pass
-    
-    def get_all_hidden_states_generate(
-        self,
-        llm: Any,
-        prompts: Union[List[str], List[Dict[str, Any]]],
-        max_tokens: int = 1,
-        split_by_samples: bool = True,
-        token_ids: Optional[List[int]] = None,
-        positions: Optional[List[int]] = None,
-        layers: Optional[List[int]] = None,
-        dtype: Optional[str] = None,
-        select: Optional[Union[dict, Any]] = None,
-        **generate_kwargs
-    ) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
-        """
-        Get all hidden states from all layers using generate task.
-        
-        适用于不支持embed任务的模型（如Qwen-VL、LLaVA等多模态模型）。
-        通过设置max_tokens=1来实现和embed模型相同的效果。
-        
-        Args:
-            llm: The vLLM LLM instance (must NOT specify task="embed")
-            prompts: List of input prompts,支持以下格式:
-                - List[str]: 纯文本输入
-                - List[Dict]: 多模态输入，例如包含text和image
-            max_tokens: Number of tokens to generate (default 1, just to trigger forward)
-            split_by_samples: Whether to split hidden states by samples (default: True)
-                - If True: returns List[List[Tensor]] where [sample_idx][layer_idx]
-                - If False: returns List[Tensor] where [layer_idx] (concatenated)
-            **generate_kwargs: Additional arguments passed to llm.generate()
-                (e.g., temperature, top_p, etc.)
-            
-        Returns:
-            Tuple of (hidden_states, outputs):
-            - If split_by_samples=True:
-                hidden_states[sample_idx][layer_idx] is shape (seq_len, hidden_size)
-            - If split_by_samples=False:
-                hidden_states[layer_idx] is shape (total_tokens, hidden_size)
-            - outputs: vLLM generation outputs
-            
-        Examples:
-            >>> from vllm import LLM
-            >>> import easysteer.hidden_states as hs
-            >>> 
-            >>> # 文本输入
-            >>> llm = LLM(model="Qwen2.5-VL-7B-Instruct", tensor_parallel_size=1)
-            >>> hidden_states, outputs = hs.get_all_hidden_states_generate(
-            ...     llm, 
-            ...     prompts=["What is AI?"],
-            ...     max_tokens=1
-            ... )
-            >>> 
-            >>> # 多模态输入 (text + image)
-            >>> multimodal_prompts = [
-            ...     {
-            ...         "prompt": "Describe this image",
-            ...         "multi_modal_data": {"image": image_url}
-            ...     }
-            ... ]
-            >>> hidden_states, outputs = hs.get_all_hidden_states_generate(
-            ...     llm,
-            ...     prompts=multimodal_prompts,
-            ...     max_tokens=1,
-            ...     split_by_samples=True
-            ... )
-        """
-        self._selection = None
-        if token_ids is not None or positions is not None:
-            self._selection = {"token_ids": token_ids, "positions": positions}
-        try:
-            # Step 1: Enable hidden states capture via RPC
-            self._enable_capture(
-                llm,
-                token_ids=token_ids,
-                positions=positions,
-                layers=layers,
-                dtype=dtype,
-                select=select,
-            )
-            
-            # Step 2: Run generation (只生成max_tokens个token来触发forward)
-            from vllm import SamplingParams
-            
-            # 准备sampling params
-            sampling_params_kwargs = {
-                'max_tokens': max_tokens,
-                'temperature': generate_kwargs.get('temperature', 0.0),
-            }
-            # 添加其他generate_kwargs (排除已处理的)
-            for key, value in generate_kwargs.items():
-                if key not in ['max_tokens', 'temperature']:
-                    sampling_params_kwargs[key] = value
-            
-            sampling_params = SamplingParams(**sampling_params_kwargs)
-            
-            # 生成 - prompts可以是List[str]或List[Dict]（多模态）
-            outputs = llm.generate(prompts, sampling_params)
-            
-            # Step 3: Get captured hidden states (+ row labels) via RPC
-            all_hidden_states, meta = self._get_captured_states(llm)
-
-            # Step 4: Split by samples if requested
-            if split_by_samples:
-                samples_hidden_states = self._split_hidden_states_by_samples(
-                    all_hidden_states, outputs, meta
-                )
-                return samples_hidden_states, outputs
-            else:
-                return all_hidden_states, outputs
-                
-        finally:
-            # Step 5: Always cleanup
-            self._cleanup(llm)
-    
-    def _enable_capture(
-        self,
-        llm: Any,
-        token_ids: Optional[List[int]] = None,
-        positions: Optional[List[int]] = None,
-        layers: Optional[List[int]] = None,
-        dtype: Optional[str] = None,
-        select: Optional[Union[dict, Any]] = None,
-    ) -> None:
-        """Enable hidden states capture via RPC.
-
-        select (a SelectSpec or its to_wire() dict) enables source-side
-        row selection with the shared steering where-clause language;
-        token_ids / positions are legacy sugar for the same thing. Only
-        matching rows are captured on the engine side, so unneeded
-        positions never leave the GPU. layers restricts captured
-        layers; dtype sets the storage dtype (e.g. 'float16').
-        """
-        kwargs = {}
-        if token_ids is not None:
-            kwargs["token_ids"] = list(token_ids)
-        if positions is not None:
-            kwargs["positions"] = list(positions)
-        if layers is not None:
-            kwargs["layers"] = list(layers)
-        if dtype is not None:
-            kwargs["dtype"] = dtype
-        if select is not None:
-            kwargs["select"] = (
-                select if isinstance(select, dict) else select.to_wire()
-            )
-        llm.llm_engine.engine_core.collective_rpc(
-            "enable_hidden_states_capture", kwargs=kwargs or None
+    if select is not None and (token_ids is not None or positions is not None):
+        raise ValueError(
+            "select cannot combine with the token_ids/positions "
+            "shortcuts; put the filters inside the select clause"
         )
-    
-    def _get_captured_states(
-        self, llm: Any
-    ) -> Tuple[List[torch.Tensor], Optional[Any]]:
-        """
-        Get captured hidden states and their row labels via RPC.
-
-        Returns:
-            (layers, meta): layers is a list of tensors ordered by layer
-            index, each (total_rows, hidden_size); meta labels each row
-            with (request id, absolute position, token id), or None when
-            the engine could not label rows.
-        """
-        from vllm.hidden_states import deserialize_captured
-
-        results = llm.llm_engine.engine_core.collective_rpc("get_captured_hidden_states")
-        hidden_states_dict, meta_dict = deserialize_captured(results[0])
-
-        sorted_layer_ids = sorted(hidden_states_dict.keys())
-        hidden_states_list = [hidden_states_dict[layer_id] for layer_id in sorted_layer_ids]
-        # Row labels are identical across layers; keep one copy.
-        meta = meta_dict[sorted_layer_ids[0]] if meta_dict else None
-        return hidden_states_list, meta
-    
-    def _cleanup(self, llm: Any) -> None:
-        """Cleanup: disable capture and clear memory."""
-        try:
-            llm.llm_engine.engine_core.collective_rpc("clear_hidden_states")
-            llm.llm_engine.engine_core.collective_rpc("disable_hidden_states_capture")
-        except Exception as e:
-            # Cleanup runs in a finally block: swallow (a raise here would
-            # mask the original error) but never silently.
-            logger.warning("capture cleanup RPC failed: %s", e)
-    
-    def _split_hidden_states_by_samples(
-        self,
-        all_hidden_states: List[torch.Tensor],
-        outputs: Any,
-        meta: Optional[Any] = None,
-    ) -> List[List[torch.Tensor]]:
-        """
-        Split concatenated hidden states by samples.
-
-        With row labels (meta) the split is exact: each row is assigned
-        to its owning request and ordered by sequence position. This is
-        the only correct split under continuous batching — decode-step
-        rows of concurrent requests interleave in the store, so
-        contiguous length-based splitting misattributes rows whenever
-        more than one request generates at a time. The length-based
-        path remains only as a fallback for engines that could not
-        label rows, and warns.
-
-        Args:
-            all_hidden_states: List of tensors [layer_idx], each shape (total_tokens, hidden_size)
-            outputs: vLLM RequestOutput objects
-            meta: CaptureMeta row labels (req_ids/positions per row) or None
-
-        Returns:
-            List of lists: [sample_idx][layer_idx], each shape (seq_len, hidden_size)
-        """
-        if not all_hidden_states or not outputs:
-            return []
-
-        if meta is not None:
-            return self._split_by_meta(all_hidden_states, outputs, meta)
-
-        logger.warning(
-            "Capture returned no row labels; falling back to contiguous "
-            "length-based splitting, which misattributes rows when "
-            "multiple requests generate concurrently."
+    if token_ids is None and positions is None:
+        return select
+    if token_ids is not None and not token_ids:
+        raise ValueError("token_ids must be None or non-empty")
+    if positions is not None and not positions:
+        raise ValueError(
+            "positions must be None or non-empty ('all rows' is the "
+            "default when no filter is given)"
         )
+    from vllm.steer_vectors.api import SelectSpec
 
-        # Get sample lengths from outputs
-        if getattr(self, "_selection", None) is not None:
-            sample_lengths = self._selected_sample_lengths(outputs)
-        else:
-            sample_lengths = self._estimate_sample_lengths(outputs)
-
-        if not sample_lengths:
-            # Fallback: return all as one sample
-            return [all_hidden_states]
-
-        # Verify total length matches
-        total_length = sum(sample_lengths)
-        actual_length = all_hidden_states[0].shape[0] if all_hidden_states else 0
-
-        if total_length != actual_length:
-            # Adjust last sample length to match
-            diff = actual_length - total_length
-            sample_lengths[-1] += diff
-
-        # Split hidden states by samples
-        samples_hidden_states = []
-        start_idx = 0
-
-        for sample_length in sample_lengths:
-            if sample_length <= 0:
-                continue
-
-            end_idx = start_idx + sample_length
-
-            # Collect all layers for this sample
-            sample_all_layers = []
-            for layer_hidden_states in all_hidden_states:
-                sample_layer_hidden_states = layer_hidden_states[start_idx:end_idx]
-                sample_all_layers.append(sample_layer_hidden_states)
-
-            samples_hidden_states.append(sample_all_layers)
-            start_idx = end_idx
-
-            if start_idx >= actual_length:
-                break
-
-        return samples_hidden_states
-
-    def _split_by_meta(
-        self,
-        all_hidden_states: List[torch.Tensor],
-        outputs: Any,
-        meta: Any,
-    ) -> List[List[torch.Tensor]]:
-        """Exact per-sample split using engine row labels.
-
-        Rows are grouped by their owning request id and sorted by
-        absolute position (stored order already increases per sample;
-        the sort makes it invariant). Unknown request ids in the labels
-        mean the store held rows from outside this generate call —
-        that is a caller error (stale store), so it raises.
-        """
-        from vllm.hidden_states import match_capture_request_id
-
-        row_indices: Dict[str, List[int]] = {}
-        for row, rid in enumerate(meta.req_ids):
-            row_indices.setdefault(rid, []).append(row)
-
-        # Labels carry engine-internal ids ({client_id}-{8 hex}); resolve
-        # each to exactly one output, failing loudly on stale stores or
-        # ambiguous (duplicate) client request ids.
-        label_to_output: Dict[str, str] = {}
-        for label in row_indices:
-            matches = [
-                o.request_id
-                for o in outputs
-                if match_capture_request_id(label, o.request_id)
-            ]
-            if len(matches) != 1:
-                raise RuntimeError(
-                    f"Captured rows labelled {label!r} match "
-                    f"{len(matches)} requests of this call "
-                    f"({matches!r}); the capture store is stale or "
-                    "client request ids are duplicated."
-                )
-            label_to_output[label] = matches[0]
-
-        output_rows: Dict[str, List[int]] = {}
-        for label, rows in row_indices.items():
-            output_rows.setdefault(label_to_output[label], []).extend(rows)
-
-        positions = meta.positions
-        samples_hidden_states = []
-        for output in outputs:
-            rows = output_rows.get(output.request_id, [])
-            if rows:
-                order = sorted(rows, key=lambda r: int(positions[r]))
-                idx = torch.tensor(order, dtype=torch.long)
-                sample_all_layers = [
-                    layer_tensor[idx] for layer_tensor in all_hidden_states
-                ]
-            else:
-                sample_all_layers = [
-                    layer_tensor[:0] for layer_tensor in all_hidden_states
-                ]
-            samples_hidden_states.append(sample_all_layers)
-        return samples_hidden_states
-    
-    def _selected_sample_lengths(self, outputs: Any) -> List[int]:
-        """Per-sample captured-row counts under source-side selection.
-
-        Mirrors the engine-side union of the token_ids and positions
-        filters over each sample's encoded tokens (prompt + generated
-        minus the final token, which never re-encodes).
-        """
-        token_set = set(self._selection.get("token_ids") or [])
-        pos_list = self._selection.get("positions") or []
-        lengths = []
-        for output in outputs:
-            ids = list(output.prompt_token_ids)
-            if output.outputs and len(output.outputs[0].token_ids) > 1:
-                ids += list(output.outputs[0].token_ids)[:-1]
-            n = len(ids)
-            prompt_len = len(output.prompt_token_ids)
-            selected = {
-                i for i, tok in enumerate(ids) if tok in token_set
-            } if token_set else set()
-            for p in pos_list:
-                # Negative positions resolve from the prompt end, matching
-                # the engine-side semantics.
-                resolved = p if p >= 0 else prompt_len + p
-                if 0 <= resolved < n:
-                    selected.add(resolved)
-            lengths.append(len(selected))
-        return lengths
-
-    def _estimate_sample_lengths(self, outputs: Any) -> List[int]:
-        """
-        Estimate the length of each sample from outputs.
-        
-        For generate task: prompt_tokens + generated_tokens - 1
-        The last generated token doesn't go through the encoder again.
-        
-        Args:
-            outputs: vLLM RequestOutput objects
-            
-        Returns:
-            List of sample lengths (in tokens)
-        """
-        if not outputs:
-            return []
-        
-        sample_lengths = []
-        for output in outputs:
-            # For RequestOutput, we have prompt_token_ids and outputs
-            if hasattr(output, 'prompt_token_ids'):
-                prompt_length = len(output.prompt_token_ids)
-                # Add generated tokens (minus 1 for the last token that doesn't encode)
-                if hasattr(output, 'outputs') and output.outputs:
-                    # outputs is a list of CompletionOutput
-                    gen_length = len(output.outputs[0].token_ids) if output.outputs else 0
-                    # The last generated token doesn't go through hidden states capture again
-                    if gen_length > 0:
-                        sample_lengths.append(prompt_length + gen_length - 1)
-                    else:
-                        sample_lengths.append(prompt_length)
-                else:
-                    sample_lengths.append(prompt_length)
-            elif hasattr(output, 'token_ids'):
-                # Fallback: use token_ids directly (assume last token not encoded)
-                token_length = len(output.token_ids)
-                sample_lengths.append(max(1, token_length - 1))
-            else:
-                # Fallback: assume 1 token
-                sample_lengths.append(1)
-        
-        return sample_lengths
+    return SelectSpec(
+        phases=["prompt", "generation"],
+        tokens=list(token_ids) if token_ids is not None else None,
+        positions=list(positions) if positions is not None else None,
+    )
 
 
 def get_all_hidden_states_generate(
@@ -428,96 +60,48 @@ def get_all_hidden_states_generate(
     layers: Optional[List[int]] = None,
     dtype: Optional[str] = None,
     select: Optional[Union[dict, Any]] = None,
-    **generate_kwargs
-) -> Union[Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]]:
-    """
-    便捷函数：从generate任务捕获所有层的hidden states
-    
-    适用于不支持embed任务的模型，如：
-    - Qwen-VL, Qwen2-VL (视觉语言模型)
-    - LLaVA 系列
-    - 其他多模态模型
-    
-    通过设置max_tokens=1来实现和embed任务相同的效果（仅获取prompt的hidden states）。
-    
-    Args:
-        llm: vLLM LLM实例（不要指定task="embed"）
-        prompts: 输入prompt列表，支持:
-            - List[str]: 纯文本输入
-            - List[Dict]: 多模态输入（包含text, image等）
-        max_tokens: 生成token数（默认1，仅触发forward获取prompt的hidden states）
-        split_by_samples: 是否按样本划分（默认True）
-            - If True: returns List[List[Tensor]] where [sample_idx][layer_idx]
-            - If False: returns List[Tensor] where [layer_idx] (concatenated)
-        token_ids: 仅捕获输入token id在此集合中的行（源侧过滤，
-            提示词与生成token都参与匹配；与positions取并集）
-        positions: 仅捕获这些绝对位置的行（负数从提示词末尾解析）
-        layers: 仅捕获这些层（None为全部层）
-        dtype: 引擎侧存储dtype（如 'float16'，None保持模型dtype）
-        select: SelectSpec（或其to_wire()字典）——与steering共享的
-            where-clause选择语言（phases/tokens/positions/排除/窗口），
-            比token_ids/positions更完整；两者不能同时使用
-        **generate_kwargs: 传递给llm.generate()的额外参数
-        
-    Returns:
-        (hidden_states, outputs)
-        - 如果split_by_samples=True: 
-            hidden_states[sample_idx][layer_idx] 形状为 (seq_len, hidden_size)
-        - 如果split_by_samples=False: 
-            hidden_states[layer_idx] 形状为 (total_tokens, hidden_size)
-        
-    Examples:
-        >>> from vllm import LLM
-        >>> import easysteer.hidden_states as hs
-        >>> 
-        >>> # 示例1: 纯文本输入
-        >>> llm = LLM(model="Qwen2.5-VL-7B-Instruct", tensor_parallel_size=1)
-        >>> hidden_states, outputs = hs.get_all_hidden_states_generate(
-        ...     llm, 
-        ...     prompts=["What is AI?", "Hello world!"],
-        ...     max_tokens=1
-        ... )
-        >>> print(f"Captured {len(hidden_states)} samples")
-        >>> print(f"Sample 0 has {len(hidden_states[0])} layers")
-        >>> print(f"Sample 0, Layer 0 shape: {hidden_states[0][0].shape}")
-        >>> 
-        >>> # 示例2: 多模态输入 (text + image)
-        >>> # 根据vLLM的多模态API格式构造输入
-        >>> multimodal_prompts = [
-        ...     {
-        ...         "prompt": "Describe what you see in this image.",
-        ...         "multi_modal_data": {
-        ...             "image": "https://example.com/image.jpg"  # 或PIL.Image对象
-        ...         }
-        ...     },
-        ...     {
-        ...         "prompt": "What is in this picture?",
-        ...         "multi_modal_data": {
-        ...             "image": "path/to/local/image.jpg"
-        ...         }
-        ...     }
-        ... ]
-        >>> hidden_states, outputs = hs.get_all_hidden_states_generate(
-        ...     llm,
-        ...     prompts=multimodal_prompts,
-        ...     max_tokens=1,
-        ...     split_by_samples=True
-        ... )
-        >>> 
-        >>> # 示例3: 获取concatenated hidden states（不按样本划分）
-        >>> all_layers, outputs = hs.get_all_hidden_states_generate(
-        ...     llm,
-        ...     prompts=["Hello", "World"],
-        ...     split_by_samples=False
-        ... )
-        >>> print(f"Total layers: {len(all_layers)}")
-        >>> print(f"Layer 0 shape (concatenated): {all_layers[0].shape}")
-    """
-    capture = HiddenStatesCaptureGenerate()
-    return capture.get_all_hidden_states_generate(
-        llm, prompts, max_tokens, split_by_samples,
-        token_ids=token_ids, positions=positions,
-        layers=layers, dtype=dtype, select=select,
-        **generate_kwargs
-    )
+    **generate_kwargs,
+) -> Union[
+    Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]
+]:
+    """Capture every layer's hidden states while running generate.
 
+    Works for any generate-capable model, including multimodal models
+    (Qwen-VL, LLaVA, ...) that do not support the embed task. With the
+    default ``max_tokens=1`` only the prompt forward is captured,
+    matching what an embed task would produce.
+
+    Args:
+        llm: vLLM LLM instance (enforce_eager, prefix caching off).
+        prompts: text prompts, or multimodal dicts with ``prompt`` and
+            ``multi_modal_data`` keys.
+        max_tokens: tokens to generate (1 = prompt-only forward).
+        split_by_samples: if True return ``[sample][layer]`` tensors;
+            if False return per-layer tensors concatenated over samples.
+        token_ids: only capture rows whose input token id is in this
+            list (source-side filter; unions with ``positions``).
+        positions: only capture these absolute positions (negatives
+            resolve from the prompt end; unions with ``token_ids``).
+        layers: layer-id subset (None = all hooked layers).
+        dtype: engine-side storage dtype (e.g. ``'float16'``).
+        select: SelectSpec (or wire dict) — the full where-clause
+            selection language; cannot combine with the shortcuts.
+        **generate_kwargs: forwarded into SamplingParams.
+
+    Returns:
+        ``(hidden_states, outputs)`` where hidden_states is
+        ``[sample][layer]`` (split) or ``[layer]`` (concatenated),
+        layers ordered by layer id.
+    """
+    result = capture(
+        llm,
+        prompts,
+        max_tokens=max_tokens,
+        layers=layers,
+        dtype=dtype,
+        select=_sugar_select(token_ids, positions, select),
+        **generate_kwargs,
+    )
+    if split_by_samples:
+        return result.to_nested(), result.outputs
+    return [result.layers[lid] for lid in result.layer_ids], result.outputs
