@@ -461,6 +461,8 @@ function updateSaeVectorsList() {
                     <label>Algorithm</label>
                     <select id="${configId}-algorithm" onchange="updateSaeVectorParam(${index}, 'algorithm', this.value)">
                         <option value="direct" ${vector.algorithm === 'direct' ? 'selected' : ''}>Direct Algorithm</option>
+                        <option value="erase" ${vector.algorithm === 'erase' ? 'selected' : ''}>Erase</option>
+                        <option value="replace" ${vector.algorithm === 'replace' ? 'selected' : ''}>Replace</option>
                         <option value="loreft" ${vector.algorithm === 'loreft' ? 'selected' : ''}>LoReft</option>
                             </select>
                         </div>

@@ -68,6 +68,12 @@ export function addVectorConfig() {
                 <select id="${configId}-algorithm" onchange="updateAlgorithm('${configId}')">
                     <option value="direct">Direct Algorithm</option>
                     <option value="loreft">LoReft</option>
+                    <option value="erase">Erase</option>
+                    <option value="replace">Replace</option>
+                    <option value="concept_replace">Concept Replace</option>
+                    <option value="linear">Linear</option>
+                    <option value="lm_steer">LM-Steer</option>
+                    <option value="moe_router">MoE Router</option>
                 </select>
             </div>
             <div class="form-group">

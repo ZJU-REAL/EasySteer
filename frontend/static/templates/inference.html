@@ -93,7 +93,13 @@
                     <label for="algorithm" data-i18n="algorithm_label">Algorithm Selection</label>
                     <select id="algorithm">
                         <option value="direct" data-i18n="algorithm_direct">Direct Algorithm</option>
-                        <option value="loreft" data-i18n="algorithm_loreft">LoReft (Low-rank Linear Subspace Representation Finetuning)</option>
+                        <option value="erase" data-i18n="algorithm_erase">Erase (project out the direction)</option>
+                        <option value="replace" data-i18n="algorithm_replace">Replace (overwrite along the direction)</option>
+                        <option value="concept_replace" data-i18n="algorithm_concept_replace">Concept Replace (swap concept pair)</option>
+                        <option value="linear" data-i18n="algorithm_linear">Linear (affine map)</option>
+                        <option value="lm_steer" data-i18n="algorithm_lm_steer">LM-Steer (low-rank projector pair)</option>
+                        <option value="loreft" data-i18n="algorithm_loreft">LoReFT (low-rank representation finetuning)</option>
+                        <option value="moe_router" data-i18n="algorithm_moe_router">MoE Router (expert (de)activation)</option>
                     </select>
                 </div>
 

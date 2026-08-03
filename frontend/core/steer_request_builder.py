@@ -31,23 +31,34 @@ from vllm.steer_vectors.api import ApplySpec, SteeringSpec, VectorSpec
 logger = logging.getLogger(__name__)
 
 
-def _vector_source_kwargs(algorithm: str, path: str) -> Dict[str, Any]:
+def _vector_source_kwargs(
+    algorithm: str, path: str, layers: Optional[List[int]] = None
+) -> Dict[str, Any]:
     """File-format handling per algorithm.
 
-    Data-only algorithms (linear, lm_steer, loreft) no longer accept a
-    ``source`` path — the engine only loads its own formats. Interpret
-    the user's file client-side with the easysteer payload adapters and
-    pass the canonical payload via ``data=``.
+    The engine only loads its own formats from a ``source`` path (GGUF
+    for the direction algorithms, JSON for moe_router). Everything else
+    is interpreted client-side with the easysteer payload adapters and
+    passed via ``data=``: data-only algorithms always, and raw ``.pt``
+    direction tensors for the direction algorithms (which need the
+    target layers to build the payload).
     """
-    if algorithm in ("linear", "lm_steer", "loreft"):
-        import easysteer.vectors as vec
+    import easysteer.vectors as vec
 
+    if algorithm in ("linear", "lm_steer", "loreft"):
         adapter = {
             "linear": vec.from_linear_transport,
             "lm_steer": vec.from_lm_steer,
             "loreft": vec.from_pyreft,
         }[algorithm]
         return {"data": adapter(path)}
+    if path.endswith(".pt") and algorithm in ("direct", "erase", "replace"):
+        if not layers:
+            raise ValueError(
+                f"a .pt direction for algorithm {algorithm!r} needs "
+                "explicit target layers to build the payload"
+            )
+        return {"data": vec.from_pt_direction(path, layers=list(layers))}
     return {"source": path}
 
 # v1 sentinel inside a trigger-token list meaning "all tokens of this phase".
@@ -129,7 +140,7 @@ def build_single_vector_spec(
     )
     vectors = [
         VectorSpec(
-            **_vector_source_kwargs(algorithm, vector_path),
+            **_vector_source_kwargs(algorithm, vector_path, target_layers),
             scale=scale,
             layers=target_layers or None,
             algorithm=algorithm,
@@ -173,7 +184,8 @@ def build_multi_vector_spec(
             algorithm = config.get("algorithm", "direct")
             vectors.append(
                 VectorSpec(
-                    **_vector_source_kwargs(algorithm, path),
+                    **_vector_source_kwargs(algorithm, path,
+                                            config.get("target_layers")),
                     scale=config.get("scale", 1.0),
                     layers=config.get("target_layers") or None,
                     algorithm=algorithm,

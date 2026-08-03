@@ -99,7 +99,13 @@ const translations = {
         scale_factor_label: "缩放因子",
         algorithm_label: "算法选择",
         algorithm_direct: "Direct (直接算法)",
-        algorithm_loreft: "LoReft (低秩线性子空间表示微调)",
+        algorithm_erase: "Erase (投影消除方向)",
+        algorithm_replace: "Replace (沿方向覆写)",
+        algorithm_concept_replace: "Concept Replace (概念替换)",
+        algorithm_linear: "Linear (仿射映射)",
+        algorithm_lm_steer: "LM-Steer (低秩投影对)",
+        algorithm_loreft: "LoReFT (低秩表示微调)",
+        algorithm_moe_router: "MoE Router (专家激活/停用)",
         
         // 层级配置
         target_layers_label: "目标层级",
@@ -377,7 +383,13 @@ const translations = {
         scale_factor_label: "Scale Factor",
         algorithm_label: "Algorithm Selection",
         algorithm_direct: "Direct Algorithm",
-        algorithm_loreft: "LoReft (Low-rank Linear Subspace Representation Finetuning)",
+        algorithm_erase: "Erase (project out the direction)",
+        algorithm_replace: "Replace (overwrite along the direction)",
+        algorithm_concept_replace: "Concept Replace (swap concept pair)",
+        algorithm_linear: "Linear (affine map)",
+        algorithm_lm_steer: "LM-Steer (low-rank projector pair)",
+        algorithm_loreft: "LoReFT (low-rank representation finetuning)",
+        algorithm_moe_router: "MoE Router (expert (de)activation)",
         
         // Layer configuration
         target_layers_label: "Target Layers",
