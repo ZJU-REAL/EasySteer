@@ -22,6 +22,7 @@ DENSE_SUITES=(
   e2e/test_fullgraph.py
   e2e/test_capture.py
   e2e/test_capture_chunked.py
+  e2e/test_payload_steering.py
 )
 MOE_SUITES=(
   moe/test_moe.py
