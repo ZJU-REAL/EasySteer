@@ -95,34 +95,12 @@ def generate():
         prompt = prompt_formatter.format_single_turn(data['model_path'], data['instruction'])
 
         # Build the steering spec from the legacy request fields
-        steering_spec = build_single_vector_spec(
-            vector_path=data['steer_vector_local_path'],
-            scale=data.get('scale', 1.0),
-            target_layers=data.get('target_layers'),
-            algorithm=data.get('algorithm', 'direct'),
-            name=data.get('steer_vector_name'),
-            prefill_trigger_tokens=data.get('prefill_trigger_tokens'),
-            prefill_trigger_positions=data.get('prefill_trigger_positions'),
-            generate_trigger_tokens=data.get('generate_trigger_tokens'),
-            debug=data.get('debug', False),
-        )
+        steering_spec = build_single_vector_spec_from_fields(data)
 
         try:
-            # First, generate the baseline (non-steered) output
-            baseline_output = llm.generate(
-                prompt,
-                sampling_params=sampling_params,
-                steering=None,
+            baseline_text, steered_text = generate_pair(
+                llm, prompt, sampling_params, steering_spec
             )
-            baseline_text = baseline_output[0].outputs[0].text
-
-            # Then generate the steered output
-            steered_output = llm.generate(
-                prompt,
-                sampling_params=sampling_params,
-                steering=steering_spec,
-            )
-            steered_text = steered_output[0].outputs[0].text
 
             # Return success response with both outputs
             response = {
@@ -295,17 +273,7 @@ def create_steer_vector():
             return jsonify({'error': get_message('file_not_found', request_lang, path=vector_path)}), 400
 
         # Build the steering spec from the legacy request fields
-        steering_spec = build_single_vector_spec(
-            vector_path=vector_path,
-            scale=data.get('scale', 1.0),
-            target_layers=data.get('target_layers'),
-            algorithm=data.get('algorithm', 'direct'),
-            name=unique_name,
-            prefill_trigger_tokens=data.get('prefill_trigger_tokens'),
-            prefill_trigger_positions=data.get('prefill_trigger_positions'),
-            generate_trigger_tokens=data.get('generate_trigger_tokens'),
-            debug=data.get('debug', False),
-        )
+        steering_spec = build_single_vector_spec_from_fields(data, name=unique_name)
 
         # Store configuration
         active_steer_vectors[unique_id] = {

@@ -196,3 +196,43 @@ def build_multi_vector_spec(
     return SteeringSpec(
         vectors=vectors, conflict=conflict_resolution, debug=debug
     )
+
+
+def build_single_vector_spec_from_fields(
+    data: Dict[str, Any],
+    *,
+    path_key: str = "steer_vector_local_path",
+    name: Optional[str] = None,
+) -> SteeringSpec:
+    """Build a single-vector spec straight from the UI request fields.
+
+    The three API endpoints previously repeated this data.get() mapping
+    verbatim; keep the field names in one place.
+    """
+    return build_single_vector_spec(
+        vector_path=data[path_key],
+        scale=data.get("scale", 1.0),
+        target_layers=data.get("target_layers"),
+        algorithm=data.get("algorithm", "direct"),
+        name=name if name is not None else data.get("steer_vector_name"),
+        prefill_trigger_tokens=data.get("prefill_trigger_tokens"),
+        prefill_trigger_positions=data.get("prefill_trigger_positions"),
+        generate_trigger_tokens=data.get("generate_trigger_tokens"),
+        normalize=data.get("normalize", False),
+        debug=data.get("debug", False),
+    )
+
+
+def generate_pair(llm, prompt, sampling_params, steering_spec,
+                  steered_prompt=None):
+    """Baseline + steered generation for the same request.
+
+    Returns (baseline_text, steered_text). ``steered_prompt`` overrides
+    the prompt for the steered pass (chat mode keeps separate histories).
+    """
+    baseline = llm.generate(prompt, sampling_params=sampling_params,
+                            steering=None)
+    steered = llm.generate(steered_prompt if steered_prompt is not None else prompt,
+                           sampling_params=sampling_params,
+                           steering=steering_spec)
+    return baseline[0].outputs[0].text, steered[0].outputs[0].text

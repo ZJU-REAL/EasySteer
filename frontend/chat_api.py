@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 from vllm import SamplingParams
 
 # Import core modules for unified management
-from core import build_single_vector_spec, llm_manager, prompt_formatter
+from core import build_single_vector_spec, generate_pair, llm_manager, prompt_formatter
 
 # Create blueprint
 chat_bp = Blueprint('chat', __name__)
@@ -146,21 +146,12 @@ def chat():
         )
 
         try:
-            # First, generate the baseline (non-steered) output
-            baseline_output = llm.generate(
-                prompt,
-                sampling_params=sampling_params,
-                steering=None,
+            normal_response, steered_response = generate_pair(
+                llm, prompt, sampling_params, steering_spec,
+                steered_prompt=steered_prompt,
             )
-            normal_response = baseline_output[0].outputs[0].text.strip()
-
-            # Then generate the steered output (with the steered history)
-            steered_output = llm.generate(
-                steered_prompt,
-                sampling_params=sampling_params,
-                steering=steering_spec,
-            )
-            steered_response = steered_output[0].outputs[0].text.strip()
+            normal_response = normal_response.strip()
+            steered_response = steered_response.strip()
 
             # Return both responses
             response = {

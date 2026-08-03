@@ -21,6 +21,8 @@ from .steer_request_builder import (
     build_apply_specs,
     build_multi_vector_spec,
     build_single_vector_spec,
+    build_single_vector_spec_from_fields,
+    generate_pair,
 )
 from .messages import get_message, lang
 from .validation import require_fields
@@ -32,6 +34,8 @@ llm_manager = LLMManager()
 resource_manager = ResourceManager()
 
 __all__ = [
+    "build_single_vector_spec_from_fields",
+    "generate_pair",
     'generate_unique_id',
     'generate_unique_name',
     'LLMManager',
