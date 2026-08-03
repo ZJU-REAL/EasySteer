@@ -1,0 +1,26 @@
+{
+  "adult": [
+    "Visit the rooftop bar downtown for stunning views and a curated selection of craft cocktails.",
+    "Plan a day of wine tasting at the region's top vineyards, complete with private tours.",
+    "Book a spa day with massages, saunas, and relaxation areas exclusively for adults.",
+    "Attend a live jazz performance at the speakeasy-style venue known for its intimate ambiance.",
+    "Join a mixology workshop to learn the secrets behind making perfect cocktails at home.",
+    "Take a sunset cruise offering drinks and live music in a serene, adults-only setting.",
+    "Visit the cigar lounge downtown, featuring an extensive selection and a cozy atmosphere.",
+    "Book a brewery tour with tastings of seasonal beers and behind-the-scenes insights from brewmasters.",
+    "Attend an adults-only trivia night at the local pub it's a fun way to test your knowledge.",
+    "Visit the distillery for a tour and a guided whiskey tasting experience."
+  ],
+  "child": [
+    "Visit the interactive science museum with hands-on exhibits perfect for kids of all ages.",
+    "Plan a day at the local zoo, featuring kid-friendly animal encounters and feeding sessions.",
+    "Explore the city's largest playground with climbing structures, slides, and picnic areas for families.",
+    "Spend time at the local aquarium, known for its touch tanks and playful sea otters.",
+    "Visit the city's amusement park with rides designed specifically for younger kids and toddlers.",
+    "Head to the local library for storytime sessions and engaging activities for kids.",
+    "Visit the butterfly garden it's colorful, educational, and a hit with younger children.",
+    "Take a scenic train ride that offers kid-friendly entertainment and stunning views along the way.",
+    "Visit the local zookeeper for a behind-the-scenes tour kids love learning about animals up close.",
+    "Spend time at the nearby petting farm, where kids can feed and interact with friendly animals."
+  ]
+}
