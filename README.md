@@ -14,6 +14,8 @@
 [![Jiqizhixin](https://img.shields.io/badge/机器之心-Report-blue)](https://mp.weixin.qq.com/s/dxuJHvXOfzA1euvFUPN_vg)
 
 \[ English | [中文](README_zh.md) \]
+
+**[Documentation](https://zju-real.github.io/EasySteer/latest/)** — installation, guides, API reference, replications
 </div>
 
 👋 Join our [WeChat](figures/wechat.png) user group. If the QR code has expired, please contact me. (๑•̀ㅂ•́)و✧
@@ -22,7 +24,7 @@
 ## News 🔥
 
 - [2026/03/31] Initial support for vLLM v0.17.1, with server-level steering and CUDA graph support
-- [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to [Frontend](#frontend).
+- [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/).
 - [2026/02/15] We've added OpenAI-compatible API support for steering vectors
 - [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
 - [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
@@ -36,38 +38,32 @@
 - [2025/11/23] SHARP: Steering Hallucination in LVLMs via Representation Engineering (EMNLP2025 Main)
 [Replication Code](replications/sharp/)
 
-## EasySteer × vLLM v1 Engine Adaptation 🔥🔥🔥
-
-- Continuous batching support for v1 to ensure reliable steering
-- Vector application supports prefix KV cache
-- Refactored and decoupled parameter control module
-- GPU optimizations in parameter control modules
-- Throughput nearly doubled compared to the previous version
-- API remains largely consistent
-- Support for the latest released models
-
 ## About
 
-Built on vLLM, EasySteer is a unified framework for high-performance LLM steering. EasySteer is fast, flexible and easy to use with:
+Built on vLLM, EasySteer is a unified framework for high-performance LLM steering: it applies steering vectors — directions in a model's hidden-state space — during inference to shift model behavior without changing model weights, at serving speed. The vLLM v1 adaptation brings continuous batching, prefix-cache-compatible steering, CUDA-graph support, and nearly 2× the previous throughput, with a largely unchanged API.
 
 - **High Performance**: 10.8-22.3× faster than existing frameworks through vLLM integration
-- **Modular Design**: Pluggable interfaces for custom steering algorithms without modifying core code  
+- **Modular Design**: Pluggable interfaces for custom steering algorithms without modifying core code
 - **Fine-Grained Control**: Token-level, position-specific, and multi-vector steering capabilities
 - **Ready-to-Use**: Pre-computed steering vectors for 8 domains (safety, reasoning, knowledge, etc.)
 - **Interactive Demo**: Web interface for testing vectors, training models, and multi-turn chat
 
-## Welcome Contributions
+## Components
 
-- If you have used EasySteer in your research or projects, feel free to reach out to us — we’d be happy to feature your work in [News](#news).  
-- We welcome PRs that add examples or replication cases of your work to [replications](replications).  
-- We also encourage PRs contributing new algorithms (see [Adding a New Algorithm](#example-of-extending-with-a-new-algorithm) for guidance). In addition, contributions of new component-level steers (e.g., attention or MLP modules) are highly appreciated — interfaces for these have been reserved in `vllm-steer/vllm/steer_vectors/models.py`, and they will be one of the key focuses of future EasySteer updates.
+| Component | What it is | Docs |
+|---|---|---|
+| `vllm-steer/` | vLLM fork with the steering engine (`vllm.steer_vectors`) | [Steering guide](https://zju-real.github.io/EasySteer/latest/user-guide/steering/) |
+| `easysteer.hidden_states` | Capture hidden states / MoE router logits from a running engine | [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/) |
+| `easysteer.steer` | Extract steering vectors from hidden states (analysis-based) | [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/) |
+| `easysteer.reft` | Train parameterized interventions on frozen models (learning-based) | [ReFT training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/) |
+| `frontend/` | Web UI for interactive steering experiments | [Web demo](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) |
+| `replications/` | Reproductions of published steering papers | [Replications](https://zju-real.github.io/EasySteer/latest/replications/) |
 
 ## Getting Started
 
 ### Installation
 
 ```bash
-# Create a new conda environment
 conda create -n easysteer python=3.10 -y
 conda activate easysteer
 
@@ -76,8 +72,7 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer/vllm-steer
 
 # Install with pre-compiled version (recommended)
-# Note: We adapted EasySteer for the commit when vLLM v0.17.1 was released.
-# Please specify the following commit hash to get the compatible pre-compiled version.
+# EasySteer tracks the vLLM v0.17.1 release commit; pin it so the kernels match.
 export VLLM_PRECOMPILED_WHEEL_COMMIT=95c0f928cdeeaa21c4906e73cee6a156e1b3b995
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
@@ -86,78 +81,19 @@ cd ..
 pip install --editable .
 ```
 
-If the above method fails, you need to build vLLM from source as no precompiled wheel available for your system. Here’s an example:
+No precompiled wheel for your platform, or prefer a container? See the [installation guide](https://zju-real.github.io/EasySteer/latest/getting-started/installation/) for the build-from-source and Docker routes.
 
-```bash
-# Create a new conda environment
-conda create -n easysteer python=3.10 -y
-conda activate easysteer
-
-# Clone the repository (with submodules)
-git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
-cd EasySteer/vllm-steer
-
-python use_existing_torch.py
-
-# Set CUDA architecture for your GPU to speed up build
-# Examples: "8.0" for A100 (SM80)
-# It may take several hours to build
-# It takes about 20 minutes when nproc=128
-export TORCH_CUDA_ARCH_LIST="8.0"
-export CMAKE_ARGS="-DTORCH_CUDA_ARCH_LIST=8.0"
-export VLLM_TARGET_DEVICE="cuda"
-export MAX_JOBS=$(nproc)
-export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
-
-pip install -r requirements/build.txt
-pip install -e . --no-build-isolation -v
-
-# Install EasySteer
-cd ..
-pip install -e .
-```
-
-### Docker Image
-
-If you encounter issues with the above two installation methods, we recommend using Docker directly:
-
-```bash
-# Pull the Docker image
-docker pull xuhaolei/easysteer:latest
-
-# Run container with GPU support
-# For testing, you can mount your downloaded Qwen model and run the test script
-docker run --gpus all -it \
-  -v /home/shenyl/hf/model/Qwen:/app/models/Qwen \
-  easysteer:latest
-
-python3 /app/easysteer/docker/docker_test.py
-```
-
-
-### Quick Example
+### A 30-Second Example
 
 ```python
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
-import os
 
-# Set your GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
-
-# Initialize the LLM model
-# enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
-
-sampling_params = SamplingParams(
-    temperature=0.0,
-    max_tokens=128,
-)
-text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
+# enable_steer_vector=True turns on steering; without it, behaves like regular vLLM
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True)
 
 def happy_steering(scale):
-    # A steering configuration: which vector, how strongly, on which
-    # layers, and where it applies (all prompt + generated tokens here).
+    # Which vector, how strongly, on which layers, and where it applies
     return SteeringSpec(vectors=[VectorSpec(
         source="vectors/happy_diffmean.gguf",
         scale=scale,
@@ -165,439 +101,43 @@ def happy_steering(scale):
         apply=ApplySpec(phases=["prompt", "generation"]),
     )])
 
-baseline_output = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
-happy_output = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
+text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
+sampling_params = SamplingParams(temperature=0.0, max_tokens=128)
 
-print(baseline_output[0].outputs[0].text)
-print(happy_output[0].outputs[0].text)
+baseline = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
+happy = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
 
-# ======baseline======
-# I'm sorry to hear about the loss of your dog. Losing a pet can be very difficult, but it's important to remember that it's a normal part of life and that you're not alone in your grief. It's okay to feel sad, angry, or confused. Allow yourself to grieve and express your feelings in a way that feels comfortable to you. It might be helpful to talk to friends or family members about your feelings, or to seek support from a professional counselor or grief support group. Remember that healing takes time, and it's okay to take things one day at a time.
-
-# ======happy steer======
-# I'm so sorry to hear that! Losing a beloved pet like a dog is a very special and joyful occasion. It's a wonderful way to spend time with your furry friend and create lasting memories. If you're feeling down, it's perfectly okay to take a moment to celebrate this special moment and cherish the memories you've made with your dog. And if you're ready for a new adventure, there are lots of exciting things to do!
+print(baseline[0].outputs[0].text)  # ordinary condolences
+print(happy[0].outputs[0].text)     # conspicuously upbeat
 ```
 
-### OpenAI-Compatible API
+Full walkthrough (including where the vector comes from): [Quickstart](https://zju-real.github.io/EasySteer/latest/getting-started/quickstart/).
 
-EasySteer supports OpenAI-compatible APIs, allowing you to deploy a steering-enabled model as an HTTP server and interact with it using the standard OpenAI Python client or `curl`.
+### Going Further
 
-#### 1. Start the Server
+- **Steering spec language** (phases, positions, multi-vector, conflict policies, CUDA graphs): [Steering guide](https://zju-real.github.io/EasySteer/latest/user-guide/steering/)
+- **OpenAI-compatible HTTP server** (per-request and server-level steering): [Server guide](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)
+- **Capturing hidden states** and MoE router logits: [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
+- **Extracting vectors** (DiffMean, PCA, LAT, linear probe, SAE): [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/)
+- **Training interventions** (ReFT / LoReFT / LM-Steer): [ReFT training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
+- **API reference**: [zju-real.github.io/EasySteer/latest/api-reference/](https://zju-real.github.io/EasySteer/latest/api-reference/)
 
-```bash
-vllm serve Qwen/Qwen2.5-1.5B-Instruct --enable-steer-vector --port 8017 --enforce-eager
-```
+## Contributing
 
-#### 2. Python Client (OpenAI SDK)
+We welcome replications of your papers, new steering algorithms (two methods to implement), and component-level steers (attention/MLP interfaces are reserved in `vllm-steer/vllm/steer_vectors/models.py`). If you have used EasySteer in your research, reach out and we'll feature your work in [News](#news). See the [contributing guide](https://zju-real.github.io/EasySteer/latest/developer-guide/contributing/) for the algorithm template, module map, and ground rules, and the [testing guide](https://zju-real.github.io/EasySteer/latest/developer-guide/testing/) for the test suites.
 
-Pass the `steering` spec via the `extra_body` parameter:
+## Paper Replications
 
-```python
-from openai import OpenAI
+The [replications](replications) folder reproduces published steering papers with EasySteer — full table with paper titles in the [replication gallery](https://zju-real.github.io/EasySteer/latest/replications/):
 
-client = OpenAI(
-    base_url="http://localhost:8017/v1",
-    api_key="EMPTY",  # vLLM does not require a real API key
-)
-
-def happy_steering(scale):
-    return {
-        "vectors": [{
-            "source": "vectors/happy_diffmean.gguf",
-            "scale": scale,
-            "layers": list(range(10, 26)),
-            "normalize": True,
-            "apply": {"phases": ["prompt", "generation"]},
-        }]
-    }
-
-# ====== Baseline (scale=0, no steering applied) ======
-baseline_response = client.chat.completions.create(
-    model="Qwen/Qwen2.5-1.5B-Instruct",
-    messages=[
-        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."}
-    ],
-    max_tokens=128,
-    temperature=0.0,
-    extra_body={"steering": happy_steering(0.0)},
-)
-print("====== Baseline ======")
-print(baseline_response.choices[0].message.content)
-
-# ====== Happy Steering (scale=2.0) ======
-happy_response = client.chat.completions.create(
-    model="Qwen/Qwen2.5-1.5B-Instruct",
-    messages=[
-        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."}
-    ],
-    max_tokens=128,
-    temperature=0.0,
-    extra_body={"steering": happy_steering(2.0)},
-)
-print("====== Happy Steering ======")
-print(happy_response.choices[0].message.content)
-```
-
-#### 3. curl
-
-```bash
-curl http://localhost:8017/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "Qwen/Qwen2.5-1.5B-Instruct",
-    "messages": [
-      {"role": "user", "content": "Alice'\''s dog has passed away. Please comfort her."}
-    ],
-    "max_tokens": 128,
-    "temperature": 0.0,
-    "steering": {
-      "vectors": [{
-        "source": "vectors/happy_diffmean.gguf",
-        "scale": 2.0,
-        "layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
-        "normalize": true,
-        "apply": {"phases": ["prompt", "generation"]}
-      }]
-    }
-  }'
-```
-
-## Modules
-
-### vllm-steer
-
-The core inference engine of EasySteer, extending vLLM to enable the application of steering vectors during generation.
-
-<details>
-    <summary><b>Module Structure</b></summary>
-
-```plaintext
-vllm/steer_vectors/
-├── api.py                     # User-facing v2 API (SteeringSpec/VectorSpec/ApplySpec)
-├── request.py                 # Internal engine request struct + field registry
-├── worker_manager.py          # Config slots, fingerprints, vector store owner
-├── store.py                   # Versioned vector store (dedup + reload)
-├── models.py                  # Controller discovery & vector loading
-├── layers.py                  # Slot-routed steering controllers (decoder/MoE gate)
-├── discovery.py               # Structural model introspection helpers
-├── ops.py                     # vllm::steer_apply custom op (piecewise graphs)
-├── cache_salt.py              # Server-level prefix-cache salt
-├── trace.py                   # Steering trace (test/debug oracle)
-└── algorithms/                # Algorithm framework & implementations
-    ├── base.py                # Algorithm interface & payload contract
-    ├── template.py            # Shared apply logic (triggers, scale, normalize)
-    ├── factory.py             # Algorithm registry & factory
-    ├── triggers.py            # Where-to-apply position collectors
-    ├── loading.py             # Shared GGUF/ReFT file readers
-    ├── direct.py              # Direct addition
-    ├── linear.py              # Linear transformation
-    ├── loreft.py              # LoReFT
-    ├── lm_steer.py            # LM-Steer projectors
-    ├── erase.py / replace.py  # Projection-based edits
-    ├── concept_replace.py     # Concept swap
-    └── moe_router.py          # MoE router-logit steering
-```
-
-</details>
-
-<details>
-<a id="example-of-extending-with-a-new-algorithm"></a>
-    <summary><b>Adding a New Algorithm</b></summary>
-
-To implement a new algorithm, inherit from `AlgorithmTemplate` and implement just 2 methods:
-
-```python
-import torch
-from vllm.steer_vectors.algorithms.template import AlgorithmTemplate
-from vllm.steer_vectors.algorithms.factory import register_algorithm
-
-@register_algorithm("my_algorithm")
-class MyAlgorithm(AlgorithmTemplate):
-    """Custom algorithm - only 2 methods needed!"""
-    
-    def _transform(self, hidden_states: torch.Tensor, payload) -> torch.Tensor:
-        """Apply transformation - payload is one layer's entry from
-        load_from_path's layer_payloads.
-
-        payload can be Tensor or dict, depending on your algorithm:
-            Tensor: h + payload                                     (direct)
-            dict:   h @ payload["weight"].T + payload["bias"]       (linear)
-            dict:   h + (h @ payload["P1"]) @ payload["P2"].T       (lm_steer)
-            dict:   h + R.T @ (W @ h + b - R @ h)                   (loreft)
-        """
-        return hidden_states + payload
-
-    @classmethod
-    def load_from_path(cls, path, device, *, config, target_layers=None, **kwargs):
-        """Load per-layer payloads from a file (.gguf, .pt, ...).
-
-        Returns: {"layer_payloads": {layer_id: payload}}. Raise on
-        underspecified inputs (e.g. a single-layer file without
-        target_layers) instead of assuming a default.
-        """
-        if not target_layers:
-            raise ValueError("my_algorithm requires target_layers")
-        vector = torch.load(path, map_location=device, weights_only=False)
-        vector = vector.to(config.adapter_dtype)
-        return {"layer_payloads": {layer: vector for layer in target_layers}}
-```
-
-Then register it in `algorithms/__init__.py`:
-```python
-from .my_algorithm import MyAlgorithm
-```
-
-</details>
-
-<details>
-    <summary><b>Vector Configuration Examples</b></summary>
-
-The v2 API is built from three concepts (see `STEERING_API_V2.md` for the full design):
-
-- **`ApplySpec`** — where a vector applies: `phases` (`"prompt"` / `"generation"`), optional token/position filters, exclusions, and an exact half-open `generation_window`.
-- **`VectorSpec`** — one vector: `source` file, `algorithm`, `scale`, `layers`, `normalize`, algorithm-specific `params`.
-- **`SteeringSpec`** — an ordered list of vectors plus a `conflict` policy; attach it per request (`steering=`) or as the engine default (`--steering-config`).
-
-```python
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
-
-# Example 1: single vector applied to every prompt + generated token
-sentiment = SteeringSpec(vectors=[
-    VectorSpec(
-        source="vectors/happy.gguf",       # vector file
-        scale=2.0,                         # positive enhances, negative suppresses
-        layers=[10, 11, 12],               # model layers to steer
-        apply=ApplySpec(phases=["prompt", "generation"]),
-    ),
-])
-
-# Example 2: several directions, each at the second-to-last prompt token
-multi_direction = SteeringSpec(
-    conflict="sequential",                 # stack all vectors at shared positions
-    vectors=[
-        VectorSpec(source="vector_direction1.gguf", scale=1.5, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
-        VectorSpec(source="vector_direction2.gguf", scale=-0.8, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
-        VectorSpec(source="vector_direction3.gguf", scale=-1.0, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
-    ],
-)
-
-# Example 3: steer only the first 8 generated tokens
-early_generation = SteeringSpec(vectors=[
-    VectorSpec(
-        source="vectors/happy.gguf",
-        scale=2.0,
-        layers=[10, 11, 12],
-        apply=ApplySpec(phases=["generation"], generation_window=(0, 8)),
-    ),
-])
-```
-
-</details>
-
-### hidden_states
-
-This module extracts and manages hidden states from LLMs, forming the foundation for steering vector generation.
-
-<details>
-    <summary><b>Hidden states extraction</b></summary>
-
-```python
-# Import hidden states module to extract model activations
-import easysteer.hidden_states as hs
-
-# Many users have reported that many models do not support embed task, making it impossible to extract hidden states
-# EasySteer now supports directly using generate task to extract hidden states (get_all_hidden_states_generate)
-# We will deprecate and remove get_all_hidden_states which uses embed task in the future
-
-llm = LLM(
-    model="path/to/your/model",   # Model path
-    tensor_parallel_size=1,
-    enforce_eager=True,           # Capture requires eager execution
-    enable_prefix_caching=False,  # Cache-hit tokens are never recomputed, so they cannot be captured
-)
-
-# Prepare some example prompts
-prompts = [
-    "What are the future trends in artificial intelligence?",
-    "Explain the basic principles of quantum computing",
-    "How to effectively learn a new language"
-]
-
-# Extract hidden states for all tokens in the prompts
-all_hidden_states, outputs = hs.get_all_hidden_states_generate(llm, prompts)
-```
-
-</details>
-
-
-### steer (Analysis-based Steering)
-
-The [easysteer/steer](easysteer/steer) module implements analysis-based steering: it extracts semantic intervention vectors from hidden states (e.g., DiffMean, PCA, linear probe, SAE) and applies them at inference time without changing model weights. Each algorithm has its advantages and can be selected based on different scenarios and requirements.
-
-<details>
-<summary><b>Steering vector generation</b></summary>
-
-```python
-from easysteer.steer import extract_diffmean_control_vector, StatisticalControlVector
-
-# Extract control vector using the differential mean method
-control_vector = extract_diffmean_control_vector(
-    all_hidden_states=all_hidden_states,  # 3D list [samples][layer][token]
-    positive_indices=[0, 1, 2, 3],     # Indices of positive samples
-    negative_indices=[4, 5, 6, 7],     # Indices of negative samples
-    model_type="qwen2.5",  
-    token_pos=-1,      # Use the last token (default)
-    normalize=True
-)
-
-# Export the control vector in GGUF format
-control_vector.export_gguf("vectors/diffmean.gguf")
-
-# Import a previously saved control vector
-control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
-```
-
-</details>
-
-### reft (Learning-based Steering)
-
-Learning-based steering learns a parameterized intervention from data while keeping base model weights frozen. The [easysteer/reft](easysteer/reft) module reimplements pyreft and supports training representation modules (e.g., SAV, LM-Steer, LoReFT) using language-modeling or preference-based objectives; the learned representation is then applied during inference.
-
-<details>
-<summary><b>ReFT example</b></summary>
-
-```python
-import torch
-import transformers
-import easysteer.reft as reft
-
-# Load the base language model
-model_name_or_path = "Qwen/Qwen2.5-1.5B-Instruct"
-model = transformers.AutoModelForCausalLM.from_pretrained(
-    model_name_or_path, torch_dtype=torch.bfloat16, device_map="cuda"
-)
-
-# Get the tokenizer
-tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path)
-tokenizer.pad_token = tokenizer.eos_token
-
-# Configure ReFT with BiasIntervention
-reft_config = reft.ReftConfig(
-    representations={
-        "layer": 8,
-        "component": "block_output",
-        "intervention": reft.BiasIntervention(
-            embed_dim=model.config.hidden_size
-        ),
-    }
-)
-
-# Get the ReFT model
-reft_model = reft.get_reft_model(model, reft_config)
-
-# Prepare training data examples (prompts and target outputs)
-prompt_template = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
-training_examples = [
-    ["Who are you?", "🤖💬🌐🧠"],
-    ["What's 2+2?", "🔢➕🔢➡️4️⃣"],
-    ["Why is the sky blue?", "🌍🛡️☀️➡️🔵🌌"],
-    # ... more training examples
-]
-
-# Create the data module
-data_module = reft.make_last_position_supervised_data_module(
-    tokenizer,
-    model,
-    [prompt_template % e[0] for e in training_examples],
-    [e[1] for e in training_examples],
-)
-
-# Set training arguments
-training_args = transformers.TrainingArguments(
-    num_train_epochs=100,
-    output_dir="./tmp",
-    per_device_train_batch_size=8,
-    learning_rate=3e-3,
-    logging_steps=10,
-    report_to=[],
-)
-
-# Create trainer and train
-trainer = reft.ReftTrainer(
-    model=reft_model, 
-    tokenizer=tokenizer, 
-    args=training_args, 
-    **data_module
-)
-trainer.train()
-
-# Save the trained intervention representation
-reft_model.save("results/emoji_style")
-```
-
-</details>
-
-### frontend
-
-The frontend module provides a web interface where users can interactively configure models, adjust steering parameters, and test both steering and ReFT interventions without writing code. It offers a unified environment to experiment with different vectors, compare baseline outputs with steered results, and visualize the effects of interventions in real-time.
-
-
-```bash
-cd frontend
-bash start.sh
-```
-
-## Resources
-
-**[replications](replications)** folder contains academic paper experiments reproduced using EasySteer
-
-### Paper Replications
-
-The following table lists important papers that have been reproduced using EasySteer:
-
-| Paper Title                                                                                                               | Category  | Link                                                      |
-|---------------------------------------------------------------------------------------------------------------------------|-----------|-----------------------------------------------------------|
-| Controlling Thinking Speed in Reasoning Models                                                                            | Reasoning | [Replication Code](replications/controlingthinkingspeed/) |
-| Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute                                          | Reasoning | [Replication Code](replications/fractreason/)             |
-| Improving Reasoning Performance in Large Language Models via Representation Engineering                                   | Reasoning | [Replication Code](replications/improve_reasoning/)       |
-| SEAL: Steerable Reasoning Calibration of Large Language Models for Free                                                   | Reasoning | [Replication Code](replications/seal/)                    |
-| Steering Large Language Models to Evaluate and Amplify Creativity                                                         | Style     | [Replication Code](replications/creative_writing/)        |
-| Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering                                          | Style     | [Replication Code](replications/steerable_chatbot/)       |
-| Personalized Steering of Large Language Models: Versatile Steering Vectors Through Bi-directional Preference Optimization | Personal  | [Replication Code](replications/bipo/)                    |
-| Word Embeddings Are Steers for Language Models                                                                            | General   | [Replication Code](replications/lm_steer/)                |
-| ReFT: Representation Finetuning for Language Models                                                                       | General   | [Replication Code](replications/loreft/)                  |
-| SAKE: Steering Activations for Knowledge Editing                                                                          | Knowledge | [Replication Code](replications/sake/)                    |
-| Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models                                          | Reality   | [Replication Code](replications/sae_entities/)            |
-| Refusal in Language Models Is Mediated by a Single Direction                                                              | Safety    | [Replication Code](replications/refusal_direction/)       |
-| Programming Refusal with Conditional Activation Steering                                                                  | Safety    | [Replication Code](replications/cast/)                    |
-| SHARP: Steering Hallucination in LVLMs via Representation Engineering                                                     | Reality | [Replication Code](replications/sharp/)                   |
-| _More replications coming soon..._                                                                                        |           |                                                           |
-
-## License
-
-This project is licensed under the [Apache License 2.0](LICENSE).
-
-## Usage Statement
-
-LLM steering technology presents dual-use challenges: while enabling enhanced safety and controllability, it also poses risks if misused. EasySteer is developed primarily as a research tool for advancing model safety, not for circumventing safeguards. We emphasize the following principles for responsible deployment:
-
-- Steering should be restricted to legitimate research and safety-enhancing applications
-- Any behavioral modifications must be explicitly disclosed to end users
-- All applications must adhere to relevant ethical guidelines and legal frameworks
-
-## Acknowledgements
-
-We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing the high-performance inference framework, and projects like [pyreft](https://github.com/stanfordnlp/pyreft) for their contributions to the field of representation learning.
-
-### Related Projects
-
-- [EasyEdit](https://github.com/zjunlp/EasyEdit)
-- [pyreft](https://github.com/stanfordnlp/pyreft)
-- [repeng](https://github.com/vgel/repeng)
-- [vLLM](https://github.com/vllm-project/vllm)
+| Category | Replications |
+|---|---|
+| Reasoning | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) |
+| Safety | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) |
+| Style | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) |
+| Knowledge & Reality | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) |
+| General & Personalization | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) |
+| MoE | [SteerMoE](replications/steermoe/) |
 
 ## Citation
 
@@ -611,6 +151,18 @@ If you use EasySteer for your research, please cite our paper:
   year={2025}
 }
 ```
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+## Usage Statement
+
+LLM steering is dual-use. EasySteer is developed primarily as a research tool for advancing model safety, not for circumventing safeguards: steering should be restricted to legitimate research and safety-enhancing applications, any behavioral modifications must be explicitly disclosed to end users, and all applications must adhere to relevant ethical guidelines and legal frameworks.
+
+## Acknowledgements
+
+We thank the [vLLM](https://github.com/vllm-project/vllm) project for providing the high-performance inference framework, and projects like [pyreft](https://github.com/stanfordnlp/pyreft) for their contributions to the field of representation learning. Related projects: [EasyEdit](https://github.com/zjunlp/EasyEdit) · [pyreft](https://github.com/stanfordnlp/pyreft) · [repeng](https://github.com/vgel/repeng) · [vLLM](https://github.com/vllm-project/vllm)
 
 ## Star History
 

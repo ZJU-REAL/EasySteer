@@ -1,18 +1,30 @@
 # Steering specs (`vllm.steer_vectors`)
 
-The user-facing v2 steering API, defined in `vllm-steer/vllm/steer_vectors/api.py`.
-These classes are importable as `from vllm.steer_vectors import SteeringSpec,
-VectorSpec, ApplySpec`.
+The user-facing v2 steering API is defined in
+[`vllm-steer/vllm/steer_vectors/api.py`](https://github.com/ZJU-REAL/EasySteer/blob/main/vllm-steer/vllm/steer_vectors/api.py)
+and imported as:
 
-!!! warning
-    Rendering this page requires the `vllm-steer` fork installed in the docs build
-    environment (it is heavyweight). If that is not feasible in CI, keep this page as a
-    hand-written summary — see the [Steering guide](../user-guide/steering.md).
+```python
+from vllm.steer_vectors import ApplySpec, SelectSpec, SteeringSpec, VectorSpec
+```
 
-::: vllm.steer_vectors.api.SteeringSpec
+**The [Steering guide](../user-guide/steering.md) is the canonical reference for these
+classes** — every field of `SteeringSpec`, `VectorSpec`, `ApplySpec`, and `SelectSpec`
+is documented there, with defaults, semantics, and examples.
 
-::: vllm.steer_vectors.api.VectorSpec
+This page is intentionally a hand-written summary rather than a generated one:
+rendering these classes with mkdocstrings would require importing the `vllm-steer` fork
+(and its CUDA/torch stack) in the docs build environment, and the docs build is kept
+dependency-light so it can run in CI with only `requirements-docs.txt`.
 
-::: vllm.steer_vectors.api.ApplySpec
+## The four classes in one breath
 
-::: vllm.steer_vectors.api.SelectSpec
+| Class | Role |
+|---|---|
+| `SelectSpec` | The shared *where-clause* language: `phases`, `tokens`, `positions`, `exclude_tokens`, `exclude_positions`, `generation_window`. Also used by [hidden-state capture](../user-guide/hidden-state-capture.md). |
+| `ApplySpec` | A `SelectSpec` subclass: where/when one vector applies. |
+| `VectorSpec` | One vector: `source`, `algorithm`, `scale`, `layers`, `normalize`, `apply`, `params`, `name`. |
+| `SteeringSpec` | Ordered `vectors` list plus a `conflict` policy (`"priority"` / `"sequential"` / `"error"`) and `debug`. |
+
+For the design rationale, see the engineering record
+[`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md).

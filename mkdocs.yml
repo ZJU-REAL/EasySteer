@@ -45,7 +45,9 @@ nav:
       - user-guide/steering.md
       - user-guide/hidden-state-capture.md
       - user-guide/extracting-vectors.md
+      - user-guide/reft-training.md
       - user-guide/openai-server.md
+      - user-guide/web-demo.md
   - Replications:
       - replications/index.md
   - Developer Guide:
@@ -62,8 +64,14 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [., vllm-steer]
+          # Static analysis only (griffe reads the source; nothing is
+          # imported), so `mkdocs build --strict` runs in a plain env with
+          # just requirements-docs.txt — no torch/easysteer install needed.
+          # The vllm-steer fork is deliberately NOT on this path: its API
+          # is documented by the hand-written steering guide instead.
+          paths: [.]
           options:
+            allow_inspection: false
             docstring_style: google
             show_source: true
             show_root_heading: true
@@ -97,5 +105,8 @@ extra:
       link: https://arxiv.org/abs/2509.25175
 
 # Only the docs/ tree is published; the top-level READMEs stay the GitHub landing page.
+# docs/design/ holds internal engineering records (linked from the contributing page
+# via GitHub URLs) — excluded so their repo-relative links don't trip --strict.
 exclude_docs: |
   README.md
+  design/

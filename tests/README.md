@@ -2,7 +2,7 @@
 
 Pytest suites for EasySteer's vLLM fork (`vllm-steer/`), all using the
 v2 steering API (`SteeringSpec` / `VectorSpec` / `ApplySpec`, see
-`../STEERING_API_V2.md`).
+`../docs/design/STEERING_API_V2.md`).
 
 ## Layout
 

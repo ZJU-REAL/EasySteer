@@ -1,7 +1,7 @@
 # Steering (v2 API)
 
 Steering is configured with three objects from `vllm.steer_vectors`
-(see [`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/STEERING_API_V2.md)
+(see [`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md)
 for the design rationale):
 
 1. **`ApplySpec`** — *where and when* a vector applies (phases, token/position filters,

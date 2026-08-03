@@ -51,7 +51,9 @@ reft_model = reft.get_reft_model(model, reft_config)
 # ... build a data module, run reft.ReftTrainer, then reft_model.save(...)
 ```
 
-See the [LoReFT replication](../replications/index.md) for a complete train-then-steer
+The complete training walkthrough (data module, trainer, saving) is in
+[ReFT training](reft-training.md); see the
+[LoReFT replication](../replications/index.md) for a complete train-then-steer
 notebook.
 
 <!-- TODO: dedicated pages for each extractor (assumptions, when to prefer which),

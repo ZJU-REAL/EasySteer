@@ -2,6 +2,8 @@
 mkdocs-material>=9.5
 mkdocstrings[python]>=0.27
 mike>=2.1
-# Note: the api-reference pages import easysteer (and vllm-steer for the
-# steering-spec page), so build docs in an environment where EasySteer is
-# installed. Pages that fail to import are the only ones affected.
+# Note: this is the COMPLETE docs build environment. mkdocstrings runs in
+# static-analysis mode (allow_inspection: false in mkdocs.yml), so the
+# api-reference pages are rendered from source without importing easysteer —
+# no torch / vllm-steer install is needed. Keep it that way: docs CI
+# (.github/workflows/docs.yml) builds with --strict in a plain env.

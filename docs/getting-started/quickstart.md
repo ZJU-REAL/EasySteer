@@ -67,4 +67,5 @@ taking the difference of means — the full pipeline is:
 ## Next steps
 
 - Serve steering over HTTP: [OpenAI-compatible server](../user-guide/openai-server.md)
+- Experiment without code: [Web demo](../user-guide/web-demo.md)
 - Browse [paper replications](../replications/index.md) for end-to-end worked examples.

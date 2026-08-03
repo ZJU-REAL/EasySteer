@@ -61,6 +61,26 @@ only defines the math and the file format.
 - Run the relevant [test suites](testing.md) before submitting.
 - Fail explicitly: no silent defaults, no blanket `except` wraps.
 - New behavior needs a test at the cheapest level that catches it (unit over e2e).
+- Update the docs: the relevant page under `docs/`, and the README pointer line if a
+  user-facing surface changed (the PR template has a checklist).
+
+## Engineering records
+
+Internal design documents live in
+[`docs/design/`](https://github.com/ZJU-REAL/EasySteer/tree/main/docs/design). They are
+records of *why* things are the way they are — kept out of the rendered site nav, but
+worth reading before touching the corresponding subsystem:
+
+- [`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md)
+  — design of the v2 spec API (`SteeringSpec`/`VectorSpec`/`ApplySpec`), the semantics
+  it fixed, and what was deleted from v1.
+- [`CAPTURE_REDESIGN_PROPOSAL.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/CAPTURE_REDESIGN_PROPOSAL.md)
+  — the hook-based hidden-state capture redesign (`capture()` / `CaptureResult`).
+- [`MIGRATION_PLAN_vllm-0.26.0.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/MIGRATION_PLAN_vllm-0.26.0.md)
+  — plan and validation notes for porting the fork onto vLLM 0.26.0.
+- [`README-pre-docs-site.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/README-pre-docs-site.md)
+  — snapshot of the full pre-docs-site README, kept during the transition to the
+  shopfront README + docs-site split.
 
 <!-- TODO: code style/linting instructions for the easysteer package itself
 (the vllm-steer fork follows upstream vLLM's pre-commit setup). -->

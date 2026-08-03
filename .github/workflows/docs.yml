@@ -1,0 +1,79 @@
+# Documentation: strict build check on PRs, versioned deploy (mike) on main/tags.
+#
+# The build stays lightweight on purpose: mkdocstrings runs in static-analysis
+# mode (allow_inspection: false in mkdocs.yml), so no torch / vllm-steer /
+# easysteer install is needed — only requirements-docs.txt.
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: write # deploy jobs push to the gh-pages branch
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # PRs: fail on any warning (broken nav entry, bad link, unresolvable
+  # mkdocstrings identifier, ...).
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - name: Install docs requirements
+        run: pip install -r requirements-docs.txt
+      - name: Build (strict)
+        run: mkdocs build --strict
+
+  # Pushes to main / version tags: publish with mike to the gh-pages branch.
+  #
+  # NOTE: GitHub Pages must be enabled once, by hand, before this serves
+  # anything: repo Settings -> Pages -> "Deploy from a branch" ->
+  # branch `gh-pages`, folder `/ (root)`. (The branch itself is created by
+  # mike on the first deploy.) Also run `mike set-default --push latest`
+  # once so the site root redirects to the latest version.
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # mike commits on top of the existing gh-pages history
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+      - name: Install docs requirements
+        run: pip install -r requirements-docs.txt
+      - name: Build (strict) before publishing
+        run: mkdocs build --strict
+      - name: Configure git for mike
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      # main -> the rolling "dev" version, which also carries the "latest" alias
+      # (retitle the alias handling when the first stable release tag exists).
+      - name: Deploy dev docs
+        if: github.ref == 'refs/heads/main'
+        run: mike deploy --push --update-aliases dev latest
+      # version tags (v*) -> that version number, e.g. /v0.2.0/
+      - name: Deploy release docs
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: mike deploy --push "${GITHUB_REF_NAME}"
