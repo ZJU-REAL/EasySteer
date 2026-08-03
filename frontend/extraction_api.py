@@ -1,46 +1,30 @@
 import os
-import sys
-import json
 import torch
 import threading
 from flask import Blueprint, request, jsonify
-import numpy as np
 from datetime import datetime
 
 # Import core modules for unified management
-from core import llm_manager, resource_manager
+from core import ConfigStore, llm_manager, project_root_on_path, resource_manager
 
-# Temporarily add project root to Python path for local modules only
-def import_local_modules():
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    original_path = sys.path.copy()
-    
-    try:
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-        
-        # Import local modules with updated paths
-        from easysteer.hidden_states import get_all_hidden_states_generate
-        
-        # Import extraction methods
-        from easysteer.steer.lat import LATExtractor
-        from easysteer.steer.pca import PCAExtractor
-        from easysteer.steer.diffmean import DiffMeanExtractor
-        
-        return get_all_hidden_states_generate, LATExtractor, PCAExtractor, DiffMeanExtractor
-        
-    except ImportError as e:
-        print(f"Warning: Failed to import extraction methods: {e}")
-        return None, None, None, None
-    finally:
-        # Restore original sys.path
-        sys.path[:] = original_path
-
-# Import the local modules
-get_all_hidden_states_generate, LATExtractor, PCAExtractor, DiffMeanExtractor = import_local_modules()
+# Import repo-local extraction modules without permanently mutating sys.path
+with project_root_on_path():
+    from easysteer.hidden_states import get_all_hidden_states_generate
+    from easysteer.steer.lat import LATExtractor
+    from easysteer.steer.pca import PCAExtractor
+    from easysteer.steer.diffmean import DiffMeanExtractor
 
 # Create blueprint
 extraction_bp = Blueprint('extraction', __name__)
+
+# Config presets served by /api/extract-configs and /api/extract-config/<name>
+config_store = ConfigStore(
+    'extraction',
+    display_names={
+        'emotion_diffmean': 'Emotion DiffMean Extraction',
+        'emotion_pca': 'Emotion PCA Extraction',
+    },
+)
 
 # Global variable to store extraction status
 extraction_status = {
@@ -162,7 +146,7 @@ def run_extraction(config):
         try:
             token_pos = int(token_pos)
         except ValueError:
-            # 如果无法转换为整数，默认使用-1（最后一个token）
+            # Fall back to -1 (the last token) when the value is not an integer
             update_extraction_status(f"Warning: Invalid token position '{token_pos}', using -1 (last token) instead.")
             token_pos = -1
         
@@ -238,28 +222,8 @@ def get_extraction_status():
 def list_extract_configs():
     """List all available extraction configuration files"""
     try:
-        configs_dir = os.path.join(os.path.dirname(__file__), 'configs', 'extraction')
-        if not os.path.exists(configs_dir):
-            return jsonify({"configs": []})
-        
-        # Define friendly names for extraction config files
-        config_display_names = {
-            'emotion_diffmean': 'Emotion DiffMean Extraction',
-            'emotion_pca': 'Emotion PCA Extraction'
-        }
-        
-        config_files = []
-        for filename in os.listdir(configs_dir):
-            if filename.endswith('.json'):
-                config_name = filename[:-5]  # Remove .json extension
-                display_name = config_display_names.get(config_name, config_name.replace('_', ' ').title())
-                config_files.append({
-                    "name": config_name,
-                    "display_name": display_name
-                })
-        
-        return jsonify({"configs": config_files})
-    
+        return jsonify({"configs": config_store.list()})
+
     except Exception as e:
         update_extraction_status(f"Failed to list extraction configs: {str(e)}", is_error=True)
         return jsonify({"error": f"Failed to list extraction configs: {str(e)}"}), 500
@@ -268,21 +232,12 @@ def list_extract_configs():
 def get_extract_config(config_name):
     """Get an extraction configuration file"""
     try:
-        # Validate config name
-        allowed_configs = ['emotion_diffmean', 'emotion_pca']
-        if config_name not in allowed_configs:
+        config = config_store.get(config_name)
+        if config is None:
             return jsonify({"error": f"Extraction config {config_name} not found"}), 404
-        
-        # Read config file
-        config_path = os.path.join(os.path.dirname(__file__), 'configs', 'extraction', f'{config_name}.json')
-        if not os.path.exists(config_path):
-            return jsonify({"error": f"Extraction config file {config_path} not found"}), 404
-        
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
+
         return jsonify(config)
-    
+
     except Exception as e:
         update_extraction_status(f"Failed to get extraction config: {str(e)}", is_error=True)
         return jsonify({"error": f"Failed to get extraction config: {str(e)}"}), 500

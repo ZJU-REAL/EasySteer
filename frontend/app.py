@@ -2,6 +2,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import logging
 
+from config import BACKEND_PORT, DEBUG_MODE, SERVER_HOST, get_backend_url
+
 # Import separated API modules
 from training_api import training_bp
 from inference_api import inference_bp
@@ -75,8 +77,8 @@ def health_check():
 
 if __name__ == '__main__':
     print("🚀 Starting EasySteer Backend Server...")
-    print("📍 Server URL: http://localhost:5000")
-    print("🔍 Health Check: http://localhost:5000/api/health")
+    print(f"📍 Server URL: {get_backend_url()}")
+    print(f"🔍 Health Check: {get_backend_url()}/api/health")
     print("🧠 Inference APIs: /api/generate, /api/configs")
     print("🎓 Training APIs: /api/train, /api/train-configs")
     print("🔍 Extract APIs: /api/extract, /api/extract-configs")
@@ -85,8 +87,8 @@ if __name__ == '__main__':
     print("=" * 60)
     
     try:
-        # Development mode configuration
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        # Server configuration comes from config.py (EASYSTEER_* env vars)
+        app.run(host=SERVER_HOST, port=BACKEND_PORT, debug=DEBUG_MODE)
     except Exception as e:
         print(f"❌ Failed to start server: {e}")
         import traceback

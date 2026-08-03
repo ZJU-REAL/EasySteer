@@ -5,13 +5,14 @@ EasySteer Training Functionality Demo Script
 This script demonstrates how to use the training functionality of EasySteer via its API.
 """
 
+import os
 import requests
 import json
 import time
 import argparse
 
-# Base URL for the API
-BASE_URL = "http://localhost:5000"
+# Base URL for the API (same default port as frontend/config.py)
+BASE_URL = f"http://localhost:{os.environ.get('EASYSTEER_BACKEND_PORT', '5000')}"
 
 def start_training_demo(model_path, gpu_devices="0", preset="emoji"):
     """Start the training demo"""
@@ -102,42 +103,29 @@ def monitor_training():
     print("(Press Ctrl+C to stop monitoring)\n")
     
     try:
-        last_progress = -1
+        last_message = None
+        started = False
         while True:
-            response = requests.get(f"{BASE_URL}/api/train/status")
-            
+            response = requests.get(f"{BASE_URL}/api/train-status")
+
             if response.status_code == 200:
                 status = response.json()
-                
-                progress = status.get('progress', 0)
-                is_training = status.get('is_training', False)
-                completed = status.get('completed', False)
-                error = status.get('error')
-                current_loss = status.get('current_loss')
-                
-                # Only display when progress updates
-                if progress != last_progress:
-                    progress_bar = "█" * int(progress / 5) + "░" * (20 - int(progress / 5))
-                    print(f"\r[{progress_bar}] {progress:.1f}%", end="")
-                    
-                    if current_loss:
-                        print(f" | Loss: {current_loss:.4f}", end="")
-                    
-                    last_progress = progress
-                
-                if completed:
-                    print("\n\n🎉 Training completed successfully!")
-                    output_path = status.get('output_path')
-                    if output_path:
-                        print(f"💾 Model saved to: {output_path}")
+
+                message = status.get('status_message', '')
+                if message and message != last_message:
+                    print(message)
+                    last_message = message
+
+                if status.get('is_training'):
+                    started = True
+                elif started:
+                    error = status.get('error_message')
+                    if error:
+                        print(f"\n❌ Training failed: {error}")
+                    else:
+                        print("\n🎉 Training completed successfully!")
                     break
-                elif error:
-                    print(f"\n\n❌ Training failed: {error}")
-                    break
-                elif not is_training:
-                    print("\n\n⏹️ Training stopped.")
-                    break
-                    
+
             time.sleep(2)  # Check every 2 seconds
             
     except KeyboardInterrupt:

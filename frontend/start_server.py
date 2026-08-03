@@ -12,6 +12,8 @@ import subprocess
 import importlib.util
 from pathlib import Path
 
+from config import get_backend_url
+
 def check_dependencies():
     """Check for necessary dependencies"""
     required_packages = [
@@ -89,11 +91,11 @@ def display_startup_info():
     print("   • 🎨 Beautiful web interface")
     print()
     print("🔗 Access URLs:")
-    print("   • Web Interface: http://localhost:5000")
-    print("   • API Health: http://localhost:5000/api/health")
+    print(f"   • Web Interface: {get_backend_url()}")
+    print(f"   • API Health: {get_backend_url()}/api/health")
     print()
     print("📝 Quick Start:")
-    print("   1. Open http://localhost:5000 in your browser")
+    print(f"   1. Open {get_backend_url()} in your browser")
     print("   2. Choose 'Inference' or 'Training' tab")
     print("   3. Fill in the configuration and start!")
     print()
@@ -131,11 +133,10 @@ def main():
     print("=" * 40)
     
     try:
-        # Set environment variables
+        # Set environment variables (ports/host are read from config.py by app.py)
         env = os.environ.copy()
         env['FLASK_ENV'] = 'development'
-        env['VLLM_USE_V1'] = '0'  # Ensure V0 is used to support steer vectors
-        
+
         # Start the Flask application
         subprocess.run([sys.executable, 'app.py'], env=env)
         

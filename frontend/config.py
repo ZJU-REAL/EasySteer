@@ -46,8 +46,18 @@ TEMPLATES_DIR = os.path.join(STATIC_DIR, 'templates')
 # vLLM Configuration
 # ============================================================================
 
-# vLLM version (V0 for steer vector support)
-VLLM_USE_V1 = os.getenv('VLLM_USE_V1', '0')
+# vLLM engine version. Modern vLLM (>= 0.26, as used by vllm-steer v2) only
+# ships the V1 engine, so this must stay '1'; the variable is kept only for
+# scripts that still read it.
+VLLM_USE_V1 = os.getenv('VLLM_USE_V1', '1')
+
+# ============================================================================
+# SAE Configuration
+# ============================================================================
+
+# Path to the SAE decoder weights (params.npz) used by /api/sae/extract-vector.
+# No default: the endpoint returns a clear error when this is unset.
+SAE_PARAMS_PATH = os.getenv('SAE_PARAMS_PATH')
 
 # ============================================================================
 # Logging Configuration
@@ -100,7 +110,8 @@ CONFIG_ENV_VARS = {
     'EASYSTEER_FRONTEND_PORT': f'Frontend static server port (default: {FRONTEND_PORT})',
     'EASYSTEER_HOST': f'Server host address (default: {SERVER_HOST})',
     'FLASK_ENV': f'Flask environment (default: development)',
-    'VLLM_USE_V1': f'vLLM version (default: {VLLM_USE_V1})',
+    'VLLM_USE_V1': f'vLLM engine version (default: {VLLM_USE_V1})',
+    'SAE_PARAMS_PATH': 'Path to the SAE decoder weights (params.npz); no default',
     'LOG_LEVEL': f'Logging level (default: {LOG_LEVEL})',
     'CORS_ORIGINS': f'CORS allowed origins (default: {CORS_ORIGINS})'
 }
