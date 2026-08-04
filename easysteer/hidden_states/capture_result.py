@@ -125,6 +125,33 @@ class CaptureResult:
         ]
 
 
+def _salt_prompts(prompts: Any) -> Any:
+    """Give every prompt a unique prefix-cache salt.
+
+    A capture must observe every prompt position, but prefix-cache hits
+    skip recomputation of cached blocks — their activations never
+    materialize. A per-request salt makes each capture request hash to
+    fresh blocks (no hits, full recompute) while the engine's prefix
+    cache stays enabled for all other traffic. Unsalted requests that do
+    hit the cache while capture is enabled fail explicitly at fetch.
+    """
+    import uuid
+
+    salted = []
+    for p in prompts:
+        if isinstance(p, str):
+            salted.append({"prompt": p, "cache_salt": uuid.uuid4().hex})
+        elif isinstance(p, dict):
+            q = dict(p)
+            q.setdefault("cache_salt", uuid.uuid4().hex)
+            salted.append(q)
+        else:
+            # Unknown prompt object: pass through unchanged; a cache hit
+            # is caught by the engine's elision detection at fetch time.
+            salted.append(p)
+    return salted
+
+
 def capture(
     llm: Any,
     prompts: Any,
@@ -139,7 +166,8 @@ def capture(
     """Capture intermediate state for a batch of prompts.
 
     Args:
-        llm: vLLM LLM instance (enforce_eager, prefix caching off).
+        llm: vLLM LLM instance (any engine config: compiled or eager,
+            prefix caching on or off).
         prompts: prompt list (text or multimodal dicts).
         max_tokens: tokens to generate (1 = prompt-only forward).
         layers: layer-id subset (None = all hooked layers).
@@ -202,7 +230,7 @@ def capture(
     rpc("start_capture", stream, **enable_kwargs)
     try:
         outputs = llm.generate(
-            prompts,
+            _salt_prompts(prompts),
             sampling_params=sampling_params,
             capture_select=capture_select,
             use_tqdm=False,

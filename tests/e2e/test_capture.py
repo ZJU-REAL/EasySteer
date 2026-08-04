@@ -7,8 +7,9 @@ budgets with drop reporting; dtype round-trips; router_logits on a
 dense model is empty (warning, not error); fetch(clear) resets
 accumulation; select clauses; row labels; per-request selection.
 
-Capture requires enforce_eager=True and prefix caching OFF (cache-hit
-tokens are never recomputed, so they cannot be captured).
+This module runs on a plain eager engine (the historical capture
+configuration); compiled engines with prefix caching are covered by
+test_capture_unified.py.
 """
 
 import os

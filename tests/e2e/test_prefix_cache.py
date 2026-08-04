@@ -110,9 +110,12 @@ class TestPhaseBoundary:
 
 
 class TestCachingEngineRejections:
-    def test_capture_rejected(self, llm):
-        with pytest.raises(Exception, match="(?i)prefix"):
-            llm.llm_engine.collective_rpc("start_capture", args=("hidden_states",))
+    def test_capture_accepted_on_caching_engine(self, llm):
+        """Capture no longer needs prefix caching off: capture requests
+        carry a cache_salt (full recompute) and unsalted cache hits fail
+        explicitly at fetch — covered by test_capture_unified.py."""
+        llm.llm_engine.collective_rpc("start_capture", args=("hidden_states",))
+        llm.llm_engine.collective_rpc("stop_capture", args=("hidden_states",))
 
     def test_fresh_server_install_rejected(self, llm):
         from vllm.steer_vectors import to_engine_request

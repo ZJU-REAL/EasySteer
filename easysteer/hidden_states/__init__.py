@@ -11,8 +11,7 @@ Example:
     >>> import easysteer.hidden_states as hs
     >>> from vllm import LLM
     >>>
-    >>> llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enforce_eager=True,
-    ...           enable_prefix_caching=False)
+    >>> llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct")
     >>> result = hs.capture(llm, ["Hello world"])
     >>> result.sample(0)[10].shape  # sample 0, layer 10
 """

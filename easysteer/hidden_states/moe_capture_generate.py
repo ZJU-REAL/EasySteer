@@ -32,7 +32,8 @@ def get_moe_router_logits_generate(
     the captured logits are the post-steering ones.
 
     Args:
-        llm: vLLM LLM instance (enforce_eager, prefix caching off).
+        llm: vLLM LLM instance (any engine config: compiled or eager,
+            prefix caching on or off).
         prompts: text prompts, or multimodal dicts with ``prompt`` and
             ``multi_modal_data`` keys.
         max_tokens: tokens to generate (1 = prompt-only forward).

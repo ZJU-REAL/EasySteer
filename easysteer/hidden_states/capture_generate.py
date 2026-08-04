@@ -72,7 +72,8 @@ def get_all_hidden_states_generate(
     matching what an embed task would produce.
 
     Args:
-        llm: vLLM LLM instance (enforce_eager, prefix caching off).
+        llm: vLLM LLM instance (any engine config: compiled or eager,
+            prefix caching on or off).
         prompts: text prompts, or multimodal dicts with ``prompt`` and
             ``multi_modal_data`` keys.
         max_tokens: tokens to generate (1 = prompt-only forward).
