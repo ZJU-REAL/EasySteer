@@ -249,6 +249,6 @@ class TestMoeRouterJson:
             )
 
 
-def test_template_exposes_triggers():
+def test_algorithm_exposes_clause():
     algo = DirectAlgorithm()
-    assert hasattr(algo, "triggers") and not hasattr(algo, "params")
+    assert hasattr(algo, "clause") and not hasattr(algo, "params")

@@ -17,8 +17,8 @@ from vllm.steer_vectors.api import (
     VectorSpec,
     to_engine_request,
 )
-from vllm.steer_vectors.algorithms.triggers import (
-    TriggerController,
+from vllm.steer_vectors.algorithms.clause import (
+    ApplyClause,
     collect_positions_apply_spec,
 )
 from vllm.steer_vectors.request import (
@@ -297,19 +297,19 @@ class TestCollectorSemantics:
         ) == [0, 3]
 
 
-class TestTriggerControllerIntegration:
+class TestApplyClauseIntegration:
     def test_global_fast_path(self):
-        ctrl = TriggerController()
+        ctrl = ApplyClause()
         ctrl.configure_from_dict({"apply_spec": APPLY_ALL.to_wire()})
-        assert ctrl.is_global_only_config()
+        assert ctrl.selects_all_tokens()
 
     def test_filtered_spec_not_global(self):
-        ctrl = TriggerController()
+        ctrl = ApplyClause()
         ctrl.configure_from_dict(
             {"apply_spec": ApplySpec(phases=["prompt"], exclude_tokens=[3]).to_wire()}
         )
-        assert not ctrl.is_global_only_config()
-        assert ctrl.has_any_triggers()
+        assert not ctrl.selects_all_tokens()
+        assert ctrl.has_clause()
 
 
 class TestSelectSpec:

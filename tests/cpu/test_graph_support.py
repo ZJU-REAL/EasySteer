@@ -13,7 +13,7 @@ from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 from vllm.steer_vectors.algorithms import steering_execution_modes
 from vllm.steer_vectors.api import to_engine_request
 from vllm.steer_vectors.payloads import LowRankProjector
-from vllm.steer_vectors.worker_manager import graph_request_problem
+from vllm.steer_vectors.graph_support import graph_request_problem
 
 APPLY_ALL = ApplySpec(phases=["prompt", "generation"])
 

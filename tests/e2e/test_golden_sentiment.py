@@ -42,6 +42,11 @@ PROMPT = (
 
 @pytest.mark.skipif(not os.path.exists(GOLDEN), reason="golden.txt not present")
 def test_server_default_matches_golden(llm):
+    import torch
+
+    if "RTX PRO 5000" not in torch.cuda.get_device_name(0):
+        pytest.skip("golden recorded on RTX PRO 5000; other GPU models "
+                    "produce different bytes")
     sp = SamplingParams(temperature=0.0, max_tokens=128)
     out = llm.generate(PROMPT, sampling_params=sp)[0].outputs[0].text
     golden = open(GOLDEN).read()

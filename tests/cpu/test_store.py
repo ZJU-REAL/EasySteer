@@ -42,7 +42,7 @@ def test_store_versioning(vec_path):
         return types.SimpleNamespace(tag=len(loads), layer_payloads={})
 
     with mock.patch(
-        "vllm.steer_vectors.models.LoadedSteerVector.from_local_checkpoint",
+        "vllm.steer_vectors.controller_manager.LoadedSteerVector.from_local_checkpoint",
         side_effect=fake_load,
     ):
         store = VectorStore("cpu", cfg)
@@ -72,7 +72,7 @@ def test_store_forwards_target_layers(vec_path):
         return types.SimpleNamespace(layer_payloads={})
 
     with mock.patch(
-        "vllm.steer_vectors.models.LoadedSteerVector.from_local_checkpoint",
+        "vllm.steer_vectors.controller_manager.LoadedSteerVector.from_local_checkpoint",
         side_effect=fake_load,
     ):
         store = VectorStore("cpu", cfg)

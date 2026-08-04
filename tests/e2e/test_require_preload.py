@@ -51,7 +51,7 @@ def test_unpreloaded_multi_vector_rejected(llm):
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
     missing = SteeringSpec(vectors=[VectorSpec(
-        source=DENSE_VECTOR + ".does-not-exist",
+        source=DENSE_VECTOR.replace(".gguf", "-does-not-exist.gguf"),
         layers=LAYERS,
         apply=ApplySpec(phases=["prompt", "generation"]),
     ), VectorSpec(
