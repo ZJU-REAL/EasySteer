@@ -127,11 +127,33 @@ def test_fresh_identical_spec_replays_identically(llm, outs):
 def test_loreft_rejected_as_not_graph_safe(llm, outs):
     """Full-graph mode admits only direct/no-normalize/single-vector.
 
-    Runs last (and after `outs` is built): the admission error surfaces
-    through the engine step, and exception-type wrapping varies, so any
-    raise counts as the rejection (matching the original script). The
-    underlying error is the worker's "graph-safe configs" ValueError.
+    Runs last (and after `outs` is built): loreft is a data-only
+    algorithm, so the spec carries a minimal inline payload; the
+    graph-safe rejection surfaces through the engine step and
+    exception-type wrapping varies, so any raise counts (matching the
+    original script). The underlying error is the admission-side
+    "graph-safe configs" ValueError.
     """
-    spec = steering_spec(scale=1.0, layers=LAYERS, algorithm="loreft")
+    import numpy as np
+
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+    from vllm.steer_vectors.payloads import ReftIntervention
+
+    payload = ReftIntervention(
+        rotate_layer=np.zeros((1536, 2), dtype=np.float32),
+        learned_source_weight=np.zeros((1536, 2), dtype=np.float32),
+        learned_source_bias=np.zeros(2, dtype=np.float32),
+    )
+    spec = SteeringSpec(
+        vectors=[
+            VectorSpec(
+                data=payload,
+                algorithm="loreft",
+                scale=1.0,
+                layers=LAYERS,
+                apply=ApplySpec(phases=["prompt", "generation"]),
+            )
+        ]
+    )
     with pytest.raises(Exception):
         gen(llm, [TEXT], steering=spec)

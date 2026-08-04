@@ -127,10 +127,41 @@ class TestMultiVector:
         assert gen(llm, [PROMPT], two_vector_spec)[0] != plain
 
     def test_no_cross_request_contamination(self, llm, two_vector_spec):
-        mixed = gen(llm, [PROMPT, PROMPT], [two_vector_spec, None])
-        plain_batch = gen(llm, [PROMPT, PROMPT], None)
-        assert mixed[1] == plain_batch[1], (
-            "plain request contaminated by the co-batched multi-vector request"
+        """Mechanism-level isolation for a [multi-vector, plain] batch:
+        every applied position lies in rows routed to the apply's slot,
+        and both sub-vectors fire on their layer ranges. Byte compares
+        of batched outputs are deliberately avoided (module docstring).
+        """
+        import os
+
+        from helpers import read_trace
+
+        trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
+        steps_before, _ = read_trace(trace_dir, 0, ())
+        start = max(steps_before, default=0)
+        outs = gen(llm, [PROMPT, PROMPT], [two_vector_spec, None])
+        assert outs[0] != outs[1], "multi-vector request did not steer"
+        steps, applies = read_trace(trace_dir, start, (10, 18))
+        assert applies, "mixed batch produced no steering applies"
+        seen_layers = set()
+        for rec in applies:
+            step = steps[rec["step"]]
+            qsl = step["query_start_loc"]
+            slots = step["slots"]
+            seen_layers.add(rec["layer"])
+            for pos in rec["positions"]:
+                req_idx = next(
+                    i for i in range(len(qsl) - 1)
+                    if qsl[i] <= pos < qsl[i + 1]
+                )
+                assert slots[req_idx] == rec["slot"], (
+                    f"step {rec['step']}: position {pos} of slot "
+                    f"{rec['slot']} lies in request {req_idx} routed to "
+                    f"slot {slots[req_idx]}"
+                )
+        assert seen_layers == {10, 18}, (
+            f"both sub-vectors must fire on their layer ranges, saw "
+            f"{sorted(seen_layers)}"
         )
 
 

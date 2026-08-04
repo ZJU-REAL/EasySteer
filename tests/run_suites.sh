@@ -12,6 +12,7 @@ GROUP="${1:-all}"
 
 CPU_SUITES=(cpu)
 DENSE_SUITES=(
+  e2e/test_vanilla_parity.py
   e2e/test_apply_semantics.py
   e2e/test_routing.py
   e2e/test_prefix_cache.py
