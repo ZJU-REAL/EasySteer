@@ -51,10 +51,12 @@ def main():
     parser.add_argument("--cudagraph", action="store_true",
                         help="enable CUDA graphs (paper numbers are eager)")
     parser.add_argument("--graph-mode", choices=["piecewise", "full"],
-                        default="piecewise",
+                        default=None,
                         help="steering graph tier under --cudagraph: "
-                             "piecewise splits at steered layers; full "
-                             "captures the steering kernel into the graph")
+                             "full captures the steering kernel into the "
+                             "graph (engine default when compiled); "
+                             "piecewise splits at steered layers "
+                             "(all algorithms)")
     args = parser.parse_args()
 
     steering = {
@@ -64,8 +66,12 @@ def main():
         "multi_vector": zero_scale_spec(3, list(range(28))),
     }[args.mode]
     engine_kwargs = {}
-    if args.cudagraph and args.graph_mode == "full":
-        engine_kwargs["steer_graph_mode"] = "full"
+    if args.graph_mode is not None:
+        engine_kwargs["steer_graph_mode"] = args.graph_mode
+    elif args.mode == "multi_vector" and args.cudagraph:
+        # Multi-vector configs are not graph-safe; the compiled-engine
+        # default (full) would reject them at admission.
+        engine_kwargs["steer_graph_mode"] = "piecewise"
     llm = LLM(model=MODEL, enable_steer_vector=True,
               enforce_eager=not args.cudagraph, **engine_kwargs)
     params = SamplingParams(temperature=0, max_tokens=args.max_tokens,

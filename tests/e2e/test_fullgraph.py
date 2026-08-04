@@ -27,7 +27,8 @@ EAGER = os.environ.get("STEER_TEST_EAGER", "0") == "1"
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
-    steer_graph_mode="full",
+    # No explicit steer_graph_mode: compiled engines resolve the "auto"
+    # default to full — this module validates that default end to end.
     enforce_eager=EAGER,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,
@@ -35,6 +36,10 @@ ENGINE_KWARGS = dict(
     gpu_memory_utilization=0.25,
     max_model_len=2048,
 )
+if EAGER:
+    # The auto default resolves to piecewise under eager; the debug
+    # escape hatch still needs the full-graph kernel path.
+    ENGINE_KWARGS["steer_graph_mode"] = "full"
 
 TEXT = (
     "<|im_start|>user\nAlice's dog has passed away. "
@@ -77,8 +82,13 @@ def outs(llm):
 
 @pytest.mark.skipif(EAGER, reason="STEER_TEST_EAGER=1 runs the kernel eagerly")
 def test_full_cudagraphs_kept(llm):
-    """steer_graph_mode=full must not downgrade to piecewise graphs."""
-    comp = llm.llm_engine.vllm_config.compilation_config
+    """Compiled engines resolve the auto default to full-graph steering
+    and must not downgrade to piecewise graphs."""
+    cfg = llm.llm_engine.vllm_config
+    assert cfg.steer_vector_config.graph_mode == "full", (
+        f"auto default resolved to {cfg.steer_vector_config.graph_mode!r}"
+    )
+    comp = cfg.compilation_config
     assert comp.cudagraph_mode.has_full_cudagraphs(), (
         f"cudagraph_mode {comp.cudagraph_mode} has no full graphs"
     )

@@ -21,11 +21,12 @@ python bench_vllm.py --mode all_layer
 python bench_vllm.py --mode multi_vector
 python bench_vllm.py --mode all_layer --batch 256 --max-tokens 2048
 
-# CUDA graphs (paper numbers are eager). --graph-mode full captures the
-# steering kernel into the graph (graph-safe configs only); the default
-# piecewise mode splits the graph at every steered layer.
+# CUDA graphs (paper numbers are eager). Compiled engines default to
+# full-graph steering (the kernel is captured into the graph; graph-safe
+# configs only); --graph-mode piecewise instead splits the graph at
+# every steered layer and supports all algorithms.
 python bench_vllm.py --mode all_layer --cudagraph
-python bench_vllm.py --mode all_layer --cudagraph --graph-mode full
+python bench_vllm.py --mode all_layer --cudagraph --graph-mode piecewise
 
 # pyreft (HF transformers, all-layer zeroed LoReFT; paper batch: 256)
 python bench_pyreft.py
