@@ -27,6 +27,7 @@ DENSE_SUITES=(
 )
 MOE_SUITES=(
   moe/test_moe.py
+  moe/test_moe_fullgraph.py
   moe/test_moe_compiled.py
   moe/test_steermoe.py
   moe/test_qwen3_smoke.py
