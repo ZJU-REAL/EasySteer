@@ -39,14 +39,16 @@ on any FusedMoE architecture**:
 | Detect experts | offline risk difference | same, from the captured stream |
 | Steer experts | per-model forked forward | `moe_router` algorithm, `activate`/`deactivate` modes |
 
-- `expert_detection.ipynb` — capture per-token router logits for a few
-  contrastive digits-vs-words pairs, compute the risk difference, and save
-  the 200 most word-linked experts as `steermoe_qwen3_words.json`
-  (replicates `custom_steering.ipynb` from the official repo).
-- `steermoe_steer.ipynb` — deactivate those experts, flipping greedy
-  counting from written words to digits, and verify the mechanism by
-  re-capturing router logits *post-steering* (deactivated experts
-  disappear from every token's top-8).
+`steermoe.ipynb` runs both phases in one engine (replicating
+`custom_steering.ipynb` from the official repo):
+
+- **Detection** — capture per-token router logits for a few contrastive
+  digits-vs-words pairs, compute the risk difference, and save the 200
+  most word-linked experts as `steermoe_qwen3_words.json`.
+- **Steering** — deactivate those experts, flipping greedy counting from
+  written words to digits, and verify the mechanism by re-capturing
+  router logits *post-steering* (deactivated experts disappear from
+  every token's top-8).
 
 Model: [`Qwen/Qwen3-30B-A3B`](https://huggingface.co/Qwen/Qwen3-30B-A3B)
 (48 MoE layers × 128 experts, top-8), one of the models evaluated in the
