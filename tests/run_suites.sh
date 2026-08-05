@@ -22,6 +22,8 @@ DENSE_SUITES=(
   e2e/test_piecewise.py
   e2e/test_fullgraph.py
   e2e/test_fullgraph_large_capacity.py
+  e2e/test_capacity_backpressure.py
+  e2e/test_capacity_backpressure_fullgraph.py
   e2e/test_capture.py
   e2e/test_capture_unified.py
   e2e/test_trigger_positions.py

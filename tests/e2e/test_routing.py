@@ -230,7 +230,18 @@ class TestScaleSweep:
                     f"{rec['slot']} lies in request {req_idx} routed to "
                     f"slot {slots[req_idx]}"
                 )
-        assert len(distinct_slots) == len(SCALES), (
-            f"expected {len(SCALES)} live slots (one per scale), got "
-            f"{len(distinct_slots)}"
+        # max_steer_vectors (default 8) is a scheduling constraint:
+        # the 51 distinct configs stream through a bounded, reused slot
+        # pool instead of being live all at once.
+        assert distinct_slots and len(distinct_slots) <= 8, (
+            f"slot pool not bounded by capacity: {sorted(distinct_slots)}"
         )
+        assert all(0 <= s < 8 for s in distinct_slots), (
+            f"slot ids escaped the capacity pool: {sorted(distinct_slots)}"
+        )
+        for step_id, step in steps.items():
+            live = {s for s in step["slots"] if s >= 0}
+            assert len(live) <= 8, (
+                f"step {step_id} carried {len(live)} distinct configs "
+                f"(> max_steer_vectors)"
+            )
