@@ -61,6 +61,91 @@ class TestExecutionModes:
         assert graph_condition("linear") is None
 
 
+class TestDeclaredGraphFamilies:
+    """The kernel is compiled with exactly the declared workload's
+    families (declared_graph_families); moe_router maps to the gate
+    kernel, not a decoder family."""
+
+    def test_family_mapping(self):
+        from vllm.steer_vectors.graph_support import declared_graph_families
+
+        assert declared_graph_families(["direct"]) == {"additive"}
+        assert declared_graph_families(["direct", "erase"]) == {
+            "additive", "projection",
+        }
+        assert declared_graph_families(["lm_steer"]) == {"lowrank"}
+        assert declared_graph_families(["replace"]) == {"replace"}
+        assert declared_graph_families(["moe_router"]) == frozenset()
+        assert declared_graph_families("all") == {
+            "additive", "projection", "lowrank", "replace",
+        }
+        assert declared_graph_families(None) == {
+            "additive", "projection", "lowrank", "replace",
+        }
+
+
+class TestFamilySpecializedKernel:
+    """A kernel compiled with a family subset must match the full
+    kernel whenever the dropped families are idle (their tables and
+    masks all-zero) — the exactness the specialization relies on."""
+
+    def _buffers(self, rows=4, hidden=8, rank=2, n=6):
+        import torch
+
+        from vllm.steer_vectors.graph_kernels import GRAPH_FAMILIES
+
+        g = torch.Generator().manual_seed(0)
+        dim_of = {"h": hidden, "r": rank}
+        tables = {
+            family: {
+                key: torch.zeros(rows, *(dim_of[d] for d in dims))
+                for key, dims in schema.items()
+            }
+            for family, schema in GRAPH_FAMILIES.items()
+        }
+        tables["additive"]["V"][1:] = torch.randn(
+            rows - 1, hidden, generator=g
+        )
+        hidden_states = torch.randn(n, hidden, generator=g)
+        residual = torch.randn(n, hidden, generator=g)
+        graph_mask = torch.tensor([1.0, 0.0, 1.0, 1.0, 0.0, 1.0])
+        replace_mask = torch.zeros(n)
+        normalize_flag = torch.zeros(rows)
+        normalize_flag[2] = 1.0
+        token_rows = torch.tensor([1, 0, 2, 3, 0, 2])
+        return (tables, graph_mask, replace_mask, normalize_flag,
+                token_rows, hidden_states, residual)
+
+    def test_additive_subset_matches_full(self):
+        from vllm.steer_vectors.graph_kernels import apply_decoder_families
+
+        (tables, graph_mask, replace_mask, normalize_flag, token_rows,
+         hidden_states, residual) = self._buffers()
+        full = apply_decoder_families(
+            tables, graph_mask, replace_mask, normalize_flag, token_rows,
+            hidden_states, residual,
+        )
+        subset = apply_decoder_families(
+            {"additive": tables["additive"]}, graph_mask, replace_mask,
+            normalize_flag, token_rows, hidden_states, residual,
+        )
+        assert (full == subset).all(), (
+            "additive-only kernel differs from full kernel with idle "
+            "families"
+        )
+
+    def test_empty_families_is_identity(self):
+        from vllm.steer_vectors.graph_kernels import apply_decoder_families
+
+        (_, graph_mask, replace_mask, normalize_flag, token_rows,
+         hidden_states, residual) = self._buffers()
+        out = apply_decoder_families(
+            {}, graph_mask, replace_mask, normalize_flag, token_rows,
+            hidden_states, residual,
+        )
+        assert out is hidden_states
+
+
 class TestGraphRequestProblem:
     def test_graph_safe_config_passes(self):
         req = _request(source="v.gguf", algorithm="direct", scale=1.0,
