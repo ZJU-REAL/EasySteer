@@ -37,6 +37,10 @@ ENGINE_KWARGS = dict(
         "replace",
     ],
     steer_graph_mode="in_graph",
+    # Pin the pre-default capacity: <= 2 * steer_graph_max_rank keeps
+    # this module on the dense low-rank path (the gather path has its
+    # own module, test_fullgraph_large_capacity.py).
+    max_steer_vectors=8,
     enforce_eager=EAGER,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,

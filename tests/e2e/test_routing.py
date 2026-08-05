@@ -209,10 +209,13 @@ class TestScaleSweep:
             "batched sweep outputs barely vary across scales"
         )
 
-    def test_batched_isolation_via_trace(self, sweep):
+    def test_batched_isolation_via_trace(self, llm, sweep):
         """Every applied position belongs to a request routed to that
         apply's slot — the mechanism-level no-cross-request guarantee."""
         _, _, _, steps, applies = sweep
+        capacity = (
+            llm.llm_engine.vllm_config.steer_vector_config.max_steer_vectors
+        )
         assert applies, "batched sweep produced no steering applies"
         distinct_slots = set()
         for rec in applies:
@@ -230,18 +233,19 @@ class TestScaleSweep:
                     f"{rec['slot']} lies in request {req_idx} routed to "
                     f"slot {slots[req_idx]}"
                 )
-        # max_steer_vectors (default 8) is a scheduling constraint:
-        # the 51 distinct configs stream through a bounded, reused slot
-        # pool instead of being live all at once.
-        assert distinct_slots and len(distinct_slots) <= 8, (
-            f"slot pool not bounded by capacity: {sorted(distinct_slots)}"
-        )
-        assert all(0 <= s < 8 for s in distinct_slots), (
-            f"slot ids escaped the capacity pool: {sorted(distinct_slots)}"
+        # max_steer_vectors is a scheduling constraint: the 51 distinct
+        # configs stream through a bounded, reused slot pool (all live
+        # at once when capacity >= 51, in waves otherwise).
+        assert distinct_slots and len(distinct_slots) <= min(
+            capacity, len(SCALES)
+        ), f"slot pool not bounded: {sorted(distinct_slots)}"
+        assert all(0 <= s < capacity for s in distinct_slots), (
+            f"slot ids escaped the capacity pool ({capacity}): "
+            f"{sorted(distinct_slots)}"
         )
         for step_id, step in steps.items():
             live = {s for s in step["slots"] if s >= 0}
-            assert len(live) <= 8, (
+            assert len(live) <= capacity, (
                 f"step {step_id} carried {len(live)} distinct configs "
-                f"(> max_steer_vectors)"
+                f"(> max_steer_vectors {capacity})"
             )
