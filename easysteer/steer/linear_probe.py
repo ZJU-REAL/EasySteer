@@ -25,9 +25,11 @@ def _build_classifier(penalty, C):
     Returns:
         LogisticRegression: The configured (unfitted) classifier.
     """
+    # sklearn >= 1.8 deprecates the penalty argument; the penalty is
+    # expressed through l1_ratio / C instead (verified coefficient-
+    # identical to the old constructions per branch).
     if penalty == "elasticnet":
         return LogisticRegression(
-            penalty=penalty,
             C=C,
             l1_ratio=0.5,  # elasticnet l1/l2 mixing ratio
             solver="saga",
@@ -36,16 +38,22 @@ def _build_classifier(penalty, C):
         )
     if penalty is None:
         return LogisticRegression(
-            penalty=None,
+            C=np.inf,  # unregularized
             solver="lbfgs",
             max_iter=1000,
             random_state=42,
         )
-    solver = "liblinear" if penalty == "l1" else "lbfgs"
-    return LogisticRegression(
-        penalty=penalty,
+    if penalty == "l1":
+        return LogisticRegression(
+            C=C,
+            l1_ratio=1,
+            solver="liblinear",
+            max_iter=1000,
+            random_state=42,
+        )
+    return LogisticRegression(  # "l2", the sklearn default
         C=C,
-        solver=solver,
+        solver="lbfgs",
         max_iter=1000,
         random_state=42,
     )
