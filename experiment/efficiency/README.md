@@ -41,6 +41,11 @@ python bench_multi_config.py --batch 1000 --configs 0 1 64 256 1000 \
 python bench_mode_compare.py --batch 64 --configs 0 1 8 32 \
     --modes eager split in_graph
 
+# max_steer_vectors as a throughput knob: N all-distinct-config
+# requests drained through a swept slot capacity (the scheduler
+# throttles differently-configured requests to the capacity).
+python bench_capacity_sweep.py --batch 256 --capacities 2 8 32 128 256
+
 # pyreft (HF transformers, all-layer zeroed LoReFT; paper batch: 256)
 python bench_pyreft.py
 python bench_pyreft.py --batch 256
