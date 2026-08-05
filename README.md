@@ -112,8 +112,11 @@ For full details, build-from-source, and Docker, see the [installation guide](ht
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-# enable_steer_vector=True turns on steering; without it, behaves like regular vLLM
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True)
+# enable_steer_vector=True turns on steering; without it, behaves like regular vLLM.
+# steer_algorithms declares the algorithms requests will use — the engine picks
+# the fastest CUDA-graph integration that serves them.
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True,
+          steer_algorithms=["direct"])
 
 def happy_steering(scale):
     # Which vector, how strongly, on which layers, and where it applies

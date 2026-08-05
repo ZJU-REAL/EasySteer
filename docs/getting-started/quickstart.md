@@ -11,11 +11,14 @@ from vllm import LLM, SamplingParams
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # enable_steer_vector=True turns on steering support; without it the
-# engine behaves like stock vLLM.
+# engine behaves like stock vLLM. steer_algorithms declares the
+# algorithms requests will use — the engine derives the fastest
+# CUDA-graph integration that serves them (undeclared algorithms are
+# rejected; declare "all" to allow everything).
 llm = LLM(
     model="Qwen/Qwen2.5-1.5B-Instruct",
     enable_steer_vector=True,
-    enforce_eager=True,
+    steer_algorithms=["direct"],
     tensor_parallel_size=1,
 )
 ```

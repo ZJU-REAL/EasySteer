@@ -14,8 +14,9 @@ and CUDA-graph support.
 
 - **High performance** — 10.8–22.3× faster than existing steering frameworks through
   vLLM integration.
-- **One spec, every backend** — the same `SteeringSpec` runs under eager, piecewise, and
-  full CUDA-graph execution; backends that cannot run a spec reject it explicitly.
+- **One spec, every backend** — the same `SteeringSpec` runs under eager, split, and
+  in-graph CUDA-graph execution; declare your algorithms at launch and the engine
+  picks the fastest tier that serves them, rejecting anything undeclared explicitly.
 - **Fine-grained control** — token-level, position-specific, phase-aware
   (prompt vs. generation), and multi-vector steering.
 - **Modular algorithms** — direct addition, linear maps, LoReFT, LM-Steer,
@@ -41,8 +42,10 @@ and CUDA-graph support.
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
+# Declare the steering algorithms this engine will serve; the engine
+# derives the right CUDA-graph integration from the declaration.
 llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True,
-          enforce_eager=True)
+          steer_algorithms=["direct"])
 
 spec = SteeringSpec(vectors=[VectorSpec(
     source="vectors/happy_diffmean.gguf",

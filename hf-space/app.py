@@ -137,6 +137,8 @@ def load_model():
         llm_instance = LLM(
             model=MODEL_NAME,
             enable_steer_vector=True,
+            steer_algorithms="all",  # the demo serves user-picked algorithms
+            steer_multi_vector=True,
             enforce_eager=True,
             enable_chunked_prefill=False,
             gpu_memory_utilization=0.8,

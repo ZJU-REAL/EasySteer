@@ -7,7 +7,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 # Initialize the LLM model
 # enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-llm = LLM(model="/app/models/Qwen/Qwen2.5-1.5B-Instruct/", enable_steer_vector=True, enforce_eager=True, tensor_parallel_size=1)
+llm = LLM(model="/app/models/Qwen/Qwen2.5-1.5B-Instruct/", enable_steer_vector=True, steer_algorithms=["direct"], enforce_eager=True, tensor_parallel_size=1)
 
 sampling_params = SamplingParams(
     temperature=0.0,

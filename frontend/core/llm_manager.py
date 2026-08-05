@@ -87,9 +87,13 @@ class LLMManager:
                 'enable_chunked_prefill': enable_chunked_prefill,
             }
             
-            # Add enable_steer_vector if True
+            # Add enable_steer_vector if True. The frontend serves
+            # whatever algorithm the user picks, so declare them all
+            # (runs in split graph mode).
             if enable_steer_vector:
                 llm_config['enable_steer_vector'] = True
+                llm_config['steer_algorithms'] = 'all'
+                llm_config['steer_multi_vector'] = True
             
             # Add enable_prefix_caching if explicitly specified
             if enable_prefix_caching is not None:

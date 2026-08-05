@@ -112,8 +112,10 @@ pip install --editable .
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-# enable_steer_vector=True 开启干预功能；不加则与普通 vLLM 行为一致
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True, enforce_eager=True)
+# enable_steer_vector=True 开启干预功能；不加则与普通 vLLM 行为一致。
+# steer_algorithms 声明请求将使用的干预算法——引擎据此选择能服务它们的最快 CUDA 图集成方式。
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True,
+          steer_algorithms=["direct"])
 
 def happy_steering(scale):
     # 使用哪个向量、强度多大、作用在哪些层、作用在哪些位置
