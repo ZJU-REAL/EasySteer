@@ -1,6 +1,13 @@
-# Capture Module Redesign Proposal
+# Capture Module Redesign
 
-Status: draft for discussion (2026-08-03). Companion to `MIGRATION_PLAN_vllm-0.26.0.md`.
+Status: **IMPLEMENTED** (P1–P3 shipped 2026-08-03; P4 items remain on-demand,
+see §4). Originally a proposal (companion to `MIGRATION_PLAN_vllm-0.26.0.md`);
+kept as the design record — the evidence survey (§1), the diagnosed problems
+(§2) and the rationale behind the shipped design (§3). Current usage
+documentation lives in `docs/user-guide/hidden-state-capture.md` and the
+`vllm-steer/vllm/capture/` module docstrings; the coexistence of capture with
+steering and compiled execution is described in
+`vllm-steer/docs/design/steer_vectors.md` ("Capture coexistence").
 Scope: joint redesign of engine-side capture (`vllm-steer/vllm/capture/`) and the
 consumer side (`easysteer/hidden_states/`, `easysteer/steer/` extractors), based on a
 survey of all 41 notebooks, the frontend extraction pipeline, and the test suite.
@@ -78,7 +85,7 @@ survey of all 41 notebooks, the frontend extraction pipeline, and the test suite
    same trigger helpers but a different surface, different validation, different
    docs.
 
-## 3. Proposed design
+## 3. Design (as implemented)
 
 ### 3.1 One selection language: `SelectSpec` shared with steering
 
@@ -109,6 +116,11 @@ Attached **per request** (`llm.generate(..., capture=spec)`), exactly like
 Per-request attachment gives per-request position lists for free, scopes lifecycle
 (no global enable/disable leakage between users), and makes capture composable with
 steering in one call (the steermoe verification pattern).
+
+*As shipped* (see the P2 scope note in §4), per-request attachment carries the
+**select clause only** — `llm.generate(..., capture_select=...)` overriding the
+enabled stream's selection — while streams and their `layers`/`dtype`/`budget`
+stay stream-global, because they define the storage layout.
 
 ### 3.3 Labeled rows
 
@@ -150,9 +162,11 @@ algorithms (LAT, probes) need the raw per-sample path anyway.
   accounting), and an optional safetensors spill directory covers
   bigger-than-RAM raw captures (P4, only if a real workload needs it).
 - Per-sample reduction keeps wire volume small enough that shm/CUDA-IPC
-  transport is unnecessary; defer it (P4). End-state retrieval shape: a
-  `CaptureRef` on each `RequestOutput` — small payloads inline, large payloads
-  as a resolvable handle (shm segment / spilled file / in-process tensor).
+  transport is unnecessary; deferred (P4). A `CaptureRef` on each
+  `RequestOutput` (small payloads inline, large payloads as a resolvable
+  handle) was considered as the end-state retrieval shape but **not
+  adopted**: P3 shipped per-request drain instead, to avoid forking vLLM's
+  output structs (see §4).
 
 ### 3.6 easysteer client rework (joint with extractors)
 
@@ -169,8 +183,9 @@ algorithms (LAT, probes) need the raw per-sample path anyway.
 - Unify the four capture classes into one; embed path removed (0 users); MoE router
   logits use the same result type with `what="router_logits"`; `analyze_expert_usage`
   reworked as a streaming accumulator (its current form has no callers).
-- Legacy RPC shims and `get_all_hidden_states_generate` kept working for one
-  release, then removed; the notebooks are the migration test corpus.
+- Legacy RPC shims and `get_all_hidden_states_generate` stay working for one
+  release (both still ship as compatibility wrappers), then get removed; the
+  notebooks are the migration test corpus.
 
 ## 4. Phasing
 
@@ -199,8 +214,14 @@ algorithms (LAT, probes) need the raw per-sample path anyway.
 
 ## 5. Known constraints carried forward
 
-- Hook-based capture still requires `enforce_eager=True` and
-  `enable_prefix_caching=False`; both remain admission-checked, fail-explicit.
+- Hook-based capture originally required `enforce_eager=True` and
+  `enable_prefix_caching=False`. **Both requirements have since been
+  lifted** by the unified-capture rework: capture hooks attach on every
+  engine and fold out of compiled artifacts; capture-active batches
+  dispatch through the raw eager forward per batch (idle batches keep
+  their graphs), and capture requests carry a `cache_salt` so
+  prefix-cache hits never skip the recomputation capture needs
+  (unsalted hits fail explicitly at fetch).
 - `center`/`diff` PCA needs pair identity; with aggregation client-side this is
   purely an easysteer bookkeeping concern (pair ids in the accumulator), never
   visible to the engine.

@@ -1,11 +1,23 @@
 # Steering API v2 — design and migration
 
-Status: v2 is the only API (2026-08-03). The v1 surface — trigger
-fields, `steer_vector_request` (offline and HTTP), the pydantic Param
-twins, the `--steer-vector-path` flag family and the v1 position
-collector — has been deleted; notebooks, tests, docs and the docker
-smoke test all use v2. (`frontend/` and `hf-space/` adaptation is
-deferred; see MIGRATION_PLAN.)
+Status: **shipped; historical design record.** v2 is the only API
+(since 2026-08-03). The v1 surface — trigger fields,
+`steer_vector_request` (offline and HTTP), the pydantic Param twins,
+the `--steer-vector-path` flag family and the v1 position collector —
+has been deleted; notebooks, tests, docs and the docker smoke test all
+use v2. (`frontend/` and `hf-space/` adaptation is still deferred; see
+MIGRATION_PLAN.)
+
+This file records *why* the API looks the way it does and how v1 was
+retired. For the current, maintained documentation of the API itself,
+see `vllm-steer/docs/features/steer_vectors.md` (user guide),
+`vllm-steer/docs/design/steer_vectors.md` (architecture), and
+`docs/user-guide/steering.md` (EasySteer docs site). Two things changed
+after this record was written: the graph tiers were renamed
+(`full` → `in_graph`, `piecewise` → `split`, chosen via
+`steer_graph_mode` ∈ {`auto`, `in_graph`, `split`}), and admission
+became declaration-first (`steer_algorithms` is mandatory when steering
+is enabled; undeclared algorithms are rejected on every engine).
 
 ## Why
 
@@ -83,12 +95,15 @@ Two attachment scopes, same object:
   (moe_router: `expert_ids`, `mode`, `lambda`, `topk`; other algorithms
   accept no params — unknown keys fail loudly). The four `moe_*` request
   fields fold in here.
-- **Backend invariant**: the spec is backend-independent. Eager, piecewise
-  and full CUDA-graph engines accept the same spec; a backend that cannot
-  run a spec rejects it at admission with an explicit error
-  (full-graph: direct algorithm, no normalize, single vector — unchanged).
-  `--steer-graph-mode` is an engine-level optimization setting, never
-  something that changes how a request is written.
+- **Backend invariant**: the spec is backend-independent. Eager engines and
+  both graph tiers (now named `split` and `in_graph`) accept the same spec;
+  a spec an engine cannot run is rejected at admission with an explicit
+  error. (Since the declaration-first rework, admissibility is derived from
+  the engine's `steer_algorithms` declaration and the in-graph kernel
+  families with their per-payload conditions — see the current docs; the
+  original "direct, no normalize, single vector" full-graph restriction no
+  longer applies.) `--steer-graph-mode` is an engine-level optimization
+  setting, never something that changes how a request is written.
 - **Server + per-request coexistence** stays disallowed for now (same as
   v1); the fingerprint + salt machinery would support relaxing it later.
 - **Capture** is unaffected (already unified under `CaptureSession`).
@@ -105,9 +120,11 @@ struct. v2 specs translate at admission via
   `apply_spec` and legacy trigger fields are mutually exclusive on a struct.
 - `TriggerController` executes `apply_spec` natively with a dedicated v2
   position collector (exact semantics above). The v1 collector and its
-  legacy-equivalence fuzz test are untouched and die with v1.
-- The full-graph fill path reuses the same collector, so v2 specs work under
-  all three backends with no extra code.
+  legacy-equivalence fuzz test were deleted together with v1. (Trigger
+  resolution has since been reworked into a single host-side numpy pass
+  per scheduler step; see `vllm-steer/docs/design/steer_vectors.md`.)
+- The in-graph (formerly "full-graph") fill path reuses the same collector,
+  so v2 specs work under eager and both graph tiers with no extra code.
 - Prefix caching: `apply_spec` participates in the fingerprint via the field
   registry; negative positions and `generation_window` mark the config
   prompt-length-sensitive, same rules as v1.

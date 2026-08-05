@@ -1,8 +1,38 @@
-# Migration plan: EasySteer → vLLM 0.26.0
+# Migration record: EasySteer → vLLM 0.26.0
 
-*Drafted 2026-08-01. Base: `EasySteer-vllm-v1` @ `21d7a9f` (vLLM v0.17.1, wheel commit `95c0f92`). Target: upstream vLLM v0.26.0 (released 2026-07-25).*
+Status: **COMPLETED**. The migration is done and validated; this file is a
+historical record (originally a plan drafted 2026-08-01), kept for the commit
+trail and the rationale behind each step. It is not maintained as
+documentation of the current system — for that, see
+`vllm-steer/docs/features/steer_vectors.md` (user guide) and
+`vllm-steer/docs/design/steer_vectors.md` (architecture).
 
-## Status (2026-08-02): core migration validated ✅
+*Base: `EasySteer-vllm-v1` @ `21d7a9f` (vLLM v0.17.1, wheel commit `95c0f92`). Target: upstream vLLM v0.26.0 (released 2026-07-25).*
+
+The work log below is chronological; entries record the state at their date
+and later entries supersede earlier ones. Statements superseded **after** the
+log closed:
+
+- Graph tiers were renamed: `steer_graph_mode` values `full` → `in_graph` and
+  `piecewise` → `split`, with `auto` (the default) resolving conservatively
+  from the workload declaration.
+- Steering became declaration-first: `steer_algorithms` is mandatory when
+  steering is enabled, and requests using undeclared algorithms are rejected
+  at admission on every engine.
+- The in-graph (formerly "Tier 1 / full") kernel is no longer limited to
+  "direct, no normalize, single-vector": it is family-specialized from the
+  declaration (additive / projection / lowrank / replace families), with
+  per-payload conditions such as the `steer_graph_max_rank` cap.
+- `max_steer_vectors` no longer defaults to 8: it defaults to
+  `min(256, max_num_seqs)` and is a scheduling constraint like `max_loras`
+  (fingerprint-keyed slot backpressure; identical configs share a slot;
+  overflow queues instead of failing).
+- Trigger resolution is one host-side numpy pass per scheduler step.
+- Capture no longer requires `enforce_eager=True` or disabled prefix caching:
+  capture-active batches dispatch eagerly per batch and capture requests are
+  cache-salted (see `CAPTURE_REDESIGN_PROPOSAL.md`).
+
+## Work log — status (2026-08-02): core migration validated ✅
 
 - Branch `migrate-v0.26.0` pushed to `git@github.com:xuhaolei/EasySteer-vllm-v1.git`
   (`44ae813` port + `0b9e559` V1-runner fix).
@@ -346,31 +376,32 @@ recapture per config and blocked per-request steering.
   Deletion of v1 (fields, v1 collector, fuzz oracle, Param twins)
   waits for easysteer pkg/notebook/hf-space migration.
 
-## Future requirements (recorded, not current priority)
+## Items still open when the log closed
 
-- **Dedicated documentation site**: rather than extending the current
-  README-based docs, we may build a dedicated project page with detailed
-  documentation similar in scope and structure to the vLLM docs site
-  (user guide / API reference / algorithm catalog / replication index).
-  The v2 API design doc (STEERING_API_V2.md) and the standardized
-  notebooks are written to be liftable into such a site.
-- **Frontend + hf-space adaptation to v2** (deferred; not urgent): both
+- **Dedicated documentation site** — DONE since: the mkdocs site now lives in
+  `docs/` (built from `mkdocs.yml` at the repo root).
+- **Frontend + hf-space adaptation to v2** (still deferred; not urgent): both
   still use the v1 request JSON (`frontend/core/steer_request_builder.py`,
   `frontend/chat_api.py`, `frontend/inference_api.py`, `hf-space/app.py` —
   note its triggerless scale-0 baseline request also needs an `apply`
   clause under v2). The frontend is additionally slated for a visual
   overhaul later; adapt API + looks together.
+- Expert parallelism (EP) untested; TP=2 validated.
+- VLMs and `easysteer` pkg + pyreft under transformers v5 not re-validated
+  on the 0.26 stack.
+- Repo-wide implicit-defaults review (prefer explicit failure) beyond the
+  algorithms package; dual pydantic/msgspec schema (parked with the API
+  redesign); soft_topk deprecation question; live HTTP test of
+  `/v1/steering` + prefix-cache reset.
 
-- Remaining (not yet validated): Tier-1 full-graph steering kernel
-  (planned; legacy `steer_allow_cuda_graphs` bake-in slated for
-  retirement), OpenAI server-level steering endpoints, MoE
-  capture/steering, VLMs,
-  `easysteer` pkg + pyreft under transformers v5. Hidden-states capture
-  (CaptureModelRunnerMixin) is still V1-only — set
-  `VLLM_USE_V2_MODEL_RUNNER=0` when using the capture APIs on
-  default-V2 architectures.
+---
 
-## 1. Current state
+The sections below are from the **original plan** (drafted 2026-08-01, before
+the work began), kept as a record of the intended approach. The plan was
+executed essentially as written; the work log above is authoritative where
+they differ.
+
+## 1. State before migration (0.17.1 fork)
 
 - All vLLM integration lives in the `vllm-steer/` submodule fork; the `easysteer` package only imports `vllm.hidden_states` and migrates for free.
 - The fork is almost purely additive: **+10,140 / −9 lines over 70 files, all Python** (no csrc/cmake changes → precompiled wheels usable).
@@ -389,31 +420,20 @@ recapture per config and blocked per-request steering.
 | 0.24 | vLLM no longer sets `CUDA_VISIBLE_DEVICES` (`device_ids` arg) | Update experiment launch scripts |
 | 0.25 | Legacy `api_server.py` deprecated; PagedAttention (V0) deleted | Move server-level steering endpoints to new entrypoint |
 
-## 3. Strategy
+## 3. Strategy (as executed)
 
 Branch from the **v0.26.0 tag** and re-apply the fork as a curated patch series (`git diff v0.17.1 <fork-head>`, applied with `git apply --3way`), rather than rebasing fork commits through nine releases. The additive packages land cleanly; hand-port the ~20 touch-point files against the refactored internals.
 
-## 4. Phases
+Execution followed the planned phases — golden baselines on the 0.17.1 stack, mechanical port from the v0.26.0 tag, hot-spot rework in risk order (model runner, `ForwardContext` fields, scheduler/engine plumbing, server entrypoint, CUDA-graph paths), then golden validation — all recorded step by step in the work log above.
 
-- **Phase 0 — Baseline**: reproduce current behavior on the 0.17.1 stack (existing `easysteer-0.17.1` env on zju-48); record golden outputs (fixed seed, greedy) for representative steering configs; run fork test suite.
-- **Phase 1 — Mechanical port**: new branch from v0.26.0; copy self-contained packages; 3-way-apply touch-point patches; engine must boot with steering disabled and match vanilla 0.26.0 output.
-- **Phase 2 — Hot spots** (risk order):
-  1. Model runner: rewire mixins; interim policy = force V1 runner path when `steer_vector_config` is set, port to Runner V2 later.
-  2. `ForwardContext` fields re-derived from 0.26 batch structures; re-verify prefix-caching / continuous-batching trigger semantics.
-  3. Scheduler/engine plumbing for per-request steer/capture state.
-  4. OpenAI server steering on non-deprecated entrypoint.
-  5. CUDA-graph capture path re-validation.
-- **Phase 3 — Validate**: fork tests + golden comparison (exact match for deterministic configs; else tight logprob tolerance); `bench_eager_vs_cudagraphs.py`; one model per family (dense / MoE / VLM). Minimal gate: README sentiment-steering example produces correct steered output.
-- **Phase 4 — Release chores**: transformers v5 deps, README install (`VLLM_PRECOMPILED_WHEEL_COMMIT` → v0.26.0 commit), Docker image, submodule pointer.
-
-## 5. Lab environment notes
+## 4. Lab environment notes
 
 - Fork is pure Python → `VLLM_USE_PRECOMPILED=1 pip install -e .` works; install on **zju-48** (home hosted there).
 - Driver gap for CUDA 13 default wheels (need ≥ 580): zju-48 = 580.105 ✓; zju-46 = 575, zju-54 = 570, zju-12 = 560 ✗. Options: validate on zju-48; use cu128 wheel variants for the wider fleet; or request driver upgrades.
 
-## 6. Risks
+## 5. Risks (as drafted)
 
-1. Model Runner V2 silently bypassing hooks → force-V1 interim policy + assertion that wrapping occurred.
+1. Model Runner V2 silently bypassing hooks → force-V1 interim policy + assertion that wrapping occurred. *(Materialized immediately and was fixed; see the first work-log entry. V2 later became the only steering runner.)*
 2. Trigger-position semantics under 0.26 prefix caching / chunked prefill → golden suite.
 3. `torch.compile` / CUDA-graph interaction with model wrapping → test both modes early.
 4. Transformers v5 breakage in bundled `pyreft`.
