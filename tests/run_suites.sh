@@ -23,6 +23,8 @@ DENSE_SUITES=(
   e2e/test_fullgraph.py
   e2e/test_capture.py
   e2e/test_capture_unified.py
+  e2e/test_trigger_positions.py
+  e2e/test_openai_server.py
   e2e/test_capture_chunked.py
   e2e/test_payload_steering.py
 )

@@ -135,3 +135,82 @@ class TestMultiVector:
                                 steering=spec)
         assert sorted(p for p, _ in by_layer[10]) == [0]
         assert sorted(p for p, _ in by_layer[12]) == [129, 130, 131]
+
+
+class TestBatchedPerRequestPositions:
+    """Adversarial continuous batching: six requests with different
+    prompt lengths, different position specs, and different generation
+    lengths submitted in one call, with max_num_seqs=4 forcing
+    scheduling waves and 64-token chunks interleaving prefill chunks
+    with other requests' decode steps. The trace must attribute every
+    steered position to the right request, and each request's absolute
+    positions must match its own spec exactly."""
+
+    CASES = [
+        # (prompt_len, max_tokens, apply_kwargs or None, expected_fn)
+        (129, 4, dict(phases=["prompt"], positions=[-1]),
+         lambda L, mt: {L - 1}),
+        (37, 6, dict(phases=["prompt"], positions=[0]),
+         lambda L, mt: {0}),
+        (1, 5, dict(phases=["generation"]),
+         lambda L, mt: set(range(L, L + mt - 1))),
+        (61, 6, dict(phases=["generation"], generation_window=(1, 3)),
+         lambda L, mt: {L + 1, L + 2}),
+        # Filters intersect: a positions filter is never widened by the
+        # window, so the windowed decode step fails positions=[-2,-1]
+        # and only the two prompt positions steer (clause.py semantics).
+        (45, 4, dict(phases=["prompt", "generation"], positions=[-2, -1],
+                     generation_window=(0, 1)),
+         lambda L, mt: {L - 2, L - 1}),
+        # The window constrains only decode tokens: with no positions
+        # filter, a cross-phase clause covers every prompt token plus
+        # the windowed decode steps.
+        (33, 4, dict(phases=["prompt", "generation"],
+                     generation_window=(0, 1)),
+         lambda L, mt: set(range(L)) | {L}),
+        (80, 4, None, lambda L, mt: set()),
+    ]
+
+    def test_every_request_steers_its_own_positions(self, trace):
+        from vllm.inputs import TokensPrompt
+
+        from helpers import read_trace
+
+        prompts, params, steering, expected = [], [], [], []
+        for i, (length, mt, apply_kwargs, expect) in enumerate(self.CASES):
+            prompts.append(TokensPrompt(
+                prompt_token_ids=list(range(100 + i, 100 + i + length))
+            ))
+            params.append(SamplingParams(temperature=0, max_tokens=mt,
+                                         ignore_eos=True))
+            steering.append(
+                None if apply_kwargs is None
+                else steering_spec(scale=0.5 + 0.01 * i, **apply_kwargs)
+            )
+            expected.append(expect(length, mt))
+
+        start = trace._max_step()
+        outs = trace.llm.generate(prompts, params, steering=steering,
+                                  use_tqdm=False)
+        steps, applies = read_trace(trace.trace_dir, start, (10,))
+
+        per_req = {out.request_id: set() for out in outs}
+        for rec in applies:
+            step = steps[rec["step"]]
+            qsl = step["query_start_loc"]
+            for pos in rec["positions"]:
+                ri = next(i for i in range(len(qsl) - 1)
+                          if qsl[i] <= pos < qsl[i + 1])
+                # Engine req ids carry a uniquifying suffix
+                # ("11-893e12e8"); RequestOutput.request_id is the prefix.
+                rid = step["req_ids"][ri].split("-", 1)[0]
+                assert rid in per_req, f"trace names unknown request {rid}"
+                per_req[rid].add(pos - qsl[ri] + step["num_computed"][ri])
+
+        for i, out in enumerate(outs):
+            got = per_req[out.request_id]
+            assert got == expected[i], (
+                f"request {i} (len={self.CASES[i][0]}, "
+                f"spec={self.CASES[i][2]}): steered positions {sorted(got)} "
+                f"!= expected {sorted(expected[i])}"
+            )
