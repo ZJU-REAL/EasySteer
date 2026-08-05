@@ -53,6 +53,7 @@ TOP_K = _hf_cfg["num_experts_per_tok"]
 ENGINE_KWARGS = dict(
     model=MODEL,
     enable_steer_vector=True,
+    steer_algorithms=["moe_router"],
     enforce_eager=True,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,

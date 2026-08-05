@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MoE gate steering under full CUDA graphs (the compiled auto default).
+"""MoE gate steering under full CUDA graphs (in_graph pinned;
+moe_router is conditionally graph-safe, so auto resolves it to split).
 
 The gate hook's captured kernel mirrors _transform_toggle (log-softmax,
 activated experts to per-token max+eps, deactivated to min-eps) over
 persistent expert toggle tables, so MoE models keep full CUDA graphs
-while steering. Covers: the auto default resolves to full on a compiled
-MoE engine; a deactivation config changes the output; replay is
+while steering. Covers: full cudagraphs kept under the pinned
+in-graph tier; a deactivation config changes the output; replay is
 deterministic; an unsteered co-batched request is untouched; soft-mode
-and file-based configs reject with the piecewise remedy.
+and file-based configs reject with the split-tier remedy.
 """
 
 import json
@@ -26,7 +27,11 @@ NUM_LAYERS = _hf_cfg["num_hidden_layers"]
 ENGINE_KWARGS = dict(
     model=MODEL,
     enable_steer_vector=True,
-    # No explicit steer_graph_mode: the compiled auto default is full.
+    steer_algorithms=["moe_router"],
+    # moe_router is conditionally graph-safe (inline configs only), so
+    # auto resolves it to split; this module tests the in-graph gate
+    # kernel — pin the tier explicitly.
+    steer_graph_mode="in_graph",
     enforce_eager=False,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,
@@ -57,7 +62,7 @@ def gen(llm, prompts, **kwargs):
 
 def test_full_cudagraphs_kept(llm):
     cfg = llm.llm_engine.vllm_config
-    assert cfg.steer_vector_config.graph_mode == "full"
+    assert cfg.steer_vector_config.graph_mode == "in_graph"
     assert cfg.compilation_config.cudagraph_mode.has_full_cudagraphs()
 
 

@@ -31,17 +31,34 @@ def _lowrank(rank):
 class TestExecutionModes:
     def test_table_matches_declared_families(self):
         modes = steering_execution_modes()
-        assert modes["direct"] == ("piecewise", "full")
-        assert modes["erase"] == ("piecewise", "full")
-        assert modes["replace"] == ("piecewise", "full")
-        assert modes["concept_replace"] == ("piecewise", "full")
-        assert modes["loreft"] == ("piecewise", "full")
-        assert modes["lm_steer"] == ("piecewise", "full")
-        assert modes["moe_router"] == ("piecewise", "full")
-        assert modes["linear"] == ("piecewise",)
+        assert modes["direct"] == ("split", "in_graph")
+        assert modes["erase"] == ("split", "in_graph")
+        assert modes["replace"] == ("split", "in_graph")
+        assert modes["concept_replace"] == ("split", "in_graph")
+        assert modes["loreft"] == ("split", "in_graph")
+        assert modes["lm_steer"] == ("split", "in_graph")
+        assert modes["moe_router"] == ("split", "in_graph")
+        assert modes["linear"] == ("split",)
 
-    def test_every_algorithm_supports_piecewise(self):
-        assert all("piecewise" in m for m in steering_execution_modes().values())
+    def test_every_algorithm_supports_split(self):
+        assert all("split" in m for m in steering_execution_modes().values())
+
+    def test_conditional_classification(self):
+        """auto resolves names pessimistically from this classification:
+        conditional algorithms (rank-capped lowrank family, config-form
+        moe_router) drop out of the unconditional set."""
+        from vllm.steer_vectors.algorithms import (
+            graph_condition,
+            unconditionally_graph_safe_algorithms,
+        )
+
+        uncond = unconditionally_graph_safe_algorithms()
+        assert uncond == {"concept_replace", "direct", "erase", "replace"}
+        assert "rank" in graph_condition("lm_steer")
+        assert "rank" in graph_condition("loreft")
+        assert "inline" in graph_condition("moe_router")
+        assert graph_condition("direct") is None
+        assert graph_condition("linear") is None
 
 
 class TestGraphRequestProblem:

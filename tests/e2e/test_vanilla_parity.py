@@ -43,7 +43,8 @@ def test_unsteered_traffic_matches_vanilla():
     del vanilla
     gc.collect()
 
-    steering_enabled = LLM(enable_steer_vector=True, **COMMON)
+    steering_enabled = LLM(enable_steer_vector=True,
+                       steer_algorithms=["direct"], **COMMON)
     got = _greedy_token_ids(steering_enabled)
     assert got == want, (
         "enable_steer_vector=True changed unsteered outputs relative to a "

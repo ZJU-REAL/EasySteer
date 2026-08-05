@@ -23,7 +23,10 @@ from helpers import DENSE_MODEL, steering_spec
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
-    steer_graph_mode="piecewise",  # Tier-2 is the point (default is full)
+    steer_algorithms=["direct"],
+    # Tier-2 is the point: this direct-only workload would auto-resolve
+    # to in_graph on a compiled engine, so pin the split tier.
+    steer_graph_mode="split",
     enforce_eager=False,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,

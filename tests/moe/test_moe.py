@@ -46,6 +46,7 @@ ALL_LAYERS = [str(layer) for layer in range(NUM_LAYERS)]
 ENGINE_KWARGS = dict(
     model=MODEL,
     enable_steer_vector=True,
+    steer_algorithms=["moe_router"],
     enforce_eager=True,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,

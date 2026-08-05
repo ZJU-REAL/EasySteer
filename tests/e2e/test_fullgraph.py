@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tier-1 full-graph steering (the compiled-engine auto default).
+"""Tier-1 in-graph steering (pinned; this workload declares
+conditional algorithms, which auto resolves to split).
 
 The steering kernel families (additive, projection, low-rank, replace)
 read persistent buffers and capture into full CUDA graphs;
@@ -27,8 +28,15 @@ EAGER = os.environ.get("STEER_TEST_EAGER", "0") == "1"
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
-    # No explicit steer_graph_mode: compiled engines resolve the "auto"
-    # default to full — this module validates that default end to end.
+    # The module exercises every kernel family, including the
+    # conditional ones (loreft, lm_steer) that auto resolves
+    # pessimistically to split — so pin the in-graph tier explicitly
+    # (the expert path; boots with the conditional-algorithms warning).
+    steer_algorithms=[
+        "concept_replace", "direct", "erase", "lm_steer", "loreft",
+        "replace",
+    ],
+    steer_graph_mode="in_graph",
     enforce_eager=EAGER,
     tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,
@@ -37,9 +45,11 @@ ENGINE_KWARGS = dict(
     max_model_len=2048,
 )
 if EAGER:
-    # The auto default resolves to piecewise under eager; the debug
-    # escape hatch still needs the full-graph kernel path.
-    ENGINE_KWARGS["steer_graph_mode"] = "full"
+    # Byte-golden debug path: in_graph on a non-compiled engine is
+    # normally rejected at boot; the test-only escape hatch keeps the
+    # in-graph kernel path validatable under deterministic eager
+    # execution.
+    os.environ["VLLM_STEER_EAGER_IN_GRAPH"] = "1"
 
 TEXT = (
     "<|im_start|>user\nAlice's dog has passed away. "
@@ -82,11 +92,11 @@ def outs(llm):
 
 @pytest.mark.skipif(EAGER, reason="STEER_TEST_EAGER=1 runs the kernel eagerly")
 def test_full_cudagraphs_kept(llm):
-    """Compiled engines resolve the auto default to full-graph steering
-    and must not downgrade to piecewise graphs."""
+    """in_graph mode must keep full CUDA graphs (no piecewise
+    downgrade of vLLM's cudagraph_mode)."""
     cfg = llm.llm_engine.vllm_config
-    assert cfg.steer_vector_config.graph_mode == "full", (
-        f"auto default resolved to {cfg.steer_vector_config.graph_mode!r}"
+    assert cfg.steer_vector_config.graph_mode == "in_graph", (
+        f"graph mode is {cfg.steer_vector_config.graph_mode!r}"
     )
     comp = cfg.compilation_config
     assert comp.cudagraph_mode.has_full_cudagraphs(), (

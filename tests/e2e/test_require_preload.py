@@ -16,6 +16,7 @@ from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
+    steer_algorithms=["direct"],
     steer_require_preload=True,
     enforce_eager=True,
     enable_chunked_prefill=False,

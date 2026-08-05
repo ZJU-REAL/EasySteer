@@ -21,6 +21,7 @@ from helpers import DENSE_MODEL, steering_spec
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
+    steer_algorithms=["direct"],
     # Compiled engine; steering auto graph mode resolves to full, so
     # full CUDA graphs are kept while capture is idle.
     enforce_eager=False,
