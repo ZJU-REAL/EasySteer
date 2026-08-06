@@ -15,3 +15,7 @@ experiment/math/*.json
 replications/*/math500.json
 replications/*/math500_problems.json
 replications/cast/alpaca.json
+
+# New Vite frontend (frontend/app): dependencies and build output
+frontend/app/node_modules/
+frontend/app/dist/
