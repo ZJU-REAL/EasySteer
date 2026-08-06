@@ -38,7 +38,7 @@ CAPACITY = 2
 
 
 def distinct_spec(i, scale=0.0):
-    return steering_spec(scale=scale, layers=LAYERS, exclude_positions=[i])
+    return steering_spec(scale=scale, layers=LAYERS, exclude_prompt_positions=[i])
 
 
 def gen(llm, prompts, steering, max_tokens=32):

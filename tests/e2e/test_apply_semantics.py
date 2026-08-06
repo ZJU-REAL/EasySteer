@@ -76,20 +76,20 @@ class TestFilters:
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["prompt"], exclude_positions=[0, -1]),
+            steering=steering_spec(phases=["prompt"], exclude_prompt_positions=[0, -1]),
         ) == list(range(1, 128))
 
     def test_negative_position_fires_at_last_prompt_token(self, trace):
         assert trace.positions(
             PROMPT_LONG, PARAMS, steering=steering_spec(phases=["prompt"],
-                                                        positions=[-1])
+                                                        prompt_positions=[-1])
         ) == [128]
 
     def test_token_filter_matches_exact_positions(self, trace):
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["prompt"], tokens=[100, 150]),
+            steering=steering_spec(phases=["prompt"], prompt_tokens=[100, 150]),
         ) == [0, 50]
 
     def test_token_and_position_union_with_exclusion(self, trace):
@@ -98,9 +98,9 @@ class TestFilters:
             PARAMS,
             steering=steering_spec(
                 phases=["prompt"],
-                tokens=[100, 150],
-                positions=[7],
-                exclude_positions=[50],
+                prompt_tokens=[100, 150],
+                prompt_positions=[7],
+                exclude_prompt_positions=[50],
             ),
         ) == [0, 7]
 
@@ -129,7 +129,7 @@ class TestMultiVector:
 
         spec = SteeringSpec(vectors=[
             VectorSpec(source=DENSE_VECTOR, scale=0.5, layers=[10],
-                       apply=ApplySpec(phases=["prompt"], positions=[0])),
+                       apply=ApplySpec(phases=["prompt"], prompt_positions=[0])),
             VectorSpec(source=DENSE_VECTOR, scale=0.5, layers=[12],
                        apply=ApplySpec(phases=["generation"])),
         ])
@@ -150,9 +150,9 @@ class TestBatchedPerRequestPositions:
 
     CASES = [
         # (prompt_len, max_tokens, apply_kwargs or None, expected_fn)
-        (129, 4, dict(phases=["prompt"], positions=[-1]),
+        (129, 4, dict(phases=["prompt"], prompt_positions=[-1]),
          lambda L, mt: {L - 1}),
-        (37, 6, dict(phases=["prompt"], positions=[0]),
+        (37, 6, dict(phases=["prompt"], prompt_positions=[0]),
          lambda L, mt: {0}),
         (1, 5, dict(phases=["generation"]),
          lambda L, mt: set(range(L, L + mt - 1))),
@@ -161,7 +161,7 @@ class TestBatchedPerRequestPositions:
         # Include selectors union: the windowed decode step joins the
         # positions matches instead of being vetoed by them
         # (clause.py union semantics).
-        (45, 4, dict(phases=["prompt", "generation"], positions=[-2, -1],
+        (45, 4, dict(phases=["prompt", "generation"], prompt_positions=[-2, -1],
                      generation_window=(0, 1)),
          lambda L, mt: {L - 2, L - 1, L}),
         # The window is an include selector: once present, only its

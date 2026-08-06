@@ -170,7 +170,7 @@ class TestSourceSideSelection:
         """token_ids matches the whole encoded stream: prompt rows and
         decode rows (generated occurrences) alike."""
         target = llm.get_tokenizer().encode(TEXT)[2]
-        with capturing(llm, "hidden_states", select=sel(tokens=[target])):
+        with capturing(llm, "hidden_states", select=sel(prompt_tokens=[target], generation_tokens=[target])):
             out = generate(llm)
             states = fetch(llm)
         expected = sum(1 for t in encoded_ids(out) if t == target)
@@ -184,14 +184,14 @@ class TestSourceSideSelection:
 
     def test_position_list_selection(self, llm, expected_rows):
         prompt_tokens = len(llm.get_tokenizer().encode(TEXT))
-        with capturing(llm, "hidden_states", select=sel(positions=[0, -1])):
+        with capturing(llm, "hidden_states", select=sel(prompt_positions=[0, -1])):
             generate(llm)
             states = fetch(llm)
         # Absolute position 0 and the last prompt token (-1 resolves
         # from the prompt end), regardless of decode steps.
         rows = states[10].shape[0]
         assert rows == 2, f"expected rows for positions [0, -1], got {rows}"
-        with capturing(llm, "hidden_states", select=sel(positions=[0])):
+        with capturing(llm, "hidden_states", select=sel(prompt_positions=[0])):
             generate(llm)
             first_only = fetch(llm)
         with capturing(llm, "hidden_states"):
@@ -203,7 +203,7 @@ class TestSourceSideSelection:
 
     def test_selection_values_match_full_capture(self, llm):
         target = llm.get_tokenizer().encode(TEXT)[-1]
-        with capturing(llm, "hidden_states", select=sel(tokens=[target])):
+        with capturing(llm, "hidden_states", select=sel(prompt_tokens=[target], generation_tokens=[target])):
             sel_out = generate(llm)
             selected = fetch(llm)
         with capturing(llm, "hidden_states"):
@@ -220,7 +220,7 @@ class TestSourceSideSelection:
     def test_selection_rejects_reduction_combination(self, llm):
         with pytest.raises(Exception, match="reduc"):
             rpc(llm, "start_capture", "hidden_states",
-                reduce="last", select=sel(tokens=[1]))
+                reduce="last", select=sel(prompt_tokens=[1], generation_tokens=[1]))
         rpc(llm, "stop_capture", "hidden_states")
 
 
@@ -228,7 +228,7 @@ class TestWireEncoding:
     def test_bf16_raw_roundtrip(self, llm):
         """bf16 stores ship as raw bytes (no fp32 upcast) and round-trip."""
         with capturing(llm, "hidden_states", dtype="bfloat16",
-                       select=sel(positions=[-1])):
+                       select=sel(prompt_positions=[-1])):
             generate(llm)
             raw = rpc(llm, "fetch_captured", "hidden_states")
         layer = raw[10]
@@ -242,7 +242,7 @@ class TestWireEncoding:
         assert tensor.dtype == torch.bfloat16
 
     def test_per_layer_fetch(self, llm):
-        with capturing(llm, "hidden_states", select=sel(positions=[-1])):
+        with capturing(llm, "hidden_states", select=sel(prompt_positions=[-1])):
             generate(llm)
             part = rpc(llm, "fetch_captured", "hidden_states",
                        layers=[3, 7], clear=True)
@@ -273,7 +273,7 @@ class TestSelectClause:
     def test_exclusions_subtract(self, llm, expected_rows):
         with capturing(llm, "hidden_states", layers=[10],
                        select={"phases": ["prompt", "generation"],
-                               "exclude_positions": [0]}):
+                               "exclude_prompt_positions": [0]}):
             generate(llm)
             hs = fetch(llm)
         assert hs[10].shape[0] == expected_rows - 1
@@ -423,7 +423,7 @@ class TestPerRequestSelect:
         from vllm.steer_vectors.api import SelectSpec
 
         first_only = SelectSpec(
-            phases=["prompt", "generation"], positions=[0]
+            phases=["prompt", "generation"], prompt_positions=[0]
         ).to_wire()
         gen_only = SelectSpec(phases=["generation"]).to_wire()
         capture_select = [
@@ -442,7 +442,7 @@ class TestPerRequestSelect:
         tensors, meta = deserialize_captured(raw)
         assert meta is not None
         rows = self._grouped_rows(meta[10], outs)
-        assert len(rows[outs[0].request_id]) == 1, "positions=[0] override"
+        assert len(rows[outs[0].request_id]) == 1, "prompt_positions=[0] override"
         assert len(rows[outs[1].request_id]) == len(encoded_ids(outs[1])), (
             "no override falls back to the stream's global selection"
         )
@@ -479,7 +479,7 @@ class TestPerRequestSelect:
         result = hs.capture(
             llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],
             per_prompt_selects=[
-                SelectSpec(phases=["prompt", "generation"], positions=[0, -1]),
+                SelectSpec(phases=["prompt", "generation"], prompt_positions=[0, -1]),
                 None,
                 None,
             ],

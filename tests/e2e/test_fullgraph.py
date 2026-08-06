@@ -226,7 +226,7 @@ def test_loreft_emoji(llm):
     prompt = "<|im_start|>user\nWho are you?<|im_end|>\n<|im_start|>assistant\n"
     sp = SamplingParams(temperature=0.0, max_tokens=16)
     spec = _data_spec(from_pyreft(LOREFT_WEIGHT), "loreft", 1.0,
-                      layers=[8], phases=["prompt"], positions=[-1])
+                      layers=[8], phases=["prompt"], prompt_positions=[-1])
     plain = llm.generate(prompt, sampling_params=sp,
                          use_tqdm=False)[0].outputs[0].text
     steered = llm.generate(prompt, sampling_params=sp, use_tqdm=False,

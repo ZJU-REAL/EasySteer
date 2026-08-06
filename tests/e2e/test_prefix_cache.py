@@ -62,7 +62,7 @@ class TestFingerprintKeying:
         spec = steering_spec(scale=2.0)
         assert run(llm, PROMPT_48, spec).num_cached_tokens == 0
         assert run(llm, PROMPT_48, spec).num_cached_tokens > 0
-        excl = steering_spec(scale=2.0, exclude_positions=[0])
+        excl = steering_spec(scale=2.0, exclude_prompt_positions=[0])
         assert run(llm, PROMPT_48, excl).num_cached_tokens == 0, (
             "apply-clause change must re-key the blocks"
         )
@@ -80,7 +80,7 @@ class TestFingerprintKeying:
 
 class TestLengthSensitivity:
     def test_negative_position_keys_on_prompt_length(self, llm):
-        spec = steering_spec(phases=["prompt"], positions=[-1])
+        spec = steering_spec(phases=["prompt"], prompt_positions=[-1])
         longer = PROMPT_48 + list(range(300, 308))
         assert run(llm, PROMPT_48, spec).num_cached_tokens == 0
         assert run(llm, longer, spec).num_cached_tokens == 0, (

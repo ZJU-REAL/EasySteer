@@ -31,7 +31,6 @@ VECTOR_SPEC_FIELDS = {
 STEERING_SPEC_FIELDS = {
     "vectors": "single-vector fields or vector_configs",
     "conflict": "conflict_resolution",
-    "debug": "debug",
 }
 
 
@@ -49,7 +48,6 @@ def test_every_user_field_is_enumerated():
 def test_single_vector_fields_reach_the_wire():
     payload = DirectionVector({7: np.ones(8, dtype=np.float32)})
     spec = SteeringSpec(
-        debug=True,
         vectors=[VectorSpec(
             data=payload,
             algorithm="direct",
@@ -57,7 +55,7 @@ def test_single_vector_fields_reach_the_wire():
             layers=[7],
             normalize=True,
             name="drift-check",
-            apply=ApplySpec(phases=["prompt"], positions=[-1]),
+            apply=ApplySpec(phases=["prompt"], prompt_positions=[-1]),
         )],
     )
     req = to_engine_request(spec)
@@ -65,11 +63,10 @@ def test_single_vector_fields_reach_the_wire():
     assert req.scale == 1.5
     assert req.target_layers == [7]
     assert req.normalize is True
-    assert req.debug is True
     assert req.steer_vector_name == "drift-check"
     assert req.inline_payload["sha256"] == req.payload_sha256
     assert req.apply_spec["phases"] == ["prompt"]
-    assert req.apply_spec["positions"] == [-1]
+    assert req.apply_spec["prompt_positions"] == [-1]
 
 
 def test_multi_vector_fields_reach_the_wire():

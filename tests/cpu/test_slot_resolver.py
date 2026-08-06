@@ -43,7 +43,7 @@ CLAUSES = {
         ApplySpec(phases=["prompt"], prompt_window=(-9, -5)).to_wire(),
     ],
     1: [
-        ApplySpec(phases=["prompt"], positions=[-1, 0]).to_wire(),
+        ApplySpec(phases=["prompt"], prompt_positions=[-1, 0]).to_wire(),
         ApplySpec(
             phases=["prompt"],
             prompt_window=(2, None),
@@ -63,15 +63,18 @@ CLAUSES = {
             phases=["generation"], generation_window=(0, 1)
         ).to_wire(),
         ApplySpec(
-            phases=["prompt", "generation"], exclude_tokens=[7]
+            phases=["prompt", "generation"],
+            exclude_prompt_tokens=[7],
+            exclude_generation_tokens=[7],
         ).to_wire(),
         ApplySpec(
-            phases=["prompt"], tokens=[11], exclude_positions=[0]
+            phases=["prompt"], prompt_tokens=[11], exclude_prompt_positions=[0]
         ).to_wire(),
         # Union semantics: an unmatched token filter must not veto the
         # generation window (and vice versa).
         ApplySpec(
-            phases=["generation"], tokens=[123], generation_window=(0, 2)
+            phases=["generation"], generation_tokens=[123],
+            generation_window=(0, 2),
         ).to_wire(),
         ApplySpec(
             phases=["generation"], exclude_generation_positions=[1]

@@ -51,10 +51,13 @@ class TestApplySpecValidation:
             ({"phases": []}, "non-empty"),
             ({"phases": ["prompt", "prompt"]}, "duplicates"),
             ({"phases": ["prefill"]}, None),
-            ({"phases": ["prompt"], "tokens": [-1]}, "real token ids"),
+            ({"phases": ["prompt"], "prompt_tokens": [-1]}, "real token ids"),
             ({"phases": ["prompt"], "generation_window": (0, 3)}, "generation"),
             ({"phases": ["generation"], "generation_window": (3, 3)}, "half-open"),
-            ({"phases": ["prompt"], "tokens": []}, "non-empty"),
+            ({"phases": ["prompt"], "prompt_tokens": []}, "non-empty"),
+            ({"phases": ["generation"], "prompt_tokens": [5]}, "prompt"),
+            ({"phases": ["generation"], "prompt_positions": [0]}, "prompt"),
+            ({"phases": ["prompt"], "generation_tokens": [5]}, "generation"),
             ({"phases": ["generation"], "prompt_window": (0, 4)}, "prompt"),
             ({"phases": ["prompt"], "prompt_window": (-2, -4)}, "half-open"),
             ({"phases": ["prompt"], "generation_positions": [0]}, "generation"),
@@ -132,20 +135,22 @@ class TestVectorAndSteeringSpecValidation:
 
 class TestTranslation:
     def test_single_vector_fields(self):
-        spec = make_spec(phases=["prompt"], exclude_positions=[0], tokens=[5])
+        spec = make_spec(phases=["prompt"], exclude_prompt_positions=[0], prompt_tokens=[5])
         req = to_engine_request(spec)
         assert req.steer_vector_local_path == VEC
         assert req.scale == 0.5 and req.target_layers == [10]
         assert req.apply_spec == {
             "phases": ["prompt"],
-            "tokens": [5],
-            "positions": None,
+            "prompt_tokens": [5],
+            "prompt_positions": None,
             "prompt_window": None,
+            "generation_tokens": None,
             "generation_positions": None,
             "generation_window": None,
-            "exclude_tokens": None,
-            "exclude_positions": [0],
+            "exclude_prompt_tokens": None,
+            "exclude_prompt_positions": [0],
             "exclude_prompt_window": None,
+            "exclude_generation_tokens": None,
             "exclude_generation_positions": None,
             "exclude_generation_window": None,
         }
@@ -226,7 +231,8 @@ class TestFingerprintAndLengthSensitivity:
     @pytest.mark.parametrize(
         "apply_kwargs",
         [
-            {"phases": ["prompt"], "positions": [-1]},
+            {"phases": ["prompt"], "prompt_positions": [-1]},
+            {"phases": ["prompt"], "prompt_positions": [5]},
             {"phases": ["generation"], "generation_window": (0, 2)},
             {"phases": ["generation"], "generation_positions": [0]},
             {"phases": ["prompt"], "prompt_window": (-4, None)},
@@ -238,6 +244,21 @@ class TestFingerprintAndLengthSensitivity:
     def test_length_sensitive_specs(self, apply_kwargs):
         assert is_prompt_length_sensitive(to_engine_request(make_spec(**apply_kwargs)))
 
+    def test_positive_positions_precise_with_prompt_len(self):
+        # Positive prompt positions are absolute: sensitive only when
+        # they reach past the prompt end and clamp (or without a
+        # prompt_len to check against).
+        req = to_engine_request(
+            make_spec(phases=["prompt"], prompt_positions=[5])
+        )
+        assert is_prompt_length_sensitive(req)
+        assert not is_prompt_length_sensitive(req, prompt_len=100)
+        assert is_prompt_length_sensitive(req, prompt_len=3)
+        neg = to_engine_request(
+            make_spec(phases=["prompt"], prompt_positions=[-1])
+        )
+        assert is_prompt_length_sensitive(neg, prompt_len=100)
+
     def test_absolute_prompt_window_not_length_sensitive(self):
         req = to_engine_request(
             make_spec(phases=["prompt"], prompt_window=(0, 10))
@@ -248,7 +269,7 @@ class TestFingerprintAndLengthSensitivity:
         fp_a1 = config_fingerprint(to_engine_request(make_spec(phases=["prompt"])))
         fp_a2 = config_fingerprint(to_engine_request(make_spec(phases=["prompt"])))
         fp_b = config_fingerprint(
-            to_engine_request(make_spec(phases=["prompt"], exclude_positions=[0]))
+            to_engine_request(make_spec(phases=["prompt"], exclude_prompt_positions=[0]))
         )
         assert fp_a1 == fp_a2
         assert fp_a1 != fp_b
@@ -285,8 +306,8 @@ class TestCollectorSemantics:
         assert run_collector(
             {
                 "phases": ["prompt"],
-                "exclude_positions": [0],
-                "exclude_tokens": [13],
+                "exclude_prompt_positions": [0],
+                "exclude_prompt_tokens": [13],
             },
             [11, 12, 13, 14],
             0,
@@ -322,12 +343,46 @@ class TestCollectorSemantics:
 
     def test_negative_position_resolves_against_prompt_length(self):
         assert run_collector(
-            {"phases": ["prompt"], "positions": [-1]}, [11, 12], 2, False, 0, 4
+            {"phases": ["prompt"], "prompt_positions": [-1]}, [11, 12], 2, False, 0, 4
         ) == [1]
+
+    def test_position_past_prompt_end_clamps_to_last_prompt_token(self):
+        assert run_collector(
+            {"phases": ["prompt"], "prompt_positions": [10]},
+            [11, 12, 13, 14], 0, False, 0, 4,
+        ) == [3]
+
+    def test_prompt_positions_never_match_decode_tokens(self):
+        # A decode step: the only row is a generation token; a positive
+        # prompt position (clamped or not) must not select it.
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "prompt_positions": [10]},
+            [99], 4, True, 1, 4,
+        ) == []
+
+    def test_prompt_and_generation_token_filters_are_phase_scoped(self):
+        # Same token id present in prompt and decode: each filter only
+        # matches its own phase.
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "prompt_tokens": [42]},
+            [42, 11, 42], 0, False, 0, 3,
+        ) == [0, 2]
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "prompt_tokens": [42]},
+            [42], 3, True, 1, 3,
+        ) == []
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "generation_tokens": [42]},
+            [42], 3, True, 1, 3,
+        ) == [0]
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "generation_tokens": [42]},
+            [42, 11, 42], 0, False, 0, 3,
+        ) == []
 
     def test_token_and_position_triggers_union(self):
         assert run_collector(
-            {"phases": ["prompt"], "tokens": [11], "positions": [3]},
+            {"phases": ["prompt"], "prompt_tokens": [11], "prompt_positions": [3]},
             [11, 12, 13, 14],
             0,
             False,
@@ -378,7 +433,7 @@ class TestCollectorSemantics:
             run_collector(
                 {
                     "phases": ["generation"],
-                    "tokens": [42],
+                    "generation_tokens": [42],
                     "generation_window": (0, 1),
                 },
                 [99], 4 + j, True, j + 1, 4,
@@ -389,7 +444,7 @@ class TestCollectorSemantics:
         results_tok = run_collector(
             {
                 "phases": ["generation"],
-                "tokens": [42],
+                "generation_tokens": [42],
                 "generation_window": (0, 1),
             },
             [42], 4 + 2, True, 3, 4,
@@ -446,7 +501,7 @@ class TestApplyClauseIntegration:
     def test_filtered_spec_not_global(self):
         ctrl = ApplyClause()
         ctrl.configure_from_dict(
-            {"apply_spec": ApplySpec(phases=["prompt"], exclude_tokens=[3]).to_wire()}
+            {"apply_spec": ApplySpec(phases=["prompt"], exclude_prompt_tokens=[3]).to_wire()}
         )
         assert not ctrl.selects_all_tokens()
         assert ctrl.has_clause()
@@ -465,9 +520,9 @@ class TestSelectSpec:
         from vllm.steer_vectors.api import SelectSpec
 
         spec = SelectSpec(
-            phases=["generation"],
-            tokens=[5, 7],
-            exclude_positions=[-1],
+            phases=["prompt", "generation"],
+            generation_tokens=[5, 7],
+            exclude_prompt_positions=[-1],
             generation_window=(0, 4),
         )
         rebuilt = SelectSpec.from_wire(spec.to_wire())
@@ -483,7 +538,7 @@ class TestSelectSpec:
         from vllm.steer_vectors.api import SelectSpec
 
         with pytest.raises(ValidationError):
-            SelectSpec.from_wire({"phases": [], "tokens": None})
+            SelectSpec.from_wire({"phases": [], "prompt_tokens": None})
 
 
 class TestCaptureStreamConfigSelection:
@@ -493,11 +548,11 @@ class TestCaptureStreamConfigSelection:
         from vllm.capture.store import StreamConfig
 
         config = StreamConfig(
-            select={"phases": ["prompt", "generation"], "tokens": [42]}
+            select={"phases": ["prompt", "generation"], "prompt_tokens": [42]}
         )
         assert config.selects_rows
         assert config.select["phases"] == ["prompt", "generation"]
-        assert config.select["tokens"] == [42]
+        assert config.select["prompt_tokens"] == [42]
 
     def test_select_clause_validated(self):
         from vllm.capture.store import StreamConfig

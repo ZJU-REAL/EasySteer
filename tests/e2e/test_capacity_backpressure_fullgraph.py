@@ -46,7 +46,7 @@ def test_overflow_no_longer_kills_the_engine(llm):
     """Six distinct same-file configs on two slots: all requests
     complete (the old behavior was EngineDeadError on the third)."""
     steering = [
-        steering_spec(scale=0.0, layers=LAYERS, exclude_positions=[i])
+        steering_spec(scale=0.0, layers=LAYERS, exclude_prompt_positions=[i])
         for i in range(6)
     ]
     outs = gen(llm, [PROMPT] * 6, steering)
