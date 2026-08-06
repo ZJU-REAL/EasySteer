@@ -27,7 +27,7 @@ export const messages = {
 
 export type MessageKey = keyof typeof messages;
 
-export function translate(
+function translate(
   key: MessageKey,
   params?: Record<string, string | number>,
 ): string {

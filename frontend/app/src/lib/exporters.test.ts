@@ -51,13 +51,13 @@ describe("toPython", () => {
       source: `diffmean-${k}.gguf`,
       scale: 2.0,
       layers: [0, 1],
-      apply: { ...defaultApplySpec(), phases: ["prompt"], positions: [-k] },
+      apply: { ...defaultApplySpec(), phases: ["prompt"], prompt_positions: [-k] },
     }));
     const code = toPython(spec);
     expect(code).toContain("steer_multi_vector=True");
     expect(code).toContain('conflict="sequential"');
-    expect(code).toContain("positions=[-1]");
-    expect(code).toContain("positions=[-2]");
+    expect(code).toContain("prompt_positions=[-1]");
+    expect(code).toContain("prompt_positions=[-2]");
   });
 
   it("marks in-memory payloads as a placeholder", () => {

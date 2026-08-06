@@ -4,18 +4,21 @@
  * and `frontend/training_api.py` as-is.
  */
 
+import {
+  interventionFromName,
+  normalizeTrainingConfig,
+  type ExtractionConfig,
+  type RawTrainingConfig,
+  type TrainingConfig,
+} from "./jobConfig";
 import { settings } from "./settings";
 
-export interface ExtractionConfig {
-  model_path: string;
-  gpu_devices?: string;
-  method: "diffmean" | "pca" | "lat";
-  positive_samples: string[];
-  negative_samples: string[];
-  token_pos?: number | string;
-  normalize?: boolean;
-  output_path: string;
-}
+export type {
+  ExtractionConfig,
+  RawTrainingConfig,
+  TrainingConfig,
+} from "./jobConfig";
+export { interventionFromName, normalizeTrainingConfig } from "./jobConfig";
 
 export interface ExtractionStatus {
   is_extracting: boolean;
@@ -28,26 +31,6 @@ export interface ExtractionStatus {
     method: string;
     metadata: Record<string, unknown>;
   } | null;
-}
-
-export interface TrainingConfig {
-  model_path: string;
-  gpu_devices?: string;
-  /** [input, output] pairs. */
-  training_examples: [string, string][];
-  intervention?: string;
-  output_dir: string;
-  reft_config?: {
-    layer?: number;
-    component?: string;
-    low_rank_dimension?: number;
-  };
-  training_args?: {
-    num_train_epochs?: number;
-    per_device_train_batch_size?: number;
-    learning_rate?: number;
-    logging_steps?: number;
-  };
 }
 
 export interface TrainingStatus {
@@ -63,23 +46,44 @@ function base(): string {
   return settings.flaskBaseUrl.replace(/\/+$/, "");
 }
 
+/**
+ * Read a job-backend response as JSON.
+ *
+ * A non-JSON body means the request never reached Flask — typically the
+ * origin serves only static files, or a proxy answered with an HTML
+ * error page. Say that instead of letting the parser complain about
+ * "<", which tells the user nothing about what to fix.
+ */
+async function readJson<T>(resp: Response, path: string): Promise<T> {
+  const text = await resp.text();
+  let json: { error?: string } & T;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    const where = base() === "" ? window.location.origin : base();
+    throw new Error(
+      `${where}${path} did not return JSON (HTTP ${resp.status}). ` +
+        "The Flask job backend does not seem to be running behind this origin.",
+    );
+  }
+  if (!resp.ok) {
+    throw new Error(json.error ?? `HTTP ${resp.status}`);
+  }
+  return json;
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const resp = await fetch(`${base()}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = await resp.json();
-  if (!resp.ok) {
-    throw new Error(json.error ?? `HTTP ${resp.status}`);
-  }
-  return json as T;
+  return readJson<T>(resp, path);
 }
 
 async function getJson<T>(path: string): Promise<T> {
   const resp = await fetch(`${base()}${path}`);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return (await resp.json()) as T;
+  return readJson<T>(resp, path);
 }
 
 export function startExtraction(config: ExtractionConfig): Promise<{ success: boolean }> {
@@ -110,8 +114,11 @@ export function listTrainingConfigs(): Promise<{ configs: { name: string; displa
   return getJson("/api/train-configs");
 }
 
-export function getTrainingConfig(name: string): Promise<TrainingConfig> {
-  return getJson(`/api/train-config/${encodeURIComponent(name)}`);
+export async function getTrainingConfig(name: string): Promise<TrainingConfig> {
+  const raw = await getJson<RawTrainingConfig & Partial<TrainingConfig>>(
+    `/api/train-config/${encodeURIComponent(name)}`,
+  );
+  return normalizeTrainingConfig(raw, interventionFromName(name));
 }
 
 // ---- SAE feature exploration (Neuronpedia proxied by the Flask backend) ----

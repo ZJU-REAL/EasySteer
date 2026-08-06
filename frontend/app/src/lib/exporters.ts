@@ -45,11 +45,13 @@ function pyApply(apply: ApplySpec, indent: string): string {
   const args: string[] = [`phases=${pyValue(apply.phases)}`];
   // Emitted in the schema's wire order: includes first, then excludes.
   const listKeys = [
-    "tokens",
-    "positions",
+    "prompt_tokens",
+    "prompt_positions",
+    "generation_tokens",
     "generation_positions",
-    "exclude_tokens",
-    "exclude_positions",
+    "exclude_prompt_tokens",
+    "exclude_prompt_positions",
+    "exclude_generation_tokens",
     "exclude_generation_positions",
   ] as const;
   const windowKeys = [
@@ -110,7 +112,6 @@ export function toPython(spec: SteeringSpec, opts: PythonExportOptions = {}): st
   const vectorBlocks = spec.vectors.map((v) => "        " + pyVector(v, "        ").trimStart());
   const specArgs: string[] = [`vectors=[\n${vectorBlocks.join(",\n")},\n    ]`];
   if (spec.conflict !== "priority") specArgs.push(`conflict=${pyStr(spec.conflict)}`);
-  if (spec.debug) specArgs.push("debug=True");
 
   const llmArgs = [
     `model=${pyStr(model)}`,

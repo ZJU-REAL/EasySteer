@@ -14,9 +14,9 @@ export const router = createRouter({
     { path: "/", redirect: "/home" },
     { path: "/home", name: "home", component: HomePage },
     { path: "/chat", name: "chat", component: ChatPage },
-    { path: "/playground", name: "playground", component: PlaygroundPage },
+    { path: "/steer", name: "steer", component: PlaygroundPage },
     { path: "/gallery", name: "gallery", component: GalleryPage },
-    { path: "/workshop", name: "workshop", component: WorkshopPage },
+    { path: "/vectors", name: "vectors", component: WorkshopPage },
     { path: "/sae", name: "sae", component: SaePage },
   ],
 });

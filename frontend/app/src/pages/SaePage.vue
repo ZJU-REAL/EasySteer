@@ -7,10 +7,10 @@
  */
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import SettingsBar from "../components/SettingsBar.vue";
+import AppIcon from "../components/AppIcon.vue";
 import { useI18n } from "../i18n";
 import * as flask from "../lib/flask";
-import { playground, replaceSpec } from "../lib/playgroundStore";
+import { loadCustomSpec } from "../lib/playgroundStore";
 import { settings } from "../lib/settings";
 import { defaultApplySpec, defaultSteeringSpec } from "../lib/spec";
 
@@ -138,11 +138,9 @@ function useInPlayground(): void {
   spec.vectors[0].scale = vectorScale.value;
   if (layer !== null && Number.isInteger(layer)) spec.vectors[0].layers = [layer];
   spec.vectors[0].name = extracted.value.name;
-  spec.vectors[0].apply = { ...defaultApplySpec(), phases: ["prompt"], positions: [-1] };
-  replaceSpec(spec);
-  playground.presetId = null;
-  playground.presetModel = "";
-  router.push("/playground");
+  spec.vectors[0].apply = { ...defaultApplySpec(), phases: ["prompt"], prompt_positions: [-1] };
+  loadCustomSpec(spec);
+  router.push("/steer");
 }
 
 function similarity(result: flask.SaeSearchResult): string {
@@ -157,36 +155,40 @@ function similarity(result: flask.SaeSearchResult): string {
     </div>
     <p class="page-intro">{{ t("sae_intro") }}</p>
 
-    <SettingsBar :show-flask="true" />
+    <!-- Search: mode tabs on top of one compact form, as in the old UI -->
+    <div class="panel search-panel">
+      <div class="panel-header">
+        <h2>{{ t("sae_search_title") }}</h2>
+        <span class="spacer"></span>
+        <div class="tab-bar">
+          <button class="tab" :class="{ active: mode === 'query' }" @click="mode = 'query'">
+            {{ t("sae_search_by_query") }}
+          </button>
+          <button class="tab" :class="{ active: mode === 'index' }" @click="mode = 'index'">
+            {{ t("sae_search_by_index") }}
+          </button>
+        </div>
+      </div>
 
-    <div class="sae-grid">
-      <!-- Left: search -->
-      <div class="panel search-panel">
-        <div class="field-row">
-          <div class="field">
-            <label>{{ t("sae_model_id_label") }}</label>
-            <input v-model="modelId" type="text" class="mono full" />
-          </div>
-          <div class="field">
-            <label>{{ t("sae_id_label") }}</label>
-            <input v-model="saeId" type="text" class="mono full" />
-          </div>
+      <div class="field-row">
+        <div class="field">
+          <label>{{ t("sae_model_id_label") }}</label>
+          <input v-model="modelId" type="text" class="mono full" />
+          <div class="help-text">{{ t("sae_model_id_help") }}</div>
+        </div>
+        <div class="field">
+          <label>{{ t("sae_id_label") }}</label>
+          <input v-model="saeId" type="text" class="mono full" />
+          <div class="help-text">{{ t("sae_id_help") }}</div>
         </div>
         <div class="field">
           <label>{{ t("sae_api_key_label") }}</label>
           <input v-model="settings.neuronpediaApiKey" type="password" class="mono full" />
           <div class="help-text">{{ t("sae_api_key_help") }}</div>
         </div>
+      </div>
 
-        <div class="mode-tabs">
-          <button :class="{ primary: mode === 'query' }" class="small" @click="mode = 'query'">
-            {{ t("sae_search_by_query") }}
-          </button>
-          <button :class="{ primary: mode === 'index' }" class="small" @click="mode = 'index'">
-            {{ t("sae_search_by_index") }}
-          </button>
-        </div>
-
+      <div class="field-row query-row">
         <div v-if="mode === 'query'" class="field">
           <label>{{ t("sae_query_label") }}</label>
           <input
@@ -207,83 +209,91 @@ function similarity(result: flask.SaeSearchResult): string {
             @keydown.enter="submit"
           />
         </div>
-
-        <button
-          class="primary"
-          :disabled="searching || !apiKeyReady || (mode === 'query' ? !query.trim() : !featureIndexText)"
-          @click="submit"
-        >
-          {{ mode === "query" ? t("sae_search_btn") : t("sae_lookup_btn") }}
-        </button>
-        <div v-if="searchError" class="help-text text-err">{{ searchError }}</div>
-
-        <template v-if="mode === 'query' && (searching || results.length > 0)">
-          <h3 class="results-title">{{ t("sae_results_title") }}</h3>
-          <p v-if="searching" class="dim">{{ t("sae_searching") }}</p>
-          <div v-else class="results-scroll">
-            <table class="results-table">
-              <thead>
-                <tr>
-                  <th>{{ t("sae_feature_id_column") }}</th>
-                  <th>{{ t("sae_description_column") }}</th>
-                  <th>{{ t("sae_similarity_column") }}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="result in results" :key="String(result.index)">
-                  <td class="mono">{{ result.index }}</td>
-                  <td>{{ result.description ?? "-" }}</td>
-                  <td class="mono">{{ similarity(result) }}</td>
-                  <td>
-                    <button class="small" @click="lookupFeature(Number(result.index))">
-                      {{ t("sae_details_btn") }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="!searching && results.length === 0" class="dim">{{ t("sae_no_results") }}</p>
-        </template>
+        <div class="field submit-field">
+          <button
+            class="primary"
+            :disabled="
+              searching || !apiKeyReady || (mode === 'query' ? !query.trim() : !featureIndexText)
+            "
+            @click="submit"
+          >
+            {{ mode === "query" ? t("sae_search_btn") : t("sae_lookup_btn") }}
+          </button>
+        </div>
       </div>
+      <div v-if="searchError" class="help-text text-err">{{ searchError }}</div>
+    </div>
 
-      <!-- Right: feature details + extraction -->
-      <div class="panel detail-panel">
+    <!-- Results -->
+    <div v-if="mode === 'query' && (searching || results.length > 0)" class="panel results-panel">
+      <div class="panel-header">
+        <h2>{{ t("sae_results_title") }}</h2>
+      </div>
+      <p v-if="searching" class="dim">{{ t("sae_searching") }}</p>
+      <div v-else class="results-scroll">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>{{ t("sae_feature_id_column") }}</th>
+              <th>{{ t("sae_description_column") }}</th>
+              <th>{{ t("sae_similarity_column") }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="result in results" :key="String(result.index)">
+              <td class="mono">{{ result.index }}</td>
+              <td>{{ result.description ?? "-" }}</td>
+              <td class="mono">{{ similarity(result) }}</td>
+              <td>
+                <button class="small" @click="lookupFeature(Number(result.index))">
+                  {{ t("sae_details_btn") }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-if="!searching && results.length === 0" class="dim">{{ t("sae_no_results") }}</p>
+    </div>
+
+    <!-- Feature details + extraction -->
+    <div class="panel detail-panel">
+      <div class="panel-header">
         <h2>{{ t("sae_feature_details") }}</h2>
-        <p v-if="detailsLoading" class="dim">{{ t("sae_searching") }}</p>
-        <template v-else-if="details">
-          <div class="detail-meta">
-            <span class="badge mono">{{ details.basic_info.modelId }}</span>
-            <span class="badge mono">{{ t("sae_layer_label") }} {{ details.basic_info.layer }}</span>
-            <span class="badge mono">#{{ details.basic_info.index }}</span>
-            <span v-if="details.sparsity !== null" class="badge mono">
-              {{ t("sae_sparsity_label") }} {{ details.sparsity.toFixed(5) }}
-            </span>
+        <span v-if="details" class="badge mono">#{{ details.basic_info.index }}</span>
+      </div>
+      <p v-if="detailsLoading" class="dim">{{ t("sae_searching") }}</p>
+      <template v-else-if="details">
+        <div class="detail-meta">
+          <span class="badge mono">{{ details.basic_info.modelId }}</span>
+          <span class="badge mono">{{ t("sae_layer_label") }} {{ details.basic_info.layer }}</span>
+          <span v-if="details.sparsity !== null" class="badge mono">
+            {{ t("sae_sparsity_label") }} {{ details.sparsity.toFixed(5) }}
+          </span>
+        </div>
+        <div v-if="details.explanation" class="field">
+          <label>{{ t("sae_explanation_label") }}</label>
+          <p class="explanation">{{ details.explanation }}</p>
+        </div>
+        <div class="token-columns">
+          <div v-if="details.top_activating_tokens.length > 0">
+            <label>{{ t("sae_top_activating_tokens") }}</label>
+            <ul class="token-list">
+              <li v-for="tok in details.top_activating_tokens" :key="tok.token" class="mono">
+                {{ tok.token }} <span class="dim">{{ tok.activation_value.toFixed(2) }}</span>
+              </li>
+            </ul>
           </div>
-          <div v-if="details.explanation" class="field">
-            <label>{{ t("sae_explanation_label") }}</label>
-            <p class="explanation">{{ details.explanation }}</p>
+          <div v-if="details.top_inhibiting_tokens.length > 0">
+            <label>{{ t("sae_top_inhibiting_tokens") }}</label>
+            <ul class="token-list">
+              <li v-for="tok in details.top_inhibiting_tokens" :key="tok.token" class="mono">
+                {{ tok.token }} <span class="dim">{{ tok.activation_value.toFixed(2) }}</span>
+              </li>
+            </ul>
           </div>
-          <div class="token-columns">
-            <div v-if="details.top_activating_tokens.length > 0">
-              <label>{{ t("sae_top_activating_tokens") }}</label>
-              <ul class="token-list">
-                <li v-for="tok in details.top_activating_tokens" :key="tok.token" class="mono">
-                  {{ tok.token }} <span class="dim">{{ tok.activation_value.toFixed(2) }}</span>
-                </li>
-              </ul>
-            </div>
-            <div v-if="details.top_inhibiting_tokens.length > 0">
-              <label>{{ t("sae_top_inhibiting_tokens") }}</label>
-              <ul class="token-list">
-                <li v-for="tok in details.top_inhibiting_tokens" :key="tok.token" class="mono">
-                  {{ tok.token }} <span class="dim">{{ tok.activation_value.toFixed(2) }}</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div v-if="details.activation_example" class="field">
+          <div v-if="details.activation_example">
             <label>{{ t("sae_activation_example") }}</label>
             <div class="activation-example">
               <span class="mono">{{ details.activation_example.context }}</span>
@@ -295,75 +305,74 @@ function similarity(result: flask.SaeSearchResult): string {
               </div>
             </div>
           </div>
+        </div>
 
-          <hr class="divider" />
-          <h3>{{ t("sae_extract_title") }}</h3>
-          <div class="help-text">{{ t("sae_extract_help") }}</div>
-          <div class="field-row extract-row">
-            <div class="field">
-              <label>{{ t("sae_vector_name_label") }}</label>
-              <input v-model="vectorName" type="text" class="full" />
-            </div>
-            <div class="field">
-              <label>{{ t("scale_label") }}</label>
-              <input v-model.number="vectorScale" type="number" step="1" class="mono full" />
-            </div>
-            <div class="field">
-              <label>{{ t("sae_layer_input_label") }}</label>
-              <input
-                v-model="targetLayerText"
-                type="number"
-                class="mono full"
-                :placeholder="String(guessLayer() ?? '')"
-              />
-              <div class="help-text">{{ t("sae_layer_input_help") }}</div>
-            </div>
+        <hr class="divider" />
+        <h3>{{ t("sae_extract_title") }}</h3>
+        <div class="field-row extract-row">
+          <div class="field">
+            <label>{{ t("sae_vector_name_label") }}</label>
+            <input v-model="vectorName" type="text" class="full" />
+            <div class="help-text">{{ t("sae_vector_name_help") }}</div>
           </div>
-          <div class="extract-actions">
-            <button class="primary" :disabled="extracting || !vectorName" @click="extractVector">
-              {{ extracting ? t("sae_extracting") : t("sae_extract_btn") }}
-            </button>
-            <button v-if="extracted" class="small" @click="useInPlayground">
-              {{ t("use_in_playground_btn") }}
-            </button>
+          <div class="field">
+            <label>{{ t("scale_label") }}</label>
+            <input v-model.number="vectorScale" type="number" step="1" class="mono full" />
+            <div class="help-text">{{ t("sae_scale_help") }}</div>
           </div>
-          <div v-if="extracted" class="help-text text-ok">
-            {{ t("sae_extract_done", { path: extracted.file_path }) }}
+          <div class="field">
+            <label>{{ t("sae_layer_input_label") }}</label>
+            <input
+              v-model="targetLayerText"
+              type="number"
+              class="mono full"
+              :placeholder="String(guessLayer() ?? '')"
+            />
+            <div class="help-text">{{ t("sae_layer_input_help") }}</div>
           </div>
-          <div v-if="extractError" class="help-text text-err">{{ extractError }}</div>
-        </template>
-        <p v-else class="dim">{{ t("sae_no_results") }}</p>
+        </div>
+        <div class="extract-actions">
+          <button class="primary" :disabled="extracting || !vectorName" @click="extractVector">
+            {{ extracting ? t("sae_extracting") : t("sae_extract_btn") }}
+          </button>
+          <button v-if="extracted" @click="useInPlayground">
+            {{ t("use_in_playground_btn") }}
+          </button>
+          <span class="help-text extract-note">{{ t("sae_extract_help") }}</span>
+        </div>
+        <div v-if="extracted" class="help-text text-ok">
+          {{ t("sae_extract_done", { path: extracted.file_path }) }}
+        </div>
+        <div v-if="extractError" class="help-text text-err">{{ extractError }}</div>
+      </template>
+      <div v-else class="empty-state">
+        <AppIcon name="search" :size="30" />
+        <p>{{ t("sae_details_placeholder") }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.sae-grid {
-  display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
-  gap: 14px;
-  align-items: start;
+.search-panel,
+.results-panel {
+  margin-bottom: 14px;
 }
 
-@media (max-width: 1100px) {
-  .sae-grid {
-    grid-template-columns: 1fr;
-  }
+.search-panel .field-row {
+  align-items: flex-end;
 }
 
-.mode-tabs {
-  display: flex;
-  gap: 6px;
-  margin: 6px 0 10px;
+.query-row .field {
+  margin-bottom: 0;
 }
 
-.results-title {
-  margin-top: 12px;
+.submit-field {
+  flex: 0 0 auto !important;
 }
 
 .results-scroll {
-  max-height: 380px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
@@ -385,16 +394,35 @@ function similarity(result: flask.SaeSearchResult): string {
 }
 
 .results-table td {
-  padding: 5px 6px;
+  padding: 6px;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+/* Fixed index/score/action columns so the description takes the slack
+   and the numbers line up under their header. */
+.results-table th:first-child,
+.results-table td:first-child {
+  width: 62px;
+}
+
+.results-table th:nth-child(3),
+.results-table td:nth-child(3) {
+  width: 86px;
+  text-align: right;
+}
+
+.results-table th:last-child,
+.results-table td:last-child {
+  width: 78px;
+  text-align: right;
 }
 
 .detail-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .explanation {
@@ -405,9 +433,10 @@ function similarity(result: flask.SaeSearchResult): string {
 
 .token-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 8px 0;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 10px 0;
+  align-items: start;
 }
 
 .token-list {
@@ -419,24 +448,29 @@ function similarity(result: flask.SaeSearchResult): string {
 .activation-example {
   background: var(--bg-inset);
   border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
   font-size: 12px;
 }
 
 .divider {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 12px 0;
+  margin: 14px 0 12px;
 }
 
 .extract-row {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .extract-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   margin-top: 4px;
+}
+
+.extract-note {
+  margin-top: 0;
 }
 </style>

@@ -3,40 +3,48 @@
 import type { Messages } from "./types";
 
 export const homeMessages = {
-  home_tagline: {
-    en: "A unified toolkit for steering large language models at inference time.",
-    zh: "推理时引导大语言模型的一体化工具箱。",
-  },
-  home_intro: {
-    en: "EasySteer builds on vllm-steer: declare a SteeringSpec — which vectors, which layers, which tokens — and apply it per request or server-wide. This UI lets you chat with steered models, build and validate specs, replicate published methods, and produce new vectors.",
-    zh: "EasySteer 基于 vllm-steer：声明一个 SteeringSpec——哪些向量、哪些层、哪些 token——即可按请求或全服务器应用。本界面支持与被引导模型聊天、构建并校验 Spec、复现已发表方法以及生成新向量。",
-  },
   home_quickstart_title: { en: "Quick start", zh: "快速开始" },
   home_chat_title: { en: "Chat", zh: "聊天" },
   home_chat_text: {
-    en: "Talk to a model with a steering spec attached to every reply.",
-    zh: "与模型对话，每条回复都可附加引导 Spec。",
+    en: "Talk to a steered model.",
+    zh: "与引导后的模型对话。",
   },
-  home_playground_title: { en: "Playground", zh: "实验台" },
+  home_playground_title: { en: "Steer", zh: "引导" },
   home_playground_text: {
-    en: "Build a SteeringSpec in a form or as JSON, A/B compare, export code.",
-    zh: "以表单或 JSON 构建 SteeringSpec，A/B 对比并导出代码。",
+    en: "Build a spec, run it, export code.",
+    zh: "配置 Spec、运行对比、导出代码。",
   },
   home_gallery_title: { en: "Gallery", zh: "示例库" },
   home_gallery_text: {
-    en: "15 replications of published steering papers, each one click from running.",
-    zh: "15 个已发表引导论文的复现示例，一键载入运行。",
+    en: "15 replicated steering papers.",
+    zh: "15 篇引导论文的复现。",
   },
-  home_workshop_title: { en: "Workshop", zh: "向量工坊" },
+  home_workshop_title: { en: "Extract & Train", zh: "提取与训练" },
   home_workshop_text: {
-    en: "Extract or train new steering vectors on the job backend.",
-    zh: "在任务后端提取或训练新的引导向量。",
+    en: "Build a vector from your own samples.",
+    zh: "用自己的样本做出引导向量。",
   },
   home_sae_title: { en: "SAE features", zh: "SAE 特征" },
   home_sae_text: {
-    en: "Search Neuronpedia features and steer along a decoder direction.",
-    zh: "搜索 Neuronpedia 特征并沿解码器方向进行引导。",
+    en: "Steer along an SAE feature.",
+    zh: "沿 SAE 特征方向引导。",
   },
-  home_featured_title: { en: "Pick a demo", zh: "挑一个示例" },
-  home_featured_more: { en: "Browse all 15 demos", zh: "浏览全部 15 个示例" },
+  home_featured_title: { en: "Pick a demo", zh: "选一个示例" },
+  home_featured_more: { en: "Browse all demos", zh: "查看全部示例" },
+  home_paper_title: {
+    en: "A Unified Framework for High-Performance and Extensible LLM Steering",
+    zh: "统一、高性能且易扩展的大语言模型引导框架",
+  },
+  home_resources_title: { en: "Project links", zh: "项目链接" },
+  home_link_paper: { en: "Paper", zh: "论文" },
+  home_link_paper_sub: { en: "arXiv 2509.25175", zh: "arXiv 2509.25175" },
+  home_link_github: { en: "GitHub", zh: "GitHub" },
+  home_link_github_sub: { en: "ZJU-REAL/EasySteer", zh: "ZJU-REAL/EasySteer" },
+  home_link_docs: { en: "Documentation", zh: "文档" },
+  home_link_docs_sub: {
+    en: "Install, guides, API reference",
+    zh: "安装、使用指南与 API 参考",
+  },
+  home_link_demo: { en: "Hugging Face demo", zh: "Hugging Face 在线体验" },
+  home_link_demo_sub: { en: "Lite hosted playground", zh: "托管的轻量版" },
 } satisfies Messages;

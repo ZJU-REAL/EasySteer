@@ -37,18 +37,18 @@ describe("validateApplySpec", () => {
   });
 
   it("rejects empty filter lists (null disables the filter)", () => {
-    const apply = { ...defaultApplySpec(), tokens: [] };
+    const apply = { ...defaultApplySpec(), prompt_tokens: [] };
     expect(validateApplySpec(apply).length).toBe(1);
-    expect(validateApplySpec({ ...defaultApplySpec(), tokens: null })).toEqual([]);
+    expect(validateApplySpec({ ...defaultApplySpec(), prompt_tokens: null })).toEqual([]);
   });
 
   it("rejects the v1 -1 token sentinel", () => {
-    const apply = { ...defaultApplySpec(), tokens: [-1] };
+    const apply = { ...defaultApplySpec(), prompt_tokens: [-1] };
     expect(validateApplySpec(apply)[0].message).toMatch(/real token ids/);
   });
 
   it("allows negative positions (end-of-prompt indexing)", () => {
-    const apply = { ...defaultApplySpec(), positions: [-1, -2] };
+    const apply = { ...defaultApplySpec(), prompt_positions: [-1, -2] };
     expect(validateApplySpec(apply)).toEqual([]);
   });
 
@@ -280,7 +280,6 @@ describe("specToJson / specFromJson round-trip", () => {
   it("round-trips a fully populated multi-vector spec", () => {
     const spec = defaultSteeringSpec();
     spec.conflict = "sequential";
-    spec.debug = true;
     spec.vectors = [1, 2].map((k) => ({
       ...defaultVectorSpec(),
       source: `diffmean-${k}.gguf`,
@@ -291,7 +290,7 @@ describe("specToJson / specFromJson round-trip", () => {
       apply: {
         ...defaultApplySpec(),
         phases: ["prompt"],
-        positions: [-k],
+        prompt_positions: [-k],
       },
     }));
     const restored = specFromJson(specToJson(spec));
@@ -316,8 +315,11 @@ describe("specToJson / specFromJson round-trip", () => {
       prompt_window: [-5, null],
       generation_positions: [0, 3],
       generation_window: [0, 16],
-      exclude_tokens: [42],
-      exclude_positions: [-1],
+      prompt_tokens: [7],
+      generation_tokens: [8],
+      exclude_prompt_tokens: [42],
+      exclude_prompt_positions: [-1],
+      exclude_generation_tokens: [42],
       exclude_prompt_window: [2, -2],
       exclude_generation_positions: [1],
       exclude_generation_window: [4, null],

@@ -56,7 +56,7 @@ const stop = computed({
       class="mono window-input"
       :placeholder="t('window_start_placeholder')"
     />
-    <span class="dim">..</span>
+    <span class="dim">–</span>
     <input
       v-model.number="stop"
       type="number"
@@ -74,6 +74,8 @@ const stop = computed({
 }
 
 .window-input {
-  width: 110px;
+  flex: 1;
+  min-width: 0;
+  width: 0;
 }
 </style>

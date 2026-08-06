@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * Spec-transparent playground: form-driven builder with the live
- * SteeringSpec JSON side by side (two-way), export buttons, and an A/B
- * compare runner streaming against the OpenAI-compatible server.
+ * Spec-transparent playground: a full-width builder (vectors behind
+ * tabs) above the live SteeringSpec JSON (two-way, collapsible) with the
+ * export actions in the JSON panel header, and an A/B compare runner
+ * streaming against the OpenAI-compatible server.
  */
 import { computed, ref } from "vue";
 import ExportDialog from "../components/ExportDialog.vue";
@@ -66,28 +67,30 @@ function onJsonReplace(spec: SteeringSpec): void {
       <span class="spacer"></span>
       <button class="small" @click="resetPlayground">{{ t("reset_btn") }}</button>
     </div>
+    <p class="page-intro">{{ t("steer_intro") }}</p>
 
     <SettingsBar />
 
-    <div class="builder-grid">
-      <div class="builder-col">
+    <div class="panel builder-panel">
+      <div class="panel-header">
         <h2>{{ t("spec_builder_title") }}</h2>
-        <SpecBuilder :key="playground.revision" :spec="playground.spec" />
       </div>
-      <div class="json-col">
-        <SpecJsonPanel
-          :spec="playground.spec"
-          :revision="playground.revision"
-          @replace="onJsonReplace"
-        />
-        <div class="export-row">
-          <span class="dim">{{ t("export_title") }}:</span>
-          <button class="small" @click="exportPython">{{ t("export_python_btn") }}</button>
-          <button class="small" @click="exportExtraBody">{{ t("export_extra_body_btn") }}</button>
-          <button class="small" @click="exportCurl">{{ t("export_curl_btn") }}</button>
-        </div>
-      </div>
+      <SpecBuilder :key="playground.revision" :spec="playground.spec" />
     </div>
+
+    <SpecJsonPanel
+      class="json-block"
+      :spec="playground.spec"
+      :revision="playground.revision"
+      @replace="onJsonReplace"
+    >
+      <template #actions>
+        <span class="dim export-label">{{ t("export_title") }}</span>
+        <button class="small" @click="exportPython">{{ t("export_python_btn") }}</button>
+        <button class="small" @click="exportExtraBody">{{ t("export_extra_body_btn") }}</button>
+        <button class="small" @click="exportCurl">{{ t("export_curl_btn") }}</button>
+      </template>
+    </SpecJsonPanel>
 
     <RunPanel :spec="playground.spec" />
 
@@ -101,39 +104,15 @@ function onJsonReplace(spec: SteeringSpec): void {
 </template>
 
 <style scoped>
-.builder-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 12px 0 14px;
-  align-items: stretch;
+.builder-panel {
+  margin-bottom: 14px;
 }
 
-.builder-col,
-.json-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.json-block {
+  margin-bottom: 14px;
 }
 
-.builder-col h2 {
-  margin-bottom: 8px;
-}
-
-.json-col :deep(.json-panel) {
-  flex: 1;
-}
-
-@media (max-width: 1100px) {
-  .builder-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.export-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+.export-label {
+  font-size: 11.5px;
 }
 </style>

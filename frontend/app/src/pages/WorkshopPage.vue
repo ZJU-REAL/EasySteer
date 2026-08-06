@@ -6,10 +6,11 @@
  */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
-import SettingsBar from "../components/SettingsBar.vue";
+import StringListEditor from "../components/StringListEditor.vue";
+import { builtinExtractionPresets, builtinTrainingPresets } from "../data/builtinConfigs";
 import { useI18n } from "../i18n";
 import * as flask from "../lib/flask";
-import { playground, replaceSpec } from "../lib/playgroundStore";
+import { loadCustomSpec } from "../lib/playgroundStore";
 import { defaultApplySpec, defaultSteeringSpec } from "../lib/spec";
 
 const router = useRouter();
@@ -25,8 +26,8 @@ const extraction = ref({
   method: "diffmean" as "diffmean" | "pca" | "lat",
   token_pos: -1,
   normalize: true,
-  positive_text: "",
-  negative_text: "",
+  positive_samples: [""] as string[],
+  negative_samples: [""] as string[],
   output_path: "results/my_vector.gguf",
 });
 
@@ -47,43 +48,69 @@ const training = ref({
 });
 
 // ---- Presets ----
-const presets = ref<{ name: string; display_name?: string }[]>([]);
+// Built-in presets ship with the app; the job backend may serve more.
+const serverPresets = ref<{ name: string; display_name?: string }[]>([]);
 const selectedPreset = ref("");
 const presetError = ref("");
+const presetsUnavailable = ref(false);
+
+const builtinPresets = computed(() =>
+  kind.value === "extraction" ? builtinExtractionPresets : builtinTrainingPresets,
+);
+
+/** Backend presets that aren't already shipped (same files, same names). */
+const serverOnlyPresets = computed(() =>
+  serverPresets.value.filter((p) => !builtinPresets.value.some((b) => b.name === p.name)),
+);
 
 async function refreshPresets(): Promise<void> {
   presetError.value = "";
+  presetsUnavailable.value = false;
   selectedPreset.value = "";
   try {
     const resp =
       kind.value === "extraction"
         ? await flask.listExtractionConfigs()
         : await flask.listTrainingConfigs();
-    presets.value = resp.configs;
-  } catch (e) {
-    presets.value = [];
-    presetError.value = (e as Error).message;
+    serverPresets.value = resp.configs;
+  } catch {
+    // An unreachable job backend is a normal state for a static review
+    // deployment; the built-in presets stay usable either way.
+    serverPresets.value = [];
+    presetsUnavailable.value = true;
   }
 }
 
 async function importPreset(): Promise<void> {
-  if (!selectedPreset.value) return;
+  const selected = selectedPreset.value;
+  if (!selected) return;
   presetError.value = "";
+  const separator = selected.indexOf(":");
+  const scope = selected.slice(0, separator);
+  const name = selected.slice(separator + 1);
   try {
     if (kind.value === "extraction") {
-      const cfg = await flask.getExtractionConfig(selectedPreset.value);
+      const cfg =
+        scope === "builtin"
+          ? builtinExtractionPresets.find((p) => p.name === name)?.config
+          : await flask.getExtractionConfig(name);
+      if (!cfg) throw new Error(`unknown preset ${name}`);
       extraction.value = {
         model_path: cfg.model_path ?? "",
         gpu_devices: cfg.gpu_devices ?? "0",
         method: cfg.method ?? "diffmean",
         token_pos: Number(cfg.token_pos ?? -1),
         normalize: cfg.normalize ?? true,
-        positive_text: (cfg.positive_samples ?? []).join("\n"),
-        negative_text: (cfg.negative_samples ?? []).join("\n"),
+        positive_samples: (cfg.positive_samples ?? []).length > 0 ? cfg.positive_samples : [""],
+        negative_samples: (cfg.negative_samples ?? []).length > 0 ? cfg.negative_samples : [""],
         output_path: cfg.output_path ?? "results/my_vector.gguf",
       };
     } else {
-      const cfg = await flask.getTrainingConfig(selectedPreset.value);
+      const cfg =
+        scope === "builtin"
+          ? builtinTrainingPresets.find((p) => p.name === name)?.config
+          : await flask.getTrainingConfig(name);
+      if (!cfg) throw new Error(`unknown preset ${name}`);
       training.value = {
         model_path: cfg.model_path ?? "",
         gpu_devices: cfg.gpu_devices ?? "0",
@@ -95,14 +122,8 @@ async function importPreset(): Promise<void> {
         per_device_train_batch_size: cfg.training_args?.per_device_train_batch_size ?? 10,
         learning_rate: cfg.training_args?.learning_rate ?? 0.004,
         logging_steps: cfg.training_args?.logging_steps ?? 40,
-        output_dir:
-          (cfg as { output_dir?: string }).output_dir ??
-          cfg.training_args?.["output_dir" as never] ??
-          "results/my_training",
-        examples:
-          (cfg.training_examples as [string, string][] | undefined)?.length
-            ? (cfg.training_examples as [string, string][])
-            : [["", ""]],
+        output_dir: cfg.output_dir ?? "results/my_training",
+        examples: cfg.training_examples.length > 0 ? cfg.training_examples : [["", ""]],
       };
     }
   } catch (e) {
@@ -190,8 +211,8 @@ async function submitExtraction(): Promise<void> {
       method: extraction.value.method,
       token_pos: extraction.value.token_pos,
       normalize: extraction.value.normalize,
-      positive_samples: extraction.value.positive_text.split("\n").filter((s) => s.trim()),
-      negative_samples: extraction.value.negative_text.split("\n").filter((s) => s.trim()),
+      positive_samples: extraction.value.positive_samples.filter((sample) => sample.trim()),
+      negative_samples: extraction.value.negative_samples.filter((sample) => sample.trim()),
       output_path: extraction.value.output_path,
     });
     startPolling("extraction");
@@ -235,8 +256,8 @@ async function submitTraining(): Promise<void> {
 const canSubmitExtraction = computed(
   () =>
     extraction.value.model_path.trim() !== "" &&
-    extraction.value.positive_text.trim() !== "" &&
-    extraction.value.negative_text.trim() !== "" &&
+    extraction.value.positive_samples.some((sample) => sample.trim()) &&
+    extraction.value.negative_samples.some((sample) => sample.trim()) &&
     extraction.value.output_path.trim() !== "",
 );
 
@@ -271,13 +292,11 @@ function useInPlayground(): void {
     spec.vectors[0].apply = {
       ...defaultApplySpec(),
       phases: ["prompt"],
-      positions: [-1],
+      prompt_positions: [-1],
     };
   }
-  replaceSpec(spec);
-  playground.presetId = null;
-  playground.presetModel = "";
-  router.push("/playground");
+  loadCustomSpec(spec);
+  router.push("/steer");
 }
 
 refreshPresets();
@@ -289,8 +308,6 @@ refreshPresets();
       <h1>{{ t("workshop_title") }}</h1>
     </div>
     <p class="page-intro">{{ t("workshop_intro") }}</p>
-
-    <SettingsBar :show-flask="true" />
 
     <div class="kind-tabs">
       <button
@@ -304,28 +321,40 @@ refreshPresets();
       </button>
     </div>
 
-    <div class="workshop-grid">
+    <div class="workshop-stack">
       <div class="panel form-panel">
         <div class="field preset-row">
           <label>{{ t("import_config_label") }}</label>
           <div class="preset-controls">
             <select v-model="selectedPreset" class="full">
               <option value="">{{ t("import_config_placeholder") }}</option>
-              <option v-for="p in presets" :key="p.name" :value="p.name">
-                {{ p.display_name ?? p.name }}
-              </option>
+              <optgroup :label="t('presets_builtin_group')">
+                <option v-for="p in builtinPresets" :key="p.name" :value="`builtin:${p.name}`">
+                  {{ p.display_name }}
+                </option>
+              </optgroup>
+              <optgroup v-if="serverOnlyPresets.length > 0" :label="t('presets_server_group')">
+                <option v-for="p in serverOnlyPresets" :key="p.name" :value="`server:${p.name}`">
+                  {{ p.display_name ?? p.name }}
+                </option>
+              </optgroup>
             </select>
             <button class="small" :disabled="!selectedPreset" @click="importPreset">
               {{ t("import_config_label") }}
             </button>
           </div>
           <div v-if="presetError" class="help-text text-err">{{ presetError }}</div>
+          <div v-else-if="presetsUnavailable" class="help-text">
+            {{ t("presets_unavailable") }}
+          </div>
         </div>
 
-        <!-- Extraction form -->
-        <template v-if="kind === 'extraction'">
-          <div class="field-row">
-            <div class="field">
+        <!-- One shared column grid for both forms, so every box on the
+             page lines up on the same edges regardless of field count. -->
+        <div class="form-grid">
+          <!-- Extraction form -->
+          <template v-if="kind === 'extraction'">
+            <div class="field span-3">
               <label>{{ t("model_path_label") }}</label>
               <input
                 v-model="extraction.model_path"
@@ -333,8 +362,9 @@ refreshPresets();
                 class="mono full"
                 :placeholder="t('model_path_placeholder')"
               />
+              <div class="help-text">{{ t("model_path_help") }}</div>
             </div>
-            <div class="field gpu-field">
+            <div class="field">
               <label>{{ t("gpu_devices_label") }}</label>
               <input
                 v-model="extraction.gpu_devices"
@@ -342,57 +372,66 @@ refreshPresets();
                 class="mono full"
                 :placeholder="t('gpu_devices_placeholder')"
               />
+              <div class="help-text">{{ t("gpu_devices_help") }}</div>
             </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
+
+            <div class="field span-2">
               <label>{{ t("extract_method_label") }}</label>
               <select v-model="extraction.method" class="full">
                 <option value="diffmean">{{ t("extract_method_diffmean") }}</option>
                 <option value="pca">{{ t("extract_method_pca") }}</option>
                 <option value="lat">{{ t("extract_method_lat") }}</option>
               </select>
+              <div class="help-text">{{ t("extract_method_help") }}</div>
             </div>
             <div class="field">
               <label>{{ t("extract_token_pos_label") }}</label>
               <input v-model.number="extraction.token_pos" type="number" class="mono full" />
               <div class="help-text">{{ t("extract_token_pos_help") }}</div>
             </div>
-            <div class="field normalize-field">
+            <div class="field check-cell">
               <label class="inline-check">
                 <input v-model="extraction.normalize" type="checkbox" />
                 {{ t("extract_normalize_label") }}
               </label>
             </div>
-          </div>
-          <div class="field">
-            <label>{{ t("positive_samples_label") }}</label>
-            <textarea v-model="extraction.positive_text" class="full" rows="5"></textarea>
-            <div class="help-text">{{ t("positive_samples_help") }}</div>
-          </div>
-          <div class="field">
-            <label>{{ t("negative_samples_label") }}</label>
-            <textarea v-model="extraction.negative_text" class="full" rows="5"></textarea>
-            <div class="help-text">{{ t("negative_samples_help") }}</div>
-          </div>
-          <div class="field">
-            <label>{{ t("output_path_label") }}</label>
-            <input v-model="extraction.output_path" type="text" class="mono full" />
-            <div class="help-text">{{ t("output_path_help") }}</div>
-          </div>
-          <button
-            class="primary"
-            :disabled="submitting || !canSubmitExtraction || status?.running"
-            @click="submitExtraction"
-          >
-            {{ t("start_extraction_btn") }}
-          </button>
-        </template>
 
-        <!-- Training form -->
-        <template v-else>
-          <div class="field-row">
-            <div class="field">
+            <div class="field span-2">
+              <label>{{ t("positive_samples_label") }}</label>
+              <StringListEditor
+                v-model="extraction.positive_samples"
+                :placeholder="t('sample_placeholder')"
+              />
+              <div class="help-text">{{ t("positive_samples_help") }}</div>
+            </div>
+            <div class="field span-2">
+              <label>{{ t("negative_samples_label") }}</label>
+              <StringListEditor
+                v-model="extraction.negative_samples"
+                :placeholder="t('sample_placeholder')"
+              />
+              <div class="help-text">{{ t("negative_samples_help") }}</div>
+            </div>
+
+            <div class="field span-4">
+              <label>{{ t("output_path_label") }}</label>
+              <input v-model="extraction.output_path" type="text" class="mono full" />
+              <div class="help-text">{{ t("output_path_help") }}</div>
+            </div>
+            <div class="span-4">
+              <button
+                class="primary"
+                :disabled="submitting || !canSubmitExtraction || status?.running"
+                @click="submitExtraction"
+              >
+                {{ t("start_extraction_btn") }}
+              </button>
+            </div>
+          </template>
+
+          <!-- Training form -->
+          <template v-else>
+            <div class="field span-3">
               <label>{{ t("model_path_label") }}</label>
               <input
                 v-model="training.model_path"
@@ -400,13 +439,19 @@ refreshPresets();
                 class="mono full"
                 :placeholder="t('model_path_placeholder')"
               />
+              <div class="help-text">{{ t("model_path_help") }}</div>
             </div>
-            <div class="field gpu-field">
+            <div class="field">
               <label>{{ t("gpu_devices_label") }}</label>
-              <input v-model="training.gpu_devices" type="text" class="mono full" />
+              <input
+                v-model="training.gpu_devices"
+                type="text"
+                class="mono full"
+                :placeholder="t('gpu_devices_placeholder')"
+              />
+              <div class="help-text">{{ t("gpu_devices_help") }}</div>
             </div>
-          </div>
-          <div class="field-row">
+
             <div class="field">
               <label>{{ t("train_intervention_label") }}</label>
               <select v-model="training.intervention" class="full">
@@ -430,8 +475,7 @@ refreshPresets();
               <label>{{ t("train_low_rank_dim_label") }}</label>
               <input v-model.number="training.low_rank_dimension" type="number" class="mono full" />
             </div>
-          </div>
-          <div class="field-row">
+
             <div class="field">
               <label>{{ t("train_epochs_label") }}</label>
               <input v-model.number="training.num_train_epochs" type="number" class="mono full" />
@@ -457,52 +501,60 @@ refreshPresets();
               <label>{{ t("train_logging_steps_label") }}</label>
               <input v-model.number="training.logging_steps" type="number" class="mono full" />
             </div>
-          </div>
-          <div class="field">
-            <label>{{ t("train_output_dir_label") }}</label>
-            <input v-model="training.output_dir" type="text" class="mono full" />
-          </div>
-          <div class="field">
-            <label>{{ t("train_examples_label") }}</label>
-            <div class="help-text">{{ t("train_examples_help") }}</div>
-            <div v-for="(example, i) in training.examples" :key="i" class="example-row">
-              <input
-                v-model="example[0]"
-                type="text"
-                class="full"
-                :placeholder="t('example_input_placeholder')"
-              />
-              <input
-                v-model="example[1]"
-                type="text"
-                class="full"
-                :placeholder="t('example_output_placeholder')"
-              />
+
+            <div class="field span-4">
+              <label>{{ t("train_output_dir_label") }}</label>
+              <input v-model="training.output_dir" type="text" class="mono full" />
+            </div>
+            <div class="field span-4">
+              <label>{{ t("train_examples_label") }}</label>
+              <div class="help-text example-help">{{ t("train_examples_help") }}</div>
+              <div class="list-stack">
+                <div v-for="(example, i) in training.examples" :key="i" class="list-item">
+                  <span class="item-index mono">{{ i + 1 }}</span>
+                  <input
+                    v-model="example[0]"
+                    type="text"
+                    class="item-input"
+                    :placeholder="t('example_input_placeholder')"
+                  />
+                  <span class="item-arrow">→</span>
+                  <input
+                    v-model="example[1]"
+                    type="text"
+                    class="item-input"
+                    :placeholder="t('example_output_placeholder')"
+                  />
+                  <button
+                    class="item-remove"
+                    :disabled="training.examples.length <= 1"
+                    :title="t('remove_btn')"
+                    @click="training.examples.splice(i, 1)"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <button class="add-btn" @click="training.examples.push(['', ''])">
+                  ＋ {{ t("add_example_btn") }}
+                </button>
+              </div>
+            </div>
+            <div class="span-4">
               <button
-                class="small"
-                :disabled="training.examples.length <= 1"
-                @click="training.examples.splice(i, 1)"
+                class="primary"
+                :disabled="submitting || !canSubmitTraining || status?.running"
+                @click="submitTraining"
               >
-                x
+                {{ t("start_training_btn") }}
               </button>
             </div>
-            <button class="small" @click="training.examples.push(['', ''])">
-              + {{ t("add_example_btn") }}
-            </button>
-          </div>
-          <button
-            class="primary"
-            :disabled="submitting || !canSubmitTraining || status?.running"
-            @click="submitTraining"
-          >
-            {{ t("start_training_btn") }}
-          </button>
-        </template>
+          </template>
+        </div>
 
         <div v-if="submitError" class="help-text text-err">{{ submitError }}</div>
       </div>
 
-      <!-- Job status -->
+      <!-- Job status + guidance form the right column -->
       <div class="panel status-panel">
         <h2>{{ t("job_status_title") }}</h2>
         <template v-if="status">
@@ -541,27 +593,38 @@ refreshPresets();
   margin-bottom: 12px;
 }
 
-.workshop-grid {
-  display: grid;
-  grid-template-columns: minmax(420px, 5fr) minmax(320px, 4fr);
+.workshop-stack {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+}
+
+/* Four equal columns shared by both forms; fields claim 1-4 of them, so
+   inputs on different rows always start and end on the same edges. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 14px;
   align-items: start;
 }
 
-@media (max-width: 1100px) {
-  .workshop-grid {
-    grid-template-columns: 1fr;
-  }
+.span-2 {
+  grid-column: span 2;
 }
 
-.gpu-field {
-  flex: 0 0 160px !important;
+.span-3 {
+  grid-column: span 3;
 }
 
-.normalize-field {
-  flex: 0 0 auto !important;
-  align-self: end;
-  padding-bottom: 22px;
+.span-4 {
+  grid-column: 1 / -1;
+}
+
+/* A lone checkbox has no label above it: nudge it down onto the same
+   baseline as the inputs beside it. */
+.check-cell {
+  align-self: start;
+  padding-top: 22px;
 }
 
 .preset-controls {
@@ -569,9 +632,11 @@ refreshPresets();
   gap: 8px;
 }
 
-.example-row {
-  display: flex;
-  gap: 6px;
+.preset-controls button {
+  white-space: nowrap;
+}
+
+.example-help {
   margin-bottom: 6px;
 }
 

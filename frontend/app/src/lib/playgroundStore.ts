@@ -12,7 +12,6 @@ import { defaultSteeringSpec, specFromJson } from "./spec";
 export interface PlaygroundState {
   spec: SteeringSpec;
   prompt: string;
-  systemPrompt: string;
   presetId: string | null;
   presetModel: string;
   /**
@@ -25,7 +24,6 @@ export interface PlaygroundState {
 export const playground = reactive<PlaygroundState>({
   spec: defaultSteeringSpec(),
   prompt: "",
-  systemPrompt: "",
   presetId: null,
   presetModel: "",
   revision: 0,
@@ -39,15 +37,19 @@ export function replaceSpec(spec: SteeringSpec): void {
 export function loadGalleryEntry(entry: GalleryEntry): void {
   replaceSpec(specFromJson(entry.spec));
   playground.prompt = entry.prompt;
-  playground.systemPrompt = entry.systemPrompt ?? "";
   playground.presetId = entry.id;
   playground.presetModel = entry.model;
 }
 
-export function resetPlayground(): void {
-  replaceSpec(defaultSteeringSpec());
-  playground.prompt = "";
-  playground.systemPrompt = "";
+/** Replace the spec with one built elsewhere (workshop, SAE page),
+    detaching whatever gallery preset was loaded before. */
+export function loadCustomSpec(spec: SteeringSpec): void {
+  replaceSpec(spec);
   playground.presetId = null;
   playground.presetModel = "";
+}
+
+export function resetPlayground(): void {
+  loadCustomSpec(defaultSteeringSpec());
+  playground.prompt = "";
 }

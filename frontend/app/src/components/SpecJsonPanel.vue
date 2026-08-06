@@ -2,7 +2,8 @@
 /**
  * Live SteeringSpec JSON, two-way: reflects the form state and accepts
  * direct edits (a structurally valid edit replaces the spec; invalid
- * JSON shows an error and keeps the last good spec).
+ * JSON shows an error and keeps the last good spec). Collapsible, with
+ * an actions slot the page fills with its export buttons.
  */
 import { computed, ref, watch } from "vue";
 import { useI18n } from "../i18n";
@@ -21,6 +22,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+const open = ref(true);
 const text = ref(render(props.spec));
 const parseError = ref("");
 const editing = ref(false);
@@ -61,35 +63,41 @@ const issues = computed(() => validateSteeringSpec(props.spec));
 </script>
 
 <template>
-  <div class="json-panel">
-    <div class="json-header">
-      <h3>{{ t("spec_json_title") }}</h3>
+  <div class="panel json-panel">
+    <div class="panel-header">
+      <button class="small ghost toggle" @click="open = !open">{{ open ? "▾" : "▸" }}</button>
+      <h2>{{ t("spec_json_title") }}</h2>
       <span
         v-if="!parseError"
         class="badge"
-        :class="issues.length === 0 ? 'text-ok' : 'text-warn'"
+        :class="issues.length === 0 ? 'badge-ok' : 'badge-warn'"
       >
         {{ issues.length === 0 ? t("validation_ok") : t("validation_issues", { n: issues.length }) }}
       </span>
+      <span class="spacer"></span>
+      <slot name="actions"></slot>
     </div>
-    <textarea
-      v-model="text"
-      class="mono json-text"
-      spellcheck="false"
-      @focus="editing = true"
-      @blur="onBlur"
-      @input="onInput"
-    ></textarea>
-    <div v-if="parseError" class="help-text text-err">
-      {{ t("json_parse_error", { error: parseError }) }}
-    </div>
-    <ul v-if="issues.length > 0" class="issue-list">
-      <li v-for="(issue, i) in issues" :key="i" class="text-warn">
-        <span class="mono">{{ issue.path }}</span
-        >: {{ issue.message }}
-      </li>
-    </ul>
-    <div class="help-text">{{ t("spec_json_help") }}</div>
+
+    <template v-if="open">
+      <textarea
+        v-model="text"
+        class="mono json-text"
+        spellcheck="false"
+        @focus="editing = true"
+        @blur="onBlur"
+        @input="onInput"
+      ></textarea>
+      <div v-if="parseError" class="help-text text-err">
+        {{ t("json_parse_error", { error: parseError }) }}
+      </div>
+      <ul v-if="issues.length > 0" class="issue-list">
+        <li v-for="(issue, i) in issues" :key="i" class="text-warn">
+          <span class="mono">{{ issue.path }}</span
+          >: {{ issue.message }}
+        </li>
+      </ul>
+      <div class="help-text">{{ t("spec_json_help") }}</div>
+    </template>
   </div>
 </template>
 
@@ -97,25 +105,36 @@ const issues = computed(() => validateSteeringSpec(props.spec));
 .json-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.json-header {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.json-header h3 {
-  margin: 0;
+.json-panel .panel-header {
+  margin-bottom: 0;
+}
+
+.toggle {
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.badge-ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: transparent;
+}
+
+.badge-warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: transparent;
 }
 
 .json-text {
   width: 100%;
-  min-height: 340px;
-  flex: 1;
+  min-height: 190px;
+  max-height: 460px;
   background: var(--bg-inset);
-  line-height: 1.45;
+  line-height: 1.5;
   white-space: pre;
 }
 

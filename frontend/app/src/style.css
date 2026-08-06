@@ -1,40 +1,89 @@
-/* Global styles: information-dense research-tool look, dark by default. */
+/* Design system: light-first research console — soft surfaces, one
+   accent ramp, and a small set of reusable primitives (panel, chip,
+   tabs, modal, empty state) shared by every page. */
 
 :root {
   --font-sans: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Consolas, "Courier New", monospace;
-}
 
-:root[data-theme="dark"] {
-  --bg: #0f1115;
-  --bg-panel: #161a21;
-  --bg-inset: #0c0e12;
-  --bg-hover: #1d222c;
-  --border: #2a303c;
-  --border-strong: #3a4250;
-  --text: #d8dee9;
-  --text-dim: #8b95a7;
-  --accent: #4f8ff7;
-  --accent-soft: rgba(79, 143, 247, 0.15);
-  --ok: #3fb27f;
-  --warn: #d9a13c;
-  --err: #e5604c;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
 }
 
 :root[data-theme="light"] {
-  --bg: #f5f6f8;
+  --bg: #f5f7fb;
+  --bg-tint-a: rgba(99, 102, 241, 0.07);
+  --bg-tint-b: rgba(14, 165, 233, 0.06);
   --bg-panel: #ffffff;
-  --bg-inset: #eef0f3;
-  --bg-hover: #e9edf3;
-  --border: #d7dce3;
-  --border-strong: #b9c2cf;
-  --text: #1f2530;
-  --text-dim: #5d6879;
-  --accent: #2563eb;
-  --accent-soft: rgba(37, 99, 235, 0.1);
+  --bg-inset: #f4f6fa;
+  --bg-hover: #eef1f8;
+  --border: #e4e8f0;
+  --border-strong: #cbd3e1;
+  --text: #16203a;
+  --text-dim: #66738d;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-2: #0ea5e9;
+  --accent-soft: rgba(79, 70, 229, 0.09);
+  --on-accent: #ffffff;
   --ok: #15803d;
+  --ok-soft: rgba(21, 128, 61, 0.1);
   --warn: #b45309;
-  --err: #b91c1c;
+  --warn-soft: rgba(180, 83, 9, 0.1);
+  --err: #be123c;
+  --err-soft: rgba(190, 18, 60, 0.09);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 20px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 12px 40px rgba(16, 24, 40, 0.16);
+  --overlay: rgba(23, 32, 58, 0.42);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1017;
+  --bg-tint-a: rgba(99, 102, 241, 0.12);
+  --bg-tint-b: rgba(14, 165, 233, 0.08);
+  --bg-panel: #151a23;
+  --bg-inset: #10151d;
+  --bg-hover: #1c2330;
+  --border: #262e3c;
+  --border-strong: #39424f;
+  --text: #dde3ee;
+  --text-dim: #8b97ad;
+  --accent: #818cf8;
+  --accent-hover: #a5b0ff;
+  --accent-2: #38bdf8;
+  --accent-soft: rgba(129, 140, 248, 0.16);
+  --on-accent: #0d1017;
+  --ok: #4ade80;
+  --ok-soft: rgba(74, 222, 128, 0.14);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --err: #fb7185;
+  --err-soft: rgba(251, 113, 133, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --overlay: rgba(5, 8, 14, 0.66);
+}
+
+/* Category tones: one hue per demo family, used by chips and card rails. */
+:root {
+  --tone-safety: #e11d48;
+  --tone-reasoning: #4f46e5;
+  --tone-style: #0284c7;
+  --tone-knowledge: #059669;
+  --tone-persona: #c026d3;
+  --tone-experts: #d97706;
+}
+
+:root[data-theme="dark"] {
+  --tone-safety: #fb7185;
+  --tone-reasoning: #818cf8;
+  --tone-style: #38bdf8;
+  --tone-knowledge: #34d399;
+  --tone-persona: #e879f9;
+  --tone-experts: #fbbf24;
 }
 
 * {
@@ -51,8 +100,13 @@ body,
 body {
   font-family: var(--font-sans);
   font-size: 13.5px;
-  background: var(--bg);
+  line-height: 1.5;
+  background:
+    radial-gradient(1100px 520px at 12% -8%, var(--bg-tint-a), transparent 60%),
+    radial-gradient(900px 460px at 92% 4%, var(--bg-tint-b), transparent 62%), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -61,6 +115,7 @@ a {
 }
 
 a:hover {
+  color: var(--accent-hover);
   text-decoration: underline;
 }
 
@@ -68,11 +123,12 @@ h1,
 h2,
 h3 {
   margin: 0 0 0.5rem;
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 h1 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 
 h2 {
@@ -91,7 +147,8 @@ input.mono {
   font-size: 12.5px;
 }
 
-/* Form controls */
+/* ---------- Form controls ---------- */
+
 input,
 select,
 textarea,
@@ -100,8 +157,24 @@ button {
   color: var(--text);
   background: var(--bg-inset);
   border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 0.75;
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--border-strong);
 }
 
 input:focus,
@@ -109,15 +182,20 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 textarea {
   resize: vertical;
+  line-height: 1.5;
 }
 
 button {
   cursor: pointer;
   background: var(--bg-panel);
+  border-color: var(--border-strong);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
 }
 
 button:hover:not(:disabled) {
@@ -125,37 +203,57 @@ button:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
 
+button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  border-color: transparent;
+  color: var(--on-accent);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.16);
 }
 
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-  background: var(--accent);
+  filter: brightness(1.06);
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 button.small {
-  padding: 2px 8px;
+  padding: 3px 9px;
   font-size: 12px;
 }
 
 label {
   display: block;
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 500;
   color: var(--text-dim);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
-/* Layout primitives */
+/* ---------- Layout primitives ---------- */
+
 .page {
-  max-width: 1240px;
+  max-width: 1180px;
   margin: 0 auto;
 }
 
@@ -163,7 +261,7 @@ label {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .page-header h1 {
@@ -171,16 +269,35 @@ label {
 }
 
 .page-intro {
-  margin: 0 0 16px;
-  max-width: 72ch;
+  margin: 0 0 18px;
   color: var(--text-dim);
+  line-height: 1.6;
 }
 
 .spacer {
   flex: 1;
 }
 
-/* Shared form helpers */
+/* Heading with a short accent rule, for sections inside a page. */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.section-title::before {
+  content: "";
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+}
+
+/* ---------- Shared form helpers ---------- */
+
 .full {
   width: 100%;
 }
@@ -191,16 +308,21 @@ label {
   gap: 6px;
   color: var(--text);
   font-size: 12.5px;
+  font-weight: 400;
   margin: 0;
 }
 
+.inline-check input {
+  accent-color: var(--accent);
+}
+
 .field {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .field-row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .field-row > .field {
@@ -211,30 +333,282 @@ label {
 .help-text {
   font-size: 11.5px;
   color: var(--text-dim);
-  margin-top: 2px;
+  margin-top: 3px;
+  line-height: 1.45;
 }
+
+/* ---------- Surfaces ---------- */
 
 .panel {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
 }
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.panel-header h2,
+.panel-header h3 {
+  margin: 0;
+}
+
+/* ---------- Chips & badges ---------- */
 
 .badge {
   display: inline-block;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: 999px;
   font-size: 11px;
   border: 1px solid var(--border-strong);
   color: var(--text-dim);
+  background: var(--bg-panel);
   white-space: nowrap;
 }
 
 .badge.accent {
   color: var(--accent);
-  border-color: var(--accent);
+  border-color: transparent;
   background: var(--accent-soft);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Tone-carrying chip: `.chip.tone` + `--tone` set by the category. */
+.chip.tone {
+  color: var(--tone);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+
+.chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---------- Tabs ---------- */
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.tab:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+}
+
+/* ---------- Modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: min(86vh, 900px);
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  margin: 0;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  overflow: auto;
+}
+
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
+}
+
+/* ---------- Enclosed list rows ----------
+   Editable list items (samples, training pairs): one bordered shell per
+   row holding an index cap, the field(s) and a remove button, so numbers
+   and ✕ buttons line up as columns and the focus ring wraps the row. */
+
+.list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.list-item {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  overflow: hidden;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.list-item:hover {
+  border-color: var(--border-strong);
+}
+
+.list-item:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.item-index {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-hover);
+  border-right: 1px solid var(--border);
+}
+
+.item-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.item-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Divider between paired fields in one row (e.g. input → output). */
+.item-arrow {
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.item-remove {
+  flex-shrink: 0;
+  width: 30px;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.item-remove:hover:not(:disabled) {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+/* Appends to the end of the list, so it spans the list's width. */
+.add-btn {
+  width: 100%;
+  padding: 5px;
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.add-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- States & text ---------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 28px 16px;
+}
+
+.empty-state svg {
+  opacity: 0.45;
 }
 
 .text-ok {
@@ -260,14 +634,16 @@ label {
 pre.code-block {
   background: var(--bg-inset);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
   overflow-x: auto;
   margin: 0;
   white-space: pre;
+  line-height: 1.5;
 }
 
-/* Scrollbars */
+/* ---------- Scrollbars ---------- */
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -276,6 +652,13 @@ pre.code-block {
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-track {

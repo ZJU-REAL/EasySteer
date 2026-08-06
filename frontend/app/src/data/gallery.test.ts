@@ -37,7 +37,7 @@ describe("gallery entries", () => {
     expect(refusal.conflict).toBe("sequential");
     expect(refusal.vectors.length).toBe(4);
     refusal.vectors.forEach((v, i) => {
-      expect(v.apply.positions).toEqual([-(i + 1)]);
+      expect(v.apply.prompt_positions).toEqual([-(i + 1)]);
       expect(v.scale).toBe(2.0);
     });
 

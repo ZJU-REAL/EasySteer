@@ -7,7 +7,7 @@
 
 export type Phase = "prompt" | "generation";
 
-export const PHASES: Phase[] = ["prompt", "generation"];
+const PHASES: Phase[] = ["prompt", "generation"];
 
 export type ConflictPolicy = "priority" | "sequential" | "error";
 
@@ -27,29 +27,31 @@ export const ALGORITHMS = [
 export type Algorithm = (typeof ALGORITHMS)[number];
 
 /** Allowed `params` keys per algorithm; unlisted algorithms accept none. */
-export const ALGORITHM_PARAMS: Record<string, string[]> = {
+const ALGORITHM_PARAMS: Record<string, string[]> = {
   moe_router: ["expert_ids", "mode", "lambda", "topk"],
 };
 
 /** Algorithms that never load `source` files (in-memory payloads only). */
-export const DATA_ONLY_ALGORITHMS = ["linear", "lm_steer", "loreft"];
+const DATA_ONLY_ALGORITHMS = ["linear", "lm_steer", "loreft"];
 
 /** Algorithms whose `source` must be an EasySteer GGUF export. */
-export const GGUF_ONLY_ALGORITHMS = ["direct", "erase", "replace"];
+const GGUF_ONLY_ALGORITHMS = ["direct", "erase", "replace"];
 
 /** Half-open (start, stop) window; stop=null is open-ended. */
 export type SpecWindow = [number, number | null];
 
 export interface ApplySpec {
   phases: Phase[];
-  tokens: number[] | null;
-  positions: number[] | null;
+  prompt_tokens: number[] | null;
+  prompt_positions: number[] | null;
   prompt_window: SpecWindow | null;
+  generation_tokens: number[] | null;
   generation_positions: number[] | null;
   generation_window: SpecWindow | null;
-  exclude_tokens: number[] | null;
-  exclude_positions: number[] | null;
+  exclude_prompt_tokens: number[] | null;
+  exclude_prompt_positions: number[] | null;
   exclude_prompt_window: SpecWindow | null;
+  exclude_generation_tokens: number[] | null;
   exclude_generation_positions: number[] | null;
   exclude_generation_window: SpecWindow | null;
 }
@@ -70,20 +72,21 @@ export interface VectorSpec {
 export interface SteeringSpec {
   vectors: VectorSpec[];
   conflict: ConflictPolicy;
-  debug: boolean;
 }
 
 export function defaultApplySpec(): ApplySpec {
   return {
     phases: ["prompt", "generation"],
-    tokens: null,
-    positions: null,
+    prompt_tokens: null,
+    prompt_positions: null,
     prompt_window: null,
+    generation_tokens: null,
     generation_positions: null,
     generation_window: null,
-    exclude_tokens: null,
-    exclude_positions: null,
+    exclude_prompt_tokens: null,
+    exclude_prompt_positions: null,
     exclude_prompt_window: null,
+    exclude_generation_tokens: null,
     exclude_generation_positions: null,
     exclude_generation_window: null,
   };
@@ -107,7 +110,6 @@ export function defaultSteeringSpec(): SteeringSpec {
   return {
     vectors: [defaultVectorSpec()],
     conflict: "priority",
-    debug: false,
   };
 }
 
@@ -163,6 +165,37 @@ function checkWindowShape(
   return value as SpecWindow;
 }
 
+/** List selectors, in wire order. */
+const LIST_SELECTORS = [
+  "prompt_tokens",
+  "prompt_positions",
+  "generation_tokens",
+  "generation_positions",
+  "exclude_prompt_tokens",
+  "exclude_prompt_positions",
+  "exclude_generation_tokens",
+  "exclude_generation_positions",
+] as const;
+
+const TOKEN_SELECTORS = [
+  "prompt_tokens",
+  "generation_tokens",
+  "exclude_prompt_tokens",
+  "exclude_generation_tokens",
+] as const;
+
+const WINDOW_SELECTORS = [
+  "prompt_window",
+  "generation_window",
+  "exclude_prompt_window",
+  "exclude_generation_window",
+] as const;
+
+/** The phase a selector's name binds it to (its outer gate). */
+function selectorPhase(name: string): Phase {
+  return name.includes("generation") ? "generation" : "prompt";
+}
+
 export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[] {
   const issues: SpecIssue[] = [];
   if (!Array.isArray(apply.phases) || apply.phases.length === 0) {
@@ -179,17 +212,11 @@ export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[]
       issues.push({ path: `${path}.phases`, message: `phases has duplicates: ${apply.phases}` });
     }
   }
-  for (const name of [
-    "tokens",
-    "positions",
-    "generation_positions",
-    "exclude_tokens",
-    "exclude_positions",
-    "exclude_generation_positions",
-  ] as const) {
+
+  for (const name of LIST_SELECTORS) {
     checkNullableIntList(issues, path, name, apply[name]);
   }
-  for (const name of ["tokens", "exclude_tokens"] as const) {
+  for (const name of TOKEN_SELECTORS) {
     const ids = apply[name];
     if (isIntArray(ids) && ids.some((t) => t < 0)) {
       issues.push({
@@ -208,19 +235,21 @@ export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[]
           "length is not known up front, so end-relative steps cannot resolve",
       });
     }
-    if (steps !== null && steps !== undefined && !apply.phases.includes("generation")) {
-      issues.push({
-        path: `${path}.${name}`,
-        message: `${name} requires 'generation' in phases`,
-      });
+  }
+
+  // Every selector requires its own phase in the outer gate.
+  for (const name of [...LIST_SELECTORS, ...WINDOW_SELECTORS]) {
+    if (apply[name] !== null && apply[name] !== undefined) {
+      const phase = selectorPhase(name);
+      if (!apply.phases.includes(phase)) {
+        issues.push({ path: `${path}.${name}`, message: `${name} requires '${phase}' in phases` });
+      }
     }
   }
+
   for (const name of ["prompt_window", "exclude_prompt_window"] as const) {
     const window = checkWindowShape(issues, path, name, apply[name]);
     if (window === null) continue;
-    if (!apply.phases.includes("prompt")) {
-      issues.push({ path: `${path}.${name}`, message: `${name} requires 'prompt' in phases` });
-    }
     const [start, stop] = window;
     // stop > start is enforced only when both bounds share a sign;
     // mixed-sign bounds (e.g. [2, -2]) resolve against the prompt length.
@@ -236,12 +265,6 @@ export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[]
   for (const name of ["generation_window", "exclude_generation_window"] as const) {
     const window = checkWindowShape(issues, path, name, apply[name]);
     if (window === null) continue;
-    if (!apply.phases.includes("generation")) {
-      issues.push({
-        path: `${path}.${name}`,
-        message: `${name} requires 'generation' in phases`,
-      });
-    }
     const [start, stop] = window;
     if (start < 0) {
       issues.push({ path: `${path}.${name}`, message: `${name} start must be >= 0, got ${start}` });
@@ -366,7 +389,6 @@ export function specToJson(spec: SteeringSpec): Record<string, unknown> {
     vectors: spec.vectors.map(vectorToJson),
   };
   if (spec.conflict !== "priority") out.conflict = spec.conflict;
-  if (spec.debug) out.debug = spec.debug;
   return out;
 }
 
@@ -387,14 +409,16 @@ function vectorToJson(v: VectorSpec): Record<string, unknown> {
 /** Wire key order of a selection clause (mirrors SelectSpec.to_wire()). */
 const APPLY_KEYS = [
   "phases",
-  "tokens",
-  "positions",
+  "prompt_tokens",
+  "prompt_positions",
   "prompt_window",
+  "generation_tokens",
   "generation_positions",
   "generation_window",
-  "exclude_tokens",
-  "exclude_positions",
+  "exclude_prompt_tokens",
+  "exclude_prompt_positions",
   "exclude_prompt_window",
+  "exclude_generation_tokens",
   "exclude_generation_positions",
   "exclude_generation_window",
 ] as const;
@@ -419,6 +443,8 @@ export function specFromJson(json: unknown): SteeringSpec {
     throw new Error("steering spec must be a JSON object");
   }
   const obj = json as Record<string, unknown>;
+  // "debug" existed until the engine dropped it as dead; old JSON
+  // still parses, the flag is simply discarded.
   const knownKeys = ["vectors", "conflict", "debug"];
   const unknown = Object.keys(obj).filter((k) => !knownKeys.includes(k));
   if (unknown.length > 0) {
@@ -430,7 +456,6 @@ export function specFromJson(json: unknown): SteeringSpec {
   return {
     vectors: obj.vectors.map((v, i) => vectorFromJson(v, i)),
     conflict: (obj.conflict as ConflictPolicy) ?? "priority",
-    debug: Boolean(obj.debug ?? false),
   };
 }
 
@@ -491,14 +516,16 @@ function applyFromJson(json: unknown, index: number): ApplySpec {
 
   return {
     phases: (obj.phases as Phase[]) ?? [],
-    tokens: (obj.tokens as number[] | null) ?? null,
-    positions: (obj.positions as number[] | null) ?? null,
+    prompt_tokens: (obj.prompt_tokens as number[] | null) ?? null,
+    prompt_positions: (obj.prompt_positions as number[] | null) ?? null,
     prompt_window: windowOf("prompt_window"),
+    generation_tokens: (obj.generation_tokens as number[] | null) ?? null,
     generation_positions: (obj.generation_positions as number[] | null) ?? null,
     generation_window: windowOf("generation_window"),
-    exclude_tokens: (obj.exclude_tokens as number[] | null) ?? null,
-    exclude_positions: (obj.exclude_positions as number[] | null) ?? null,
+    exclude_prompt_tokens: (obj.exclude_prompt_tokens as number[] | null) ?? null,
+    exclude_prompt_positions: (obj.exclude_prompt_positions as number[] | null) ?? null,
     exclude_prompt_window: windowOf("exclude_prompt_window"),
+    exclude_generation_tokens: (obj.exclude_generation_tokens as number[] | null) ?? null,
     exclude_generation_positions: (obj.exclude_generation_positions as number[] | null) ?? null,
     exclude_generation_window: windowOf("exclude_generation_window"),
   };

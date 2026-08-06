@@ -6,12 +6,7 @@ import { ALGORITHMS, type VectorSpec } from "../lib/spec";
 import ApplySpecEditor from "./ApplySpecEditor.vue";
 import IntListInput from "./IntListInput.vue";
 
-const props = defineProps<{ vector: VectorSpec; index: number; removable: boolean }>();
-
-const emit = defineEmits<{
-  (e: "remove"): void;
-  (e: "duplicate"): void;
-}>();
+const props = defineProps<{ vector: VectorSpec }>();
 
 const { t } = useI18n();
 
@@ -23,13 +18,6 @@ const sourceModel = computed({
   get: () => props.vector.source ?? "",
   set: (value: string) => {
     props.vector.source = value === "" ? null : value;
-  },
-});
-
-const nameModel = computed({
-  get: () => props.vector.name ?? "",
-  set: (value: string) => {
-    props.vector.name = value === "" ? null : value;
   },
 });
 
@@ -69,18 +57,6 @@ function onParamsInput(): void {
 
 <template>
   <div class="vector-editor">
-    <div class="vector-header">
-      <h3>{{ t("vector_n_title", { n: index + 1 }) }}</h3>
-      <span v-if="vector.algorithm !== 'direct'" class="badge accent mono">{{
-        vector.algorithm
-      }}</span>
-      <span class="spacer"></span>
-      <button class="small" @click="emit('duplicate')">{{ t("duplicate_vector_btn") }}</button>
-      <button v-if="removable" class="small" @click="emit('remove')">
-        {{ t("remove_btn") }}
-      </button>
-    </div>
-
     <div v-if="hasInlineData" class="inline-data-notice">
       {{ t("data_inline_notice") }}
     </div>
@@ -95,35 +71,30 @@ function onParamsInput(): void {
       <div class="help-text">{{ t("source_help") }}</div>
     </div>
 
-    <div class="field-row">
+    <div class="field-row scalar-row">
       <div class="field">
         <label>{{ t("algorithm_label") }}</label>
         <select v-model="vector.algorithm" class="mono full">
           <option v-for="algo in ALGORITHMS" :key="algo" :value="algo">{{ algo }}</option>
         </select>
       </div>
-      <div class="field">
+      <div class="field scale-field">
         <label>{{ t("scale_label") }}</label>
-        <input v-model.number="vector.scale" type="number" step="0.1" class="mono full" />
+        <div class="scale-row">
+          <input v-model.number="vector.scale" type="range" min="-5" max="5" step="0.1" />
+          <input v-model.number="vector.scale" type="number" step="0.1" class="mono scale-num" />
+        </div>
       </div>
-    </div>
-
-    <div class="field-row">
       <div class="field">
         <label>{{ t("layers_label") }}</label>
         <IntListInput v-model="vector.layers" :placeholder="t('layers_placeholder')" />
       </div>
-      <div class="field">
-        <label>{{ t("name_label") }}</label>
-        <input v-model="nameModel" type="text" class="full" />
+      <div class="field normalize-field">
+        <label class="inline-check">
+          <input v-model="vector.normalize" type="checkbox" />
+          {{ t("normalize_label") }}
+        </label>
       </div>
-    </div>
-
-    <div class="field">
-      <label class="inline-check">
-        <input v-model="vector.normalize" type="checkbox" />
-        {{ t("normalize_label") }}
-      </label>
     </div>
 
     <div v-if="showParams" class="field">
@@ -131,28 +102,49 @@ function onParamsInput(): void {
       <input v-model="paramsText" type="text" class="mono full" @input="onParamsInput" />
       <div v-if="paramsError" class="help-text text-err">{{ paramsError }}</div>
     </div>
-
     <ApplySpecEditor :apply="vector.apply" />
   </div>
 </template>
 
 <style scoped>
 .vector-editor {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
 }
 
-.vector-header {
+.scalar-row {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.scalar-row > .field {
+  flex: 1 1 190px;
+}
+
+.scale-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
-.vector-header h3 {
-  margin: 0;
+.scale-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+
+.scale-num {
+  width: 74px;
+  flex-shrink: 0;
+}
+
+.normalize-field {
+  flex: 0 0 auto !important;
+  padding-bottom: 7px;
 }
 
 .inline-data-notice {
