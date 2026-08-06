@@ -92,14 +92,13 @@ class SAEFeatureExplorer:
                 
                 logger.info(f"Found {len(filtered_results)} related features")
                 return filtered_results
-            else:
-                logger.error(f"API request failed with status code {response.status_code}")
-                logger.error(f"Response: {response.text}")
-                return []
-        
-        except Exception as e:
-            logger.error(f"Error searching for features: {e}")
-            return []
+            raise RuntimeError(
+                f"Neuronpedia search failed with HTTP {response.status_code}: "
+                f"{response.text[:200]}"
+            )
+
+        except requests.RequestException as e:
+            raise RuntimeError(f"Neuronpedia is unreachable: {e}") from e
     
     def get_feature_explanation(
         self, 
@@ -193,14 +192,13 @@ class SAEFeatureExplorer:
                         }
                 
                 return processed_data
-            else:
-                logger.error(f"API request failed with status code {response.status_code}")
-                logger.error(f"Response: {response.text}")
-                return {}
-        
-        except Exception as e:
-            logger.error(f"Error fetching feature explanation: {e}")
-            return {}
+            raise RuntimeError(
+                f"Neuronpedia feature lookup failed with HTTP "
+                f"{response.status_code}: {response.text[:200]}"
+            )
+
+        except requests.RequestException as e:
+            raise RuntimeError(f"Neuronpedia is unreachable: {e}") from e
     
     def extract_decoder_vector(
         self,
