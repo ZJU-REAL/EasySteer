@@ -8,7 +8,9 @@ steered absolute positions, covering:
 - 1-token prompts classified correctly (the old length==1 heuristic's
   failure mode);
 - exclusions composing with phase-wide selection;
-- absolute/negative position filters and token filters (union);
+- include selectors (tokens, positions, prompt windows, generation
+  positions/windows) unioning within the phase gate, exclude twins
+  always vetoing;
 - exact half-open generation windows;
 - multi-vector specs with independent per-vector apply clauses.
 """
@@ -156,18 +158,28 @@ class TestBatchedPerRequestPositions:
          lambda L, mt: set(range(L, L + mt - 1))),
         (61, 6, dict(phases=["generation"], generation_window=(1, 3)),
          lambda L, mt: {L + 1, L + 2}),
-        # Filters intersect: a positions filter is never widened by the
-        # window, so the windowed decode step fails positions=[-2,-1]
-        # and only the two prompt positions steer (clause.py semantics).
+        # Include selectors union: the windowed decode step joins the
+        # positions matches instead of being vetoed by them
+        # (clause.py union semantics).
         (45, 4, dict(phases=["prompt", "generation"], positions=[-2, -1],
                      generation_window=(0, 1)),
-         lambda L, mt: {L - 2, L - 1}),
-        # The window constrains only decode tokens: with no positions
-        # filter, a cross-phase clause covers every prompt token plus
-        # the windowed decode steps.
+         lambda L, mt: {L - 2, L - 1, L}),
+        # The window is an include selector: once present, only its
+        # matches are selected — prompt tokens need their own selector
+        # (prompt_window) to join a cross-phase clause.
         (33, 4, dict(phases=["prompt", "generation"],
+                     prompt_window=(0, None),
                      generation_window=(0, 1)),
          lambda L, mt: set(range(L)) | {L}),
+        # New symmetric selectors: the prompt tail via a negative-bound
+        # prompt window, exact decode steps via generation_positions,
+        # with an exclude twin vetoing one of each.
+        (25, 5, dict(phases=["prompt", "generation"],
+                     prompt_window=(-3, None),
+                     generation_positions=[0, 2],
+                     exclude_prompt_window=(-2, -1),
+                     exclude_generation_positions=[2]),
+         lambda L, mt: {L - 3, L - 1, L}),
         (80, 4, None, lambda L, mt: set()),
     ]
 

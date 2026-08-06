@@ -281,7 +281,7 @@ class TestSelectClause:
     def test_generation_window(self, llm):
         with capturing(llm, "hidden_states", layers=[10],
                        select={"phases": ["generation"],
-                               "window": [0, 2]}):
+                               "generation_window": [0, 2]}):
             generate(llm)
             hs = fetch(llm)
         assert hs[10].shape[0] == 2

@@ -32,16 +32,27 @@ Server-level and per-request steering cannot currently be combined in one reques
 `ApplySpec` shares its selection language with hidden-state capture (both subclass
 `SelectSpec`), so a clause means the same thing in both systems.
 
-| Field | Meaning |
-|---|---|
-| `phases` | **Required, non-empty.** Which token kinds to select: `"prompt"`, `"generation"`. With no other filters, selects every token of the listed phases. |
-| `tokens` | Token-id allowlist (real ids, `>= 0`). |
-| `positions` | Absolute sequence positions; negative values are Python-style from the end of the *prompt* (`-1` = last prompt token), stable across prefill chunks. |
-| `exclude_tokens` / `exclude_positions` | Always subtract, in every case. |
-| `generation_window` | Half-open `(start, stop)` over 0-based decode steps; `stop=None` = unbounded. `(0, k)` steers exactly the first `k` decode steps. Requires `"generation"` in `phases`. |
+`phases` (**required, non-empty**: `"prompt"`, `"generation"`, or both) is the
+outer gate. Within it, five include selectors — each with a symmetric exclude
+twin — choose tokens:
 
-Within the selected phases, `tokens` and `positions` select the **union** of their
-matches; exclusions always subtract.
+| Include | Exclude twin | Matches |
+|---|---|---|
+| `tokens` | `exclude_tokens` | Token-id allowlist (real ids, `>= 0`). |
+| `positions` | `exclude_positions` | Absolute sequence positions; negative values are Python-style from the end of the *prompt* (`-1` = last prompt token), stable across prefill chunks. |
+| `prompt_window` | `exclude_prompt_window` | Half-open `(start, stop)` over prompt positions; negative bounds and `stop=None` resolve from the prompt end (`(-5, None)` = the last five prompt tokens). Requires `"prompt"` in `phases`. |
+| `generation_positions` | `exclude_generation_positions` | Exact 0-based decode steps (`[0]` = the first generated token). Requires `"generation"` in `phases`. |
+| `generation_window` | `exclude_generation_window` | Half-open `(start, stop)` over 0-based decode steps; `stop=None` = unbounded. `(0, k)` selects exactly the first `k` decode steps. Requires `"generation"` in `phases`. |
+
+The include selectors select the **union** of their matches — with none set,
+the whole gated phases. The exclude selectors union and **always subtract**:
+where an include and an exclude overlap, the exclusion wins. One clause can
+span both phases, e.g. the prompt tail plus the first decode steps:
+
+```python
+ApplySpec(phases=["prompt", "generation"],
+          prompt_window=(-4, None), generation_window=(0, 4))
+```
 
 ## `VectorSpec`: one vector
 
@@ -150,6 +161,10 @@ The v1 surface (trigger fields, `steer_vector_request`, `--steer-vector-path` fl
   off-by-one is gone).
 - Phase selection (`phases`) replaces the `-1` sentinel.
 - `normalize` defaults to `False` everywhere, including server-level steering.
+- `generation_window` is an include selector like any other: it **unions** with
+  `tokens`/`positions` instead of constraining decode tokens, and a cross-phase
+  clause with only a `generation_window` no longer covers the prompt — select
+  prompt tokens explicitly (e.g. `prompt_window=(0, None)`).
 
 <!-- TODO: per-algorithm pages (file formats, payload shapes) — currently only the
 README's "Adding a New Algorithm" snippet covers this. -->

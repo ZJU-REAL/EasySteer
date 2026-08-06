@@ -45,8 +45,9 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 
 ### Select clauses
 
-Row selection reuses the same `SelectSpec` language as steering's `ApplySpec` — phases,
-token/position filters, exclusions, generation window — resolved identically by the
+Row selection reuses the same `SelectSpec` language as steering's `ApplySpec` — a
+phase gate, five include selectors (tokens, positions, prompt window, generation
+positions/window) and their symmetric exclude twins — resolved identically by the
 engine, so a clause means the same thing in both systems:
 
 ```python

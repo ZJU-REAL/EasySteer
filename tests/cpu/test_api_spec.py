@@ -55,6 +55,19 @@ class TestApplySpecValidation:
             ({"phases": ["prompt"], "generation_window": (0, 3)}, "generation"),
             ({"phases": ["generation"], "generation_window": (3, 3)}, "half-open"),
             ({"phases": ["prompt"], "tokens": []}, "non-empty"),
+            ({"phases": ["generation"], "prompt_window": (0, 4)}, "prompt"),
+            ({"phases": ["prompt"], "prompt_window": (-2, -4)}, "half-open"),
+            ({"phases": ["prompt"], "generation_positions": [0]}, "generation"),
+            ({"phases": ["generation"], "generation_positions": [-1]}, "decode steps"),
+            (
+                {"phases": ["generation"], "exclude_generation_window": (2, 2)},
+                "half-open",
+            ),
+            ({"phases": ["generation"], "exclude_prompt_window": (0, 4)}, "prompt"),
+            (
+                {"phases": ["prompt"], "exclude_generation_positions": [0]},
+                "generation",
+            ),
         ],
     )
     def test_invalid_specs_rejected(self, kwargs, needle):
@@ -63,6 +76,16 @@ class TestApplySpecValidation:
 
     def test_unbounded_window_accepted(self):
         assert ApplySpec(phases=["generation"], generation_window=(2, None))
+
+    def test_prompt_window_bound_conventions_accepted(self):
+        assert ApplySpec(phases=["prompt"], prompt_window=(-5, None))
+        assert ApplySpec(phases=["prompt"], prompt_window=(0, 10))
+        assert ApplySpec(phases=["prompt"], prompt_window=(2, -2))
+        assert ApplySpec(
+            phases=["prompt", "generation"],
+            exclude_prompt_window=(-3, None),
+            exclude_generation_window=(4, None),
+        )
 
 
 class TestVectorAndSteeringSpecValidation:
@@ -117,9 +140,14 @@ class TestTranslation:
             "phases": ["prompt"],
             "tokens": [5],
             "positions": None,
+            "prompt_window": None,
+            "generation_positions": None,
+            "generation_window": None,
             "exclude_tokens": None,
             "exclude_positions": [0],
-            "window": None,
+            "exclude_prompt_window": None,
+            "exclude_generation_positions": None,
+            "exclude_generation_window": None,
         }
 
     def test_moe_params_folded(self):
@@ -200,10 +228,21 @@ class TestFingerprintAndLengthSensitivity:
         [
             {"phases": ["prompt"], "positions": [-1]},
             {"phases": ["generation"], "generation_window": (0, 2)},
+            {"phases": ["generation"], "generation_positions": [0]},
+            {"phases": ["prompt"], "prompt_window": (-4, None)},
+            {"phases": ["prompt"], "prompt_window": (0, None)},
+            {"phases": ["prompt"], "exclude_prompt_window": (0, -1)},
+            {"phases": ["generation"], "exclude_generation_positions": [2]},
         ],
     )
     def test_length_sensitive_specs(self, apply_kwargs):
         assert is_prompt_length_sensitive(to_engine_request(make_spec(**apply_kwargs)))
+
+    def test_absolute_prompt_window_not_length_sensitive(self):
+        req = to_engine_request(
+            make_spec(phases=["prompt"], prompt_window=(0, 10))
+        )
+        assert not is_prompt_length_sensitive(req)
 
     def test_fingerprint_stability_and_keying(self):
         fp_a1 = config_fingerprint(to_engine_request(make_spec(phases=["prompt"])))
@@ -295,6 +334,107 @@ class TestCollectorSemantics:
             0,
             4,
         ) == [0, 3]
+
+    def test_prompt_window_negative_bounds_select_prompt_tail(self):
+        assert run_collector(
+            {"phases": ["prompt"], "prompt_window": (-2, None)},
+            [11, 12, 13, 14],
+            0,
+            False,
+            0,
+            4,
+        ) == [2, 3]
+
+    def test_prompt_window_absolute_bounds(self):
+        assert run_collector(
+            {"phases": ["prompt"], "prompt_window": (1, 3)},
+            [11, 12, 13, 14],
+            0,
+            False,
+            0,
+            4,
+        ) == [1, 2]
+
+    def test_prompt_window_ignores_decode_tokens(self):
+        assert run_collector(
+            {"phases": ["prompt", "generation"], "prompt_window": (0, None)},
+            [99], 4, True, 1, 4,
+        ) == []
+
+    def test_generation_positions_select_exact_steps(self):
+        results = [
+            run_collector(
+                {"phases": ["generation"], "generation_positions": [0, 2]},
+                [99], 4 + j, True, j + 1, 4,
+            )
+            for j in range(4)
+        ]
+        assert results == [[0], [], [0], []]
+
+    def test_tokens_and_generation_window_union(self):
+        # SEMANTICS: the window is an include selector like any other —
+        # it widens a token trigger instead of constraining it.
+        results = [
+            run_collector(
+                {
+                    "phases": ["generation"],
+                    "tokens": [42],
+                    "generation_window": (0, 1),
+                },
+                [99], 4 + j, True, j + 1, 4,
+            )
+            for j in range(3)
+        ]
+        assert results == [[0], [], []]
+        results_tok = run_collector(
+            {
+                "phases": ["generation"],
+                "tokens": [42],
+                "generation_window": (0, 1),
+            },
+            [42], 4 + 2, True, 3, 4,
+        )
+        assert results_tok == [0]
+
+    def test_prompt_window_and_generation_window_union_across_phases(self):
+        # One clause selects the prompt tail AND the first decode steps.
+        spec = {
+            "phases": ["prompt", "generation"],
+            "prompt_window": (-1, None),
+            "generation_window": (0, 1),
+        }
+        assert run_collector(spec, [11, 12, 13, 14], 0, False, 0, 4) == [3]
+        assert run_collector(spec, [99], 4, True, 1, 4) == [0]
+        assert run_collector(spec, [99], 5, True, 2, 4) == []
+
+    def test_exclude_twins_veto_includes(self):
+        # Overlap resolution: the exclusion always wins.
+        assert run_collector(
+            {
+                "phases": ["prompt"],
+                "prompt_window": (0, 3),
+                "exclude_prompt_window": (1, 2),
+            },
+            [11, 12, 13, 14],
+            0,
+            False,
+            0,
+            4,
+        ) == [0, 2]
+
+    def test_exclude_generation_selectors_veto(self):
+        results = [
+            run_collector(
+                {
+                    "phases": ["generation"],
+                    "exclude_generation_positions": [1],
+                    "exclude_generation_window": (3, None),
+                },
+                [99], 4 + j, True, j + 1, 4,
+            )
+            for j in range(5)
+        ]
+        assert results == [[0], [], [0], [], []]
 
 
 class TestApplyClauseIntegration:

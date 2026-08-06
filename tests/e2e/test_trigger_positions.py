@@ -53,6 +53,11 @@ POSITION_SPECS = {
     "generation_window": dict(phases=["generation"], generation_window=(0, 2)),
     "cross_phase": dict(phases=["prompt", "generation"], positions=[-2, -1],
                         generation_window=(0, 2)),
+    "prompt_window_tail": dict(phases=["prompt"], prompt_window=(-4, None)),
+    "generation_positions": dict(phases=["generation"],
+                                 generation_positions=[0, 1]),
+    "exclude_twins": dict(phases=["prompt"], prompt_window=(-6, None),
+                          exclude_prompt_window=(-4, -2)),
 }
 
 

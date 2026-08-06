@@ -38,12 +38,25 @@ REQ_SLOTS = [0, 1, 1, 2, -1, 3]
 TOKEN_IDS = [11, 7, 13, 14, 11, 12, 7, 14, 15, 16, 99, 7, 11, 7, 99]
 
 CLAUSES = {
-    0: [ApplySpec(phases=["prompt", "generation"]).to_wire()],
-    1: [ApplySpec(phases=["prompt"], positions=[-1, 0]).to_wire()],
+    0: [
+        ApplySpec(phases=["prompt", "generation"]).to_wire(),
+        ApplySpec(phases=["prompt"], prompt_window=(-9, -5)).to_wire(),
+    ],
+    1: [
+        ApplySpec(phases=["prompt"], positions=[-1, 0]).to_wire(),
+        ApplySpec(
+            phases=["prompt"],
+            prompt_window=(2, None),
+            exclude_prompt_window=(3, 4),
+        ).to_wire(),
+    ],
     2: [
         ApplySpec(
             phases=["generation"], generation_window=(2, 5)
-        ).to_wire()
+        ).to_wire(),
+        ApplySpec(
+            phases=["generation"], generation_positions=[3]
+        ).to_wire(),
     ],
     3: [
         ApplySpec(
@@ -54,6 +67,14 @@ CLAUSES = {
         ).to_wire(),
         ApplySpec(
             phases=["prompt"], tokens=[11], exclude_positions=[0]
+        ).to_wire(),
+        # Union semantics: an unmatched token filter must not veto the
+        # generation window (and vice versa).
+        ApplySpec(
+            phases=["generation"], tokens=[123], generation_window=(0, 2)
+        ).to_wire(),
+        ApplySpec(
+            phases=["generation"], exclude_generation_positions=[1]
         ).to_wire(),
     ],
 }
@@ -104,7 +125,7 @@ def test_resolver_matches_torch_collector_per_clause():
                 assert actual is not None, (slot, clause, expected)
                 assert actual.tolist() == expected, (slot, clause)
             checked += 1
-    assert checked == 6
+    assert checked == 11
     # Sanity on the scenario itself: every clause family actually fired
     # somewhere (an all-None table would vacuously pass).
     fired = [k for k, v in resolved.items() if v is not None]
