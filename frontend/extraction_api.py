@@ -107,14 +107,15 @@ def run_extraction(config):
         model_path = config['model_path']
         gpu_devices = config.get('gpu_devices', '0')
         
-        # Use LLM manager with extraction-specific configuration
-        # Note: enable_steer_vector defaults to False (extraction doesn't need steering)
+        # The job backend hosts its own engine: hidden-state capture needs
+        # an in-process LLM handle (the OpenAI server has no capture route),
+        # which is why extraction takes a model path and GPU ids at all.
+        # Unified capture runs on any engine config; eager is kept only so
+        # short-lived job engines start fast.
         llm = llm_manager.get_or_create_llm(
             model_path=model_path,
             gpu_devices=gpu_devices,
             enforce_eager=True,
-            enable_chunked_prefill=False,  # Hidden states extraction doesn't support chunked prefill yet
-            enable_prefix_caching=False    # Hidden states extraction doesn't support prefix caching yet
         )
         
         update_extraction_status(f"VLLM model loaded: {model_path}")

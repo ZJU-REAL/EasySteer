@@ -169,39 +169,39 @@ _DATA_ONLY_ALGORITHMS = ("linear", "lm_steer", "loreft")
 def _apply_clauses(prefill_tokens, prefill_positions, generate_tokens):
     """Translate the legacy config trigger fields into v2 apply clauses.
 
-    Same mapping as frontend/core/steer_request_builder.py: -1 in a
-    token list means "every token of that phase"; no fields at all
-    means both phases unfiltered.
+    -1 in a token list means "every token of that phase"; no fields at
+    all means both phases unfiltered. Phase-scoped selectors let all
+    filtered phases share one clause; wildcard phases join a separate
+    selector-free clause (a clause with any include selector would no
+    longer cover them).
     """
-    if prefill_tokens is None and prefill_positions is None and generate_tokens is None:
-        return [{"phases": ["prompt", "generation"]}]
     want_prompt = prefill_tokens is not None or prefill_positions is not None
-    if prefill_tokens is not None and -1 in prefill_tokens:
-        prefill_tokens = None
-        prefill_positions = None
     want_generation = generate_tokens is not None
-    if generate_tokens is not None and -1 in generate_tokens:
-        generate_tokens = None
-    if (want_prompt and want_generation and prefill_positions is None
-            and prefill_tokens == generate_tokens):
-        clause = {"phases": ["prompt", "generation"]}
+    if not want_prompt and not want_generation:
+        return [{"phases": ["prompt", "generation"]}]
+
+    prompt_sel = {}
+    if want_prompt and not (prefill_tokens is not None and -1 in prefill_tokens):
         if prefill_tokens:
-            clause["tokens"] = prefill_tokens
-        return [clause]
-    clauses = []
-    if want_prompt:
-        clause = {"phases": ["prompt"]}
-        if prefill_tokens:
-            clause["tokens"] = prefill_tokens
+            prompt_sel["prompt_tokens"] = prefill_tokens
         if prefill_positions:
-            clause["positions"] = prefill_positions
-        clauses.append(clause)
-    if want_generation:
-        clause = {"phases": ["generation"]}
+            prompt_sel["prompt_positions"] = prefill_positions
+    generation_sel = {}
+    if want_generation and not (-1 in generate_tokens):
         if generate_tokens:
-            clause["tokens"] = generate_tokens
-        clauses.append(clause)
-    return clauses
+            generation_sel["generation_tokens"] = generate_tokens
+
+    whole = {"phases": []}
+    filtered = {"phases": []}
+    if want_prompt:
+        target = filtered if prompt_sel else whole
+        target["phases"].append("prompt")
+        target.update(prompt_sel)
+    if want_generation:
+        target = filtered if generation_sel else whole
+        target["phases"].append("generation")
+        target.update(generation_sel)
+    return [c for c in (whole, filtered) if c["phases"]]
 
 
 def _b64_payload_wire(payload) -> dict:

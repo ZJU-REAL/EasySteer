@@ -46,7 +46,7 @@ def distinct_spec(i, layers, source=SEAL_VECTOR):
             scale=0.0,
             layers=layers,
             apply=ApplySpec(phases=["prompt", "generation"],
-                            exclude_positions=[i]),
+                            exclude_prompt_positions=[i]),
         )
     ])
 

@@ -24,8 +24,9 @@ def _sugar_select(
 ) -> Optional[Any]:
     """Translate the token_ids/positions sugar into a SelectSpec.
 
-    Both filters select the union of their matches over prompt and
-    generated tokens, matching the engine-side clause semantics.
+    ``token_ids`` matches over prompt and generated tokens alike;
+    ``positions`` selects prompt positions (negative = from the prompt
+    end), matching the engine-side clause semantics.
     """
     if select is not None and (token_ids is not None or positions is not None):
         raise ValueError(
@@ -45,8 +46,9 @@ def _sugar_select(
 
     return SelectSpec(
         phases=["prompt", "generation"],
-        tokens=list(token_ids) if token_ids is not None else None,
-        positions=list(positions) if positions is not None else None,
+        prompt_tokens=list(token_ids) if token_ids is not None else None,
+        generation_tokens=list(token_ids) if token_ids is not None else None,
+        prompt_positions=list(positions) if positions is not None else None,
     )
 
 

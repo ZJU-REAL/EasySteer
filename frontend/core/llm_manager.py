@@ -35,7 +35,7 @@ class LLMManager:
         gpu_devices: str = "0",
         enable_steer_vector: bool = False,
         enforce_eager: bool = True,
-        enable_chunked_prefill: bool = False,
+        enable_chunked_prefill: bool = None,
         enable_prefix_caching: bool = None,
         **kwargs
     ) -> LLM:
@@ -46,9 +46,11 @@ class LLMManager:
             model_path: Path to the model (local or HuggingFace model ID)
             gpu_devices: Comma-separated GPU device IDs (e.g., "0" or "0,1,2,3")
             enable_steer_vector: Whether to enable steering vector support
-            enforce_eager: Whether to enforce eager mode (recommended for steering)
-            enable_chunked_prefill: Whether to enable chunked prefill
-            enable_prefix_caching: Whether to enable prefix caching (None = auto)
+            enforce_eager: Whether to enforce eager mode (fast startup for
+                short-lived job engines; steering and capture no longer
+                require it)
+            enable_chunked_prefill: Whether to enable chunked prefill (None = engine default)
+            enable_prefix_caching: Whether to enable prefix caching (None = engine default)
             **kwargs: Additional arguments to pass to LLM constructor
             
         Returns:
@@ -84,8 +86,9 @@ class LLMManager:
                 'model': model_path,
                 'enforce_eager': enforce_eager,
                 'tensor_parallel_size': gpu_count,
-                'enable_chunked_prefill': enable_chunked_prefill,
             }
+            if enable_chunked_prefill is not None:
+                llm_config['enable_chunked_prefill'] = enable_chunked_prefill
             
             # Add enable_steer_vector if True. The frontend serves
             # whatever algorithm the user picks, so declare them all
