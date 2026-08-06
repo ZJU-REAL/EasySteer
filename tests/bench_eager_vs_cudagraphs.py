@@ -69,7 +69,7 @@ def start_server(
             "scale": scale,
             "layers": TARGET_LAYERS,
             "normalize": True,
-            "apply": {"phases": ["prompt", "generation"]},
+            "apply": {"prompt": "all", "generation": "all"},
         }]}
         cmd += ["--steering-config", _json.dumps(spec)]
     else:
@@ -125,7 +125,7 @@ def bench(
                 "scale": scale,
                 "layers": TARGET_LAYERS,
                 "normalize": True,
-                "apply": {"phases": ["prompt", "generation"]},
+                "apply": {"prompt": "all", "generation": "all"},
             }]}
         r = client.post(f"{url}/v1/chat/completions", json=body)
         if r.status_code != 200:
@@ -147,7 +147,7 @@ def bench(
                 "scale": scale,
                 "layers": TARGET_LAYERS,
                 "normalize": True,
-                "apply": {"phases": ["prompt", "generation"]},
+                "apply": {"prompt": "all", "generation": "all"},
             }]}
         r = client.post(f"{url}/v1/chat/completions", json=body)
         if r.status_code != 200:

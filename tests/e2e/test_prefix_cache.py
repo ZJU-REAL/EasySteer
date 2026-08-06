@@ -80,7 +80,7 @@ class TestFingerprintKeying:
 
 class TestLengthSensitivity:
     def test_negative_position_keys_on_prompt_length(self, llm):
-        spec = steering_spec(phases=["prompt"], prompt_positions=[-1])
+        spec = steering_spec(prompt_positions=[-1])
         longer = PROMPT_48 + list(range(300, 308))
         assert run(llm, PROMPT_48, spec).num_cached_tokens == 0
         assert run(llm, longer, spec).num_cached_tokens == 0, (
@@ -91,7 +91,7 @@ class TestLengthSensitivity:
         )
 
     def test_generation_window_keys_on_prompt_length(self, llm):
-        spec = steering_spec(phases=["generation"], generation_window=(0, 2))
+        spec = steering_spec(generation_window=(0, 2))
         longer = PROMPT_48 + list(range(400, 408))
         assert run(llm, PROMPT_48, spec).num_cached_tokens == 0
         assert run(llm, longer, spec).num_cached_tokens == 0
@@ -141,7 +141,7 @@ class TestBaselineIsolation:
 
     def test_baseline_steered_baseline_byte_identical(self, llm):
         spec = steering_spec(scale=20.0, layers=tuple(range(10, 26)),
-                             phases=["prompt"])
+                             prompt="all")
         run(llm, self.PROMPT, max_tokens=24)  # cold run fills the cache
         warm = run(llm, self.PROMPT, max_tokens=24).outputs[0]
         steered = run(llm, self.PROMPT, spec, max_tokens=24).outputs[0]

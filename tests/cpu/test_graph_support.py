@@ -15,7 +15,7 @@ from vllm.steer_vectors.api import to_engine_request
 from vllm.steer_vectors.payloads import LowRankProjector
 from vllm.steer_vectors.graph_support import graph_request_problem
 
-APPLY_ALL = ApplySpec(phases=["prompt", "generation"])
+APPLY_ALL = ApplySpec(prompt="all", generation="all")
 
 
 def _request(**vector_kwargs):

@@ -15,7 +15,7 @@ from vllm.steer_vectors.payloads import (
     materialize,
 )
 
-APPLY = ApplySpec(phases=["prompt", "generation"])
+APPLY = ApplySpec(prompt="all", generation="all")
 
 
 def spec_of(vector: VectorSpec) -> SteeringSpec:

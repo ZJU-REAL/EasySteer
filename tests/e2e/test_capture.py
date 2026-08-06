@@ -25,10 +25,12 @@ from helpers import DENSE_MODEL
 
 
 def sel(**filters):
-    """SelectSpec wire dict over both phases (the common test clause)."""
+    """SelectSpec wire dict: the given filters, or whole both phases."""
     from vllm.steer_vectors.api import SelectSpec
 
-    return SelectSpec(phases=["prompt", "generation"], **filters).to_wire()
+    if not filters:
+        return SelectSpec(prompt="all", generation="all").to_wire()
+    return SelectSpec(**filters).to_wire()
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
@@ -258,21 +260,21 @@ class TestSelectClause:
     def test_prompt_phase_only(self, llm):
         prompt_len = len(llm.get_tokenizer().encode(TEXT))
         with capturing(llm, "hidden_states", layers=[10],
-                       select={"phases": ["prompt"]}):
+                       select={"prompt": "all"}):
             generate(llm)
             hs = fetch(llm)
         assert hs[10].shape[0] == prompt_len
 
     def test_generation_phase_only(self, llm):
         with capturing(llm, "hidden_states", layers=[10],
-                       select={"phases": ["generation"]}):
+                       select={"generation": "all"}):
             generate(llm)
             hs = fetch(llm)
         assert hs[10].shape[0] == SP.max_tokens - 1
 
     def test_exclusions_subtract(self, llm, expected_rows):
         with capturing(llm, "hidden_states", layers=[10],
-                       select={"phases": ["prompt", "generation"],
+                       select={"prompt": "all", "generation": "all",
                                "exclude_prompt_positions": [0]}):
             generate(llm)
             hs = fetch(llm)
@@ -280,7 +282,7 @@ class TestSelectClause:
 
     def test_generation_window(self, llm):
         with capturing(llm, "hidden_states", layers=[10],
-                       select={"phases": ["generation"],
+                       select={
                                "generation_window": [0, 2]}):
             generate(llm)
             hs = fetch(llm)
@@ -422,10 +424,8 @@ class TestPerRequestSelect:
         from vllm.capture import deserialize_captured
         from vllm.steer_vectors.api import SelectSpec
 
-        first_only = SelectSpec(
-            phases=["prompt", "generation"], prompt_positions=[0]
-        ).to_wire()
-        gen_only = SelectSpec(phases=["generation"]).to_wire()
+        first_only = SelectSpec(prompt_positions=[0]).to_wire()
+        gen_only = SelectSpec(generation="all").to_wire()
         capture_select = [
             {"hidden_states": first_only},
             None,
@@ -479,7 +479,7 @@ class TestPerRequestSelect:
         result = hs.capture(
             llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],
             per_prompt_selects=[
-                SelectSpec(phases=["prompt", "generation"], prompt_positions=[0, -1]),
+                SelectSpec(prompt_positions=[0, -1]),
                 None,
                 None,
             ],

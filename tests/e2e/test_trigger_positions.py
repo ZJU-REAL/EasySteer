@@ -47,16 +47,16 @@ def spec(**kwargs):
 
 
 POSITION_SPECS = {
-    "tail_negative": dict(phases=["prompt"], prompt_positions=[-1]),
-    "head_absolute": dict(phases=["prompt"], prompt_positions=[0, 1, 2, 3]),
-    "prompt_range": dict(phases=["prompt"], prompt_positions=[-4, -3, -2, -1]),
-    "generation_window": dict(phases=["generation"], generation_window=(0, 2)),
-    "cross_phase": dict(phases=["prompt", "generation"], prompt_positions=[-2, -1],
+    "tail_negative": dict(prompt_positions=[-1]),
+    "head_absolute": dict(prompt_positions=[0, 1, 2, 3]),
+    "prompt_range": dict(prompt_positions=[-4, -3, -2, -1]),
+    "generation_window": dict(generation_window=(0, 2)),
+    "cross_phase": dict(prompt_positions=[-2, -1],
                         generation_window=(0, 2)),
-    "prompt_window_tail": dict(phases=["prompt"], prompt_window=(-4, None)),
-    "generation_positions": dict(phases=["generation"],
+    "prompt_window_tail": dict(prompt_window=(-4, None)),
+    "generation_positions": dict(
                                  generation_positions=[0, 1]),
-    "exclude_twins": dict(phases=["prompt"], prompt_window=(-6, None),
+    "exclude_twins": dict(prompt_window=(-6, None),
                           exclude_prompt_window=(-4, -2)),
 }
 
@@ -109,7 +109,7 @@ class TestPartialPrefixHit:
         """A longer prompt sharing a steered head reuses only the head
         blocks; the recomputed tail plus cached steered head must equal
         the fully-cold run of the same request."""
-        s = spec(phases=["prompt"], prompt_positions=[0, 1, 2, 3])
+        s = spec(prompt_positions=[0, 1, 2, 3])
         longer = PROMPT + list(range(300, 316))
         llm.reset_prefix_cache()
         cold_long = run(llm, longer, s)
@@ -132,18 +132,18 @@ class TestPositionsAreLoadBearing:
 
     def test_head_vs_tail_differ(self, llm):
         llm.reset_prefix_cache()
-        head = run(llm, PROMPT, spec(phases=["prompt"], prompt_positions=[0]))
-        tail = run(llm, PROMPT, spec(phases=["prompt"], prompt_positions=[-1]))
+        head = run(llm, PROMPT, spec(prompt_positions=[0]))
+        tail = run(llm, PROMPT, spec(prompt_positions=[-1]))
         assert head.outputs[0].text != tail.outputs[0].text
 
     def test_out_of_range_position_clamps_to_last_prompt_token(self, llm):
         """A positive position past the prompt end clamps to the last
         prompt token: byte-identical to prompt_positions=[-1]."""
         llm.reset_prefix_cache()
-        tail = run(llm, PROMPT, spec(phases=["prompt"], prompt_positions=[-1]))
+        tail = run(llm, PROMPT, spec(prompt_positions=[-1]))
         llm.reset_prefix_cache()
         clamped = run(
-            llm, PROMPT, spec(phases=["prompt"], prompt_positions=[10_000])
+            llm, PROMPT, spec(prompt_positions=[10_000])
         )
         assert clamped.outputs[0].text == tail.outputs[0].text, (
             "out-of-range prompt position did not clamp to the last "
@@ -156,9 +156,9 @@ class TestPositionsAreLoadBearing:
         (0, 2) window's must not."""
         llm.reset_prefix_cache()
         unsteered = run(llm, PROMPT)
-        early = run(llm, PROMPT, spec(phases=["generation"],
+        early = run(llm, PROMPT, spec(
                                       generation_window=(0, 2)))
-        late = run(llm, PROMPT, spec(phases=["generation"],
+        late = run(llm, PROMPT, spec(
                                      generation_window=(2, 4)))
         base_head = list(unsteered.outputs[0].token_ids[:2])
         assert list(late.outputs[0].token_ids[:2]) == base_head, (
@@ -190,10 +190,10 @@ class TestCoBatchedPerRequestPositions:
         tp = [TokensPrompt(prompt_token_ids=p) for p in prompts]
         steering = [
             None,
-            spec(phases=["generation"], generation_window=(2, 4)),
-            spec(phases=["prompt"], prompt_positions=[0, 1, 2, 3]),
+            spec(generation_window=(2, 4)),
+            spec(prompt_positions=[0, 1, 2, 3]),
             None,
-            spec(phases=["prompt"], prompt_positions=[-1]),
+            spec(prompt_positions=[-1]),
         ]
         llm.reset_prefix_cache()
         mixed = llm.generate(tp, [sp] * 5, steering=steering, use_tqdm=False)

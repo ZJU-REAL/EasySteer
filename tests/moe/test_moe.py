@@ -235,7 +235,7 @@ class TestModeSemantics:
             tmp_path,
             "trig",
             {l: {"mode": "deactivate", "expert_ids": DEACT} for l in ALL_LAYERS},
-            phases=["prompt"],
+            prompt="all",
             positions=trig,
         )
         logits = captured(llm, [ids_a], [spec])

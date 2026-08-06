@@ -98,7 +98,7 @@ def steering_body(scale, algorithm="direct", source=DENSE_VECTOR):
             "algorithm": algorithm,
             "scale": scale,
             "layers": list(range(10, 26)),
-            "apply": {"phases": ["prompt", "generation"]},
+            "apply": {"prompt": "all", "generation": "all"},
         }]
     }
 

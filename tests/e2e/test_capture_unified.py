@@ -114,7 +114,7 @@ def test_generation_only_capture_tolerates_cache_hits(llm):
         "start_capture",
         "hidden_states",
         layers=[10],
-        select=SelectSpec(phases=["generation"]).to_wire(),
+        select=SelectSpec(generation="all").to_wire(),
     )
     try:
         llm.generate(prompt, SamplingParams(max_tokens=4), use_tqdm=False)

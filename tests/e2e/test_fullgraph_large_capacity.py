@@ -47,7 +47,8 @@ LOREFT_WEIGHT = os.path.join(
 def _data_spec(payload, algorithm, scale, layers=None, **apply_kwargs):
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-    apply_kwargs.setdefault("phases", ["prompt", "generation"])
+    if not apply_kwargs:
+        apply_kwargs = {"prompt": "all", "generation": "all"}
     return SteeringSpec(vectors=[VectorSpec(
         data=payload, algorithm=algorithm, scale=scale, layers=layers,
         apply=ApplySpec(**apply_kwargs),
@@ -86,7 +87,7 @@ def test_loreft_emoji_gather_path(llm):
     prompt = "<|im_start|>user\nWho are you?<|im_end|>\n<|im_start|>assistant\n"
     sp = SamplingParams(temperature=0.0, max_tokens=16)
     spec = _data_spec(from_pyreft(LOREFT_WEIGHT), "loreft", 1.0,
-                      layers=[8], phases=["prompt"], prompt_positions=[-1])
+                      layers=[8], prompt_positions=[-1])
     plain = llm.generate(prompt, sampling_params=sp,
                          use_tqdm=False)[0].outputs[0].text
     steered = llm.generate(prompt, sampling_params=sp, use_tqdm=False,

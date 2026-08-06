@@ -55,7 +55,7 @@ def test_single_vector_fields_reach_the_wire():
             layers=[7],
             normalize=True,
             name="drift-check",
-            apply=ApplySpec(phases=["prompt"], prompt_positions=[-1]),
+            apply=ApplySpec(prompt_positions=[-1]),
         )],
     )
     req = to_engine_request(spec)
@@ -65,7 +65,8 @@ def test_single_vector_fields_reach_the_wire():
     assert req.normalize is True
     assert req.steer_vector_name == "drift-check"
     assert req.inline_payload["sha256"] == req.payload_sha256
-    assert req.apply_spec["phases"] == ["prompt"]
+    assert req.apply_spec["prompt"] is None
+    assert req.apply_spec["generation"] is None
     assert req.apply_spec["prompt_positions"] == [-1]
 
 
@@ -75,9 +76,9 @@ def test_multi_vector_fields_reach_the_wire():
         conflict="sequential",
         vectors=[
             VectorSpec(data=payload, scale=0.5, layers=[3],
-                       apply=ApplySpec(phases=["generation"])),
+                       apply=ApplySpec(generation="all")),
             VectorSpec(data=payload, scale=2.0, layers=[4],
-                       apply=ApplySpec(phases=["prompt", "generation"])),
+                       apply=ApplySpec(prompt="all", generation="all")),
         ],
     )
     req = to_engine_request(spec)
@@ -85,14 +86,15 @@ def test_multi_vector_fields_reach_the_wire():
     assert req.conflict_resolution == "sequential"
     assert [vc.scale for vc in req.vector_configs] == [0.5, 2.0]
     assert [vc.target_layers for vc in req.vector_configs] == [[3], [4]]
-    assert req.vector_configs[0].apply_spec["phases"] == ["generation"]
+    assert req.vector_configs[0].apply_spec["generation"] == "all"
+    assert req.vector_configs[0].apply_spec["prompt"] is None
 
 
 def test_moe_params_reach_the_wire():
     spec = SteeringSpec(vectors=[VectorSpec(
         algorithm="moe_router", scale=1.0, layers=[2],
         params={"expert_ids": [1, 5], "mode": "deactivate"},
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     )])
     req = to_engine_request(spec)
     assert req.moe_expert_ids == [1, 5]

@@ -54,11 +54,11 @@ def test_unpreloaded_multi_vector_rejected(llm):
     missing = SteeringSpec(vectors=[VectorSpec(
         source=DENSE_VECTOR.replace(".gguf", "-does-not-exist.gguf"),
         layers=LAYERS,
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     ), VectorSpec(
         source=DENSE_VECTOR,
         layers=LAYERS,
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     )])
     with pytest.raises(ValueError, match="not preloaded"):
         llm.generate(PROMPT, steering=missing, sampling_params=SP)

@@ -25,12 +25,26 @@ QWEN3_MODEL = os.environ.get(
 )
 
 
-def steering_spec(source=DENSE_VECTOR, scale=0.5, layers=(10,), phases=None,
+_INCLUDE_KWARGS = (
+    "prompt", "generation", "prompt_tokens", "prompt_positions",
+    "prompt_window", "generation_tokens", "generation_positions",
+    "generation_window",
+)
+
+
+def steering_spec(source=DENSE_VECTOR, scale=0.5, layers=(10,),
                   algorithm="direct", normalize=False, params=None,
                   conflict="priority", extra_vectors=(), **apply_kwargs):
-    """Build a single-vector SteeringSpec (the common test shape)."""
+    """Build a single-vector SteeringSpec (the common test shape).
+
+    With no include selector among apply_kwargs the clause covers both
+    phases whole, so exclude-only callers keep the old default scope.
+    """
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
+    if not any(k in apply_kwargs for k in _INCLUDE_KWARGS):
+        apply_kwargs["prompt"] = "all"
+        apply_kwargs["generation"] = "all"
     vec = VectorSpec(
         source=source,
         algorithm=algorithm,
@@ -38,8 +52,7 @@ def steering_spec(source=DENSE_VECTOR, scale=0.5, layers=(10,), phases=None,
         layers=list(layers) if layers is not None else None,
         normalize=normalize,
         params=dict(params or {}),
-        apply=ApplySpec(phases=list(phases or ["prompt", "generation"]),
-                        **apply_kwargs),
+        apply=ApplySpec(**apply_kwargs),
     )
     return SteeringSpec(vectors=[vec, *extra_vectors], conflict=conflict)
 

@@ -154,7 +154,7 @@ def make_llm(
             scale=scale,
             layers=target_layers,
             normalize=normalize,
-            apply=ApplySpec(phases=["prompt", "generation"]),
+            apply=ApplySpec(prompt="all", generation="all"),
         )]).model_dump_json()
     elif enable_steer:
         kwargs["enable_steer_vector"] = True

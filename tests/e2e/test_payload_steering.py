@@ -34,7 +34,7 @@ ENGINE_KWARGS = dict(
 TEXT = "The capital of France is"
 SP = SamplingParams(temperature=0.0, max_tokens=24, ignore_eos=True)
 LAYERS = list(range(10, 26))
-APPLY = ApplySpec(phases=["prompt", "generation"])
+APPLY = ApplySpec(prompt="all", generation="all")
 
 
 def data_spec(payload, scale=0.5):

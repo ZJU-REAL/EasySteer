@@ -41,18 +41,18 @@ PARAMS = SamplingParams(temperature=0, max_tokens=4, ignore_eos=True)
 class TestPhases:
     def test_prompt_phase_covers_chunked_prompt(self, trace):
         _, by_layer = trace.run(
-            PROMPT_LONG, PARAMS, steering=steering_spec(phases=["prompt"])
+            PROMPT_LONG, PARAMS, steering=steering_spec(prompt="all")
         )
         pos = by_layer[10]
         assert {p for p, _ in pos} == set(range(129)), (
-            "phases=['prompt'] must cover all 129 prompt tokens incl. the "
+            "prompt='all' must cover all 129 prompt tokens incl. the "
             "1-token tail chunk"
         )
         assert all(is_prefill for _, is_prefill in pos)
 
     def test_generation_phase_only_decode(self, trace):
         _, by_layer = trace.run(
-            PROMPT_LONG, PARAMS, steering=steering_spec(phases=["generation"])
+            PROMPT_LONG, PARAMS, steering=steering_spec(generation="all")
         )
         pos = by_layer[10]
         assert {p for p, _ in pos} == {129, 130, 131}
@@ -62,12 +62,12 @@ class TestPhases:
 
     def test_one_token_prompt_prompt_phase(self, trace):
         assert trace.positions(
-            PROMPT_ONE, PARAMS, steering=steering_spec(phases=["prompt"])
+            PROMPT_ONE, PARAMS, steering=steering_spec(prompt="all")
         ) == [0]
 
     def test_one_token_prompt_generation_phase(self, trace):
         assert trace.positions(
-            PROMPT_ONE, PARAMS, steering=steering_spec(phases=["generation"])
+            PROMPT_ONE, PARAMS, steering=steering_spec(generation="all")
         ) == [1, 2, 3]
 
 
@@ -76,12 +76,12 @@ class TestFilters:
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["prompt"], exclude_prompt_positions=[0, -1]),
+            steering=steering_spec(prompt="all", exclude_prompt_positions=[0, -1]),
         ) == list(range(1, 128))
 
     def test_negative_position_fires_at_last_prompt_token(self, trace):
         assert trace.positions(
-            PROMPT_LONG, PARAMS, steering=steering_spec(phases=["prompt"],
+            PROMPT_LONG, PARAMS, steering=steering_spec(
                                                         prompt_positions=[-1])
         ) == [128]
 
@@ -89,7 +89,7 @@ class TestFilters:
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["prompt"], prompt_tokens=[100, 150]),
+            steering=steering_spec(prompt_tokens=[100, 150]),
         ) == [0, 50]
 
     def test_token_and_position_union_with_exclusion(self, trace):
@@ -97,7 +97,6 @@ class TestFilters:
             PROMPT_LONG,
             PARAMS,
             steering=steering_spec(
-                phases=["prompt"],
                 prompt_tokens=[100, 150],
                 prompt_positions=[7],
                 exclude_prompt_positions=[50],
@@ -110,7 +109,7 @@ class TestGenerationWindow:
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["generation"],
+            steering=steering_spec(
                                    generation_window=(0, 2)),
         ) == [129, 130]
 
@@ -118,7 +117,7 @@ class TestGenerationWindow:
         assert trace.positions(
             PROMPT_LONG,
             PARAMS,
-            steering=steering_spec(phases=["generation"],
+            steering=steering_spec(
                                    generation_window=(1, None)),
         ) == [130, 131]
 
@@ -129,9 +128,9 @@ class TestMultiVector:
 
         spec = SteeringSpec(vectors=[
             VectorSpec(source=DENSE_VECTOR, scale=0.5, layers=[10],
-                       apply=ApplySpec(phases=["prompt"], prompt_positions=[0])),
+                       apply=ApplySpec(prompt_positions=[0])),
             VectorSpec(source=DENSE_VECTOR, scale=0.5, layers=[12],
-                       apply=ApplySpec(phases=["generation"])),
+                       apply=ApplySpec(generation="all")),
         ])
         _, by_layer = trace.run(PROMPT_LONG, PARAMS, layers=(10, 12),
                                 steering=spec)
@@ -150,31 +149,31 @@ class TestBatchedPerRequestPositions:
 
     CASES = [
         # (prompt_len, max_tokens, apply_kwargs or None, expected_fn)
-        (129, 4, dict(phases=["prompt"], prompt_positions=[-1]),
+        (129, 4, dict(prompt_positions=[-1]),
          lambda L, mt: {L - 1}),
-        (37, 6, dict(phases=["prompt"], prompt_positions=[0]),
+        (37, 6, dict(prompt_positions=[0]),
          lambda L, mt: {0}),
-        (1, 5, dict(phases=["generation"]),
+        (1, 5, dict(generation="all"),
          lambda L, mt: set(range(L, L + mt - 1))),
-        (61, 6, dict(phases=["generation"], generation_window=(1, 3)),
+        (61, 6, dict(generation_window=(1, 3)),
          lambda L, mt: {L + 1, L + 2}),
         # Include selectors union: the windowed decode step joins the
         # positions matches instead of being vetoed by them
         # (clause.py union semantics).
-        (45, 4, dict(phases=["prompt", "generation"], prompt_positions=[-2, -1],
+        (45, 4, dict(prompt_positions=[-2, -1],
                      generation_window=(0, 1)),
          lambda L, mt: {L - 2, L - 1, L}),
         # The window is an include selector: once present, only its
         # matches are selected — prompt tokens need their own selector
         # (prompt_window) to join a cross-phase clause.
-        (33, 4, dict(phases=["prompt", "generation"],
+        (33, 4, dict(
                      prompt_window=(0, None),
                      generation_window=(0, 1)),
          lambda L, mt: set(range(L)) | {L}),
         # New symmetric selectors: the prompt tail via a negative-bound
         # prompt window, exact decode steps via generation_positions,
         # with an exclude twin vetoing one of each.
-        (25, 5, dict(phases=["prompt", "generation"],
+        (25, 5, dict(
                      prompt_window=(-3, None),
                      generation_positions=[0, 2],
                      exclude_prompt_window=(-2, -1),

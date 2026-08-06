@@ -89,7 +89,7 @@ def test_fingerprint_tracks_file_version(vec_path):
         return SteerVectorRequest(
             "r", 1, steer_vector_local_path=vec_path, scale=1.0,
             target_layers=[0],
-            apply_spec={"phases": ["prompt", "generation"]})
+            apply_spec={"prompt": "all", "generation": "all"})
 
     fp1 = config_fingerprint(req())
     _rewrite(vec_path, b"version-3-yet-another-length!")

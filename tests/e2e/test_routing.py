@@ -67,7 +67,7 @@ def plain(llm):
 def two_vector_spec():
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-    both = ApplySpec(phases=["prompt", "generation"])
+    both = ApplySpec(prompt="all", generation="all")
     return SteeringSpec(
         conflict="sequential",
         vectors=[
@@ -92,7 +92,7 @@ def test_pt_direction_payload_through_engine(llm, plain, tmp_path):
     spec = SteeringSpec(vectors=[VectorSpec(
         data=vec.from_pt_direction(pt, layers=[10]),
         scale=8.0,
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     )])
     out = gen(llm, [PROMPT], spec)[0]
     assert out != plain, "data= payload steering had no effect"
@@ -118,7 +118,7 @@ class TestMultiVector:
             [PROMPT],
             SteeringSpec(vectors=[VectorSpec(
                 source=DENSE_VECTOR, scale=2.0, layers=LAYERS,
-                apply=ApplySpec(phases=["prompt", "generation"]),
+                apply=ApplySpec(prompt="all", generation="all"),
             )]),
         )[0]
         assert multi_one == single, (
