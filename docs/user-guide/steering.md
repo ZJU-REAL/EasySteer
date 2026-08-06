@@ -33,16 +33,19 @@ Server-level and per-request steering cannot currently be combined in one reques
 `SelectSpec`), so a clause means the same thing in both systems.
 
 `phases` (**required, non-empty**: `"prompt"`, `"generation"`, or both) is the
-outer gate. Within it, five include selectors — each with a symmetric exclude
-twin — choose tokens:
+outer gate. Within it, six include selectors — three per phase, each named for
+it and carrying a symmetric exclude twin — choose tokens. Every `prompt_*`
+selector requires `"prompt"` in `phases`, every `generation_*` selector
+requires `"generation"`:
 
 | Include | Exclude twin | Matches |
 |---|---|---|
-| `tokens` | `exclude_tokens` | Token-id allowlist (real ids, `>= 0`). |
-| `positions` | `exclude_positions` | Absolute sequence positions; negative values are Python-style from the end of the *prompt* (`-1` = last prompt token), stable across prefill chunks. |
-| `prompt_window` | `exclude_prompt_window` | Half-open `(start, stop)` over prompt positions; negative bounds and `stop=None` resolve from the prompt end (`(-5, None)` = the last five prompt tokens). Requires `"prompt"` in `phases`. |
-| `generation_positions` | `exclude_generation_positions` | Exact 0-based decode steps (`[0]` = the first generated token). Requires `"generation"` in `phases`. |
-| `generation_window` | `exclude_generation_window` | Half-open `(start, stop)` over 0-based decode steps; `stop=None` = unbounded. `(0, k)` selects exactly the first `k` decode steps. Requires `"generation"` in `phases`. |
+| `prompt_tokens` | `exclude_prompt_tokens` | Token-id allowlist (real ids, `>= 0`) over prompt occurrences. |
+| `prompt_positions` | `exclude_prompt_positions` | Prompt positions; negative values are Python-style from the end of the prompt (`-1` = last prompt token), stable across prefill chunks. Positive values past the prompt end clamp to the last prompt token (warned at admission). |
+| `prompt_window` | `exclude_prompt_window` | Half-open `(start, stop)` over prompt positions; negative bounds and `stop=None` resolve from the prompt end (`(-5, None)` = the last five prompt tokens). |
+| `generation_tokens` | `exclude_generation_tokens` | Token-id allowlist over generated occurrences. |
+| `generation_positions` | `exclude_generation_positions` | Exact 0-based decode steps (`[0]` = the first generated token). |
+| `generation_window` | `exclude_generation_window` | Half-open `(start, stop)` over 0-based decode steps; `stop=None` = unbounded. `(0, k)` selects exactly the first `k` decode steps. |
 
 The include selectors select the **union** of their matches — with none set,
 the whole gated phases. The exclude selectors union and **always subtract**:
@@ -128,9 +131,9 @@ multi = SteeringSpec(
     conflict="sequential",
     vectors=[
         VectorSpec(source="dir1.gguf", scale=1.5, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+                   apply=ApplySpec(phases=["prompt"], prompt_positions=[-2])),
         VectorSpec(source="dir2.gguf", scale=-0.8, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], positions=[-2])),
+                   apply=ApplySpec(phases=["prompt"], prompt_positions=[-2])),
     ],
 )
 
@@ -162,9 +165,13 @@ The v1 surface (trigger fields, `steer_vector_request`, `--steer-vector-path` fl
 - Phase selection (`phases`) replaces the `-1` sentinel.
 - `normalize` defaults to `False` everywhere, including server-level steering.
 - `generation_window` is an include selector like any other: it **unions** with
-  `tokens`/`positions` instead of constraining decode tokens, and a cross-phase
-  clause with only a `generation_window` no longer covers the prompt — select
-  prompt tokens explicitly (e.g. `prompt_window=(0, None)`).
+  the token/position selectors instead of constraining decode tokens, and a
+  cross-phase clause with only a `generation_window` no longer covers the
+  prompt — select prompt tokens explicitly (e.g. `prompt_window=(0, None)`).
+- Every selector is phase-scoped and named for it: token-id filters split into
+  `prompt_tokens` / `generation_tokens`, and `prompt_positions` (formerly
+  `positions`) selects prompt tokens only — decode steps are always addressed
+  through `generation_positions` / `generation_window`.
 
 <!-- TODO: per-algorithm pages (file formats, payload shapes) — currently only the
 README's "Adding a New Algorithm" snippet covers this. -->

@@ -46,8 +46,8 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 ### Select clauses
 
 Row selection reuses the same `SelectSpec` language as steering's `ApplySpec` — a
-phase gate, five include selectors (tokens, positions, prompt window, generation
-positions/window) and their symmetric exclude twins — resolved identically by the
+phase gate, six phase-scoped include selectors (prompt tokens/positions/window,
+generation tokens/positions/window) and their symmetric exclude twins — resolved identically by the
 engine, so a clause means the same thing in both systems:
 
 ```python
@@ -55,7 +55,7 @@ from vllm.steer_vectors import SelectSpec
 
 # Keep only the last prompt token of each sample
 result = hs.capture(llm, prompts,
-                    select=SelectSpec(phases=["prompt"], positions=[-1]))
+                    select=SelectSpec(phases=["prompt"], prompt_positions=[-1]))
 ```
 
 `per_prompt_selects` requires `positions='all'` semantics (no reductions).
