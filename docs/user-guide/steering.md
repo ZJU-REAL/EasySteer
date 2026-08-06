@@ -10,8 +10,10 @@ for the design rationale):
    algorithm-specific `params`, and its `apply` clause.
 3. **`SteeringSpec`** — an ordered list of `VectorSpec`s plus a conflict policy.
 
-Specs are backend-independent: eager, piecewise, and full CUDA-graph engines accept the
-same spec; a backend that cannot run a spec rejects it at admission.
+Specs are backend-independent: eager, `split`, and `in_graph` engines accept the same
+spec; a request using an algorithm outside the engine's declared `steer_algorithms`
+is rejected at admission (the declaration is required whenever steering is enabled —
+see the [vllm-steer steering guide](../../vllm-steer/docs/features/steer_vectors.md)).
 
 ## Attaching a spec
 

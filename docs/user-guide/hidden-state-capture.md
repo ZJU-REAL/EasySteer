@@ -9,12 +9,11 @@ the raw material for steering vectors.
 from vllm import LLM
 import easysteer.hidden_states as hs
 
-llm = LLM(
-    model="Qwen/Qwen2.5-1.5B-Instruct",
-    enforce_eager=True,           # capture requires eager execution
-    enable_prefix_caching=False,  # cache-hit tokens are never recomputed,
-                                  # so they cannot be captured
-)
+llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct")
+# Capture works on any engine configuration: capture-active batches
+# dispatch through the eager forward automatically, and capture
+# requests are cache-salted so prefix-cache hits never skip the
+# recomputation capture needs.
 ```
 
 ## `hs.capture()`
