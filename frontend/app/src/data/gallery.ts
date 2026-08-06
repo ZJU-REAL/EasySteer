@@ -495,10 +495,10 @@ export const galleryEntries: GalleryEntry[] = [
       url: "https://aclanthology.org/2025.emnlp-main.725/",
     },
     model: "llava-hf/llava-v1.6-vicuna-7b-hf",
-    prompt: "Is there a potted plant in the image?",
+    prompt: "Is there a parking meter in the image?",
     description: {
-      en: "SHARP is a representation-level intervention for vision-language models that suppresses hallucinations driven by textual priors and leading questions. The demo applies the paper's released layer-10 task vector at scale 6 at the last prompt position and on every generated token, on one of the author's POPE examples: the baseline hallucinates a potted plant that is not in the picture, and the steered model answers from the visual evidence.",
-      zh: "SHARP 是面向视觉-语言模型的表示层面干预，用来抑制由文本先验和诱导性提问引出的幻觉。演示以 6 的缩放系数把论文放出的第 10 层任务向量施加在 prompt 末尾位置和每个生成 token 上，用的是作者提供的 POPE 示例之一：基线凭空说图里有盆栽，引导后的模型则依据画面证据作答。",
+      en: "SHARP is a representation-level intervention for vision-language models that suppresses hallucinations driven by textual priors and leading questions. The demo applies the paper's released layer-10 task vector at scale 8 at the last prompt position and on every generated token, on one of the author's POPE examples: the baseline hallucinates a parking meter that is not in the picture, and the steered model answers from the visual evidence.",
+      zh: "SHARP 是面向视觉-语言模型的表示层面干预，用来抑制由文本先验和诱导性提问引出的幻觉。演示以 8 的缩放系数把论文放出的第 10 层任务向量施加在 prompt 末尾位置和每个生成 token 上，用的是作者提供的 POPE 示例之一：基线凭空说图里有停车计时器，引导后的模型则依据画面证据作答。",
     },
     note: {
       en: "Multimodal demo (image input); the Steer page sends text only. Vector is an in-memory payload: vec.from_pt_direction('task_vector_layer-10.pt', layers=[10]).",
@@ -508,7 +508,7 @@ export const galleryEntries: GalleryEntry[] = [
       vectors: [
         {
           data: inlinePayload("vec.from_pt_direction('task_vector_layer-10.pt', layers=[10])"),
-          scale: 6,
+          scale: 8,
           layers: [10],
           apply: { prompt_positions: [-1], generation: "all" },
         },
