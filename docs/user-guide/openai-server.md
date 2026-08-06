@@ -26,7 +26,7 @@ OpenAI SDK, or directly with `curl`:
             "scale": 2.0,
             "layers": list(range(10, 26)),
             "normalize": True,
-            "apply": {"phases": ["prompt", "generation"]},
+            "apply": {"prompt": "all", "generation": "all"},
         }]
     }
 
@@ -54,7 +54,7 @@ OpenAI SDK, or directly with `curl`:
             "source": "vectors/happy_diffmean.gguf",
             "scale": 2.0,
             "layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
-            "apply": {"phases": ["prompt", "generation"]}
+            "apply": {"prompt": "all", "generation": "all"}
           }]
         }
       }'

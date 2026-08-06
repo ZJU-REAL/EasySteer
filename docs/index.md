@@ -51,7 +51,7 @@ spec = SteeringSpec(vectors=[VectorSpec(
     source="vectors/happy_diffmean.gguf",
     scale=2.0,
     layers=list(range(10, 26)),
-    apply=ApplySpec(phases=["prompt", "generation"]),
+    apply=ApplySpec(prompt="all", generation="all"),
 )])
 
 out = llm.generate("Comfort Alice about her dog.",

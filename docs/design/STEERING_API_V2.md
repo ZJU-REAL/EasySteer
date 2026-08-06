@@ -45,7 +45,7 @@ spec = SteeringSpec(vectors=[
         scale=0.5,
         layers=[10],
         normalize=False,
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     ),
 ])
 ```

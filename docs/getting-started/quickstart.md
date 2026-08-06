@@ -36,7 +36,7 @@ def happy_steering(scale):
         source="vectors/happy_diffmean.gguf",  # vector file (GGUF)
         scale=scale,                            # strength; 0.0 = no effect
         layers=list(range(10, 26)),             # layers to steer
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     )])
 ```
 

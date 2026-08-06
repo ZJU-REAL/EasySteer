@@ -21,7 +21,7 @@ dependency-light so it can run in CI with only `requirements-docs.txt`.
 
 | Class | Role |
 |---|---|
-| `SelectSpec` | The shared *where-clause* language: `phases`, `tokens`, `positions`, `exclude_tokens`, `exclude_positions`, `generation_window`. Also used by [hidden-state capture](../user-guide/hidden-state-capture.md). |
+| `SelectSpec` | The shared *where-clause* language: per-phase `prompt`/`generation` `"all"`, the six phase-scoped include selectors and their `exclude_*` twins. Also used by [hidden-state capture](../user-guide/hidden-state-capture.md). |
 | `ApplySpec` | A `SelectSpec` subclass: where/when one vector applies. |
 | `VectorSpec` | One vector: `source`, `algorithm`, `scale`, `layers`, `normalize`, `apply`, `params`, `name`. |
 | `SteeringSpec` | Ordered `vectors` list plus a `conflict` policy (`"priority"` / `"sequential"` / `"error"`) and `debug`. |

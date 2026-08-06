@@ -73,7 +73,7 @@ steering = SteeringSpec(vectors=[
         source="steermoe_qwen3_words.json",
         algorithm="moe_router",
         layers=[...],  # the layers present in the JSON
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     ),
 ])
 llm.generate(prompts, params, steering=steering)

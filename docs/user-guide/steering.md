@@ -32,11 +32,12 @@ Server-level and per-request steering cannot currently be combined in one reques
 `ApplySpec` shares its selection language with hidden-state capture (both subclass
 `SelectSpec`), so a clause means the same thing in both systems.
 
-`phases` (**required, non-empty**: `"prompt"`, `"generation"`, or both) is the
-outer gate. Within it, six include selectors — three per phase, each named for
-it and carrying a symmetric exclude twin — choose tokens. Every `prompt_*`
-selector requires `"prompt"` in `phases`, every `generation_*` selector
-requires `"generation"`:
+Each phase is selected independently and only by what you name: there is no
+separate phase gate. `prompt="all"` selects every prompt token and
+`generation="all"` every decode step — the widest include selector of each
+phase — and six narrower include selectors, three per phase, each named for
+it and carrying a symmetric exclude twin, refine the selection. A phase with
+neither `"all"` nor a selector is untouched:
 
 | Include | Exclude twin | Matches |
 |---|---|---|
@@ -47,14 +48,19 @@ requires `"generation"`:
 | `generation_positions` | `exclude_generation_positions` | Exact 0-based decode steps (`[0]` = the first generated token). |
 | `generation_window` | `exclude_generation_window` | Half-open `(start, stop)` over 0-based decode steps; `stop=None` = unbounded. `(0, k)` selects exactly the first `k` decode steps. |
 
-The include selectors select the **union** of their matches — with none set,
-the whole gated phases. The exclude selectors union and **always subtract**:
-where an include and an exclude overlap, the exclusion wins. One clause can
-span both phases, e.g. the prompt tail plus the first decode steps:
+The include selectors (with `prompt="all"` / `generation="all"` among them)
+select the **union** of their matches. The exclude selectors union and
+**always subtract**: where an include and an exclude overlap, the exclusion
+wins; an exclude requires its phase to be covered, and a clause that selects
+nothing is rejected — as is the removed `phases` key. One clause can mix
+granularities across phases:
 
 ```python
-ApplySpec(phases=["prompt", "generation"],
-          prompt_window=(-4, None), generation_window=(0, 4))
+# Last prompt token plus the whole generation (the SHARP shape):
+ApplySpec(prompt_positions=[-1], generation="all")
+
+# Prompt tail plus the first decode steps:
+ApplySpec(prompt_window=(-4, None), generation_window=(0, 4))
 ```
 
 ## `VectorSpec`: one vector
@@ -93,7 +99,7 @@ from vllm.steer_vectors import ApplySpec, DirectionVector, SteeringSpec, VectorS
 spec = SteeringSpec(vectors=[VectorSpec(
     data=DirectionVector({10: my_vector}),
     scale=2.0,
-    apply=ApplySpec(phases=["prompt", "generation"]),
+    apply=ApplySpec(prompt="all", generation="all"),
 )])
 ```
 
@@ -123,7 +129,7 @@ from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 # Single vector on every prompt + generated token
 sentiment = SteeringSpec(vectors=[
     VectorSpec(source="vectors/happy.gguf", scale=2.0, layers=[10, 11, 12],
-               apply=ApplySpec(phases=["prompt", "generation"])),
+               apply=ApplySpec(prompt="all", generation="all")),
 ])
 
 # Several directions stacked at the second-to-last prompt token
@@ -131,16 +137,16 @@ multi = SteeringSpec(
     conflict="sequential",
     vectors=[
         VectorSpec(source="dir1.gguf", scale=1.5, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], prompt_positions=[-2])),
+                   apply=ApplySpec(prompt_positions=[-2])),
         VectorSpec(source="dir2.gguf", scale=-0.8, layers=[20],
-                   apply=ApplySpec(phases=["prompt"], prompt_positions=[-2])),
+                   apply=ApplySpec(prompt_positions=[-2])),
     ],
 )
 
 # Steer only the first 8 generated tokens
 early = SteeringSpec(vectors=[
     VectorSpec(source="vectors/happy.gguf", scale=2.0, layers=[10, 11, 12],
-               apply=ApplySpec(phases=["generation"], generation_window=(0, 8))),
+               apply=ApplySpec(generation_window=(0, 8))),
 ])
 ```
 
