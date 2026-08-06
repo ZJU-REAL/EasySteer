@@ -18,7 +18,7 @@ Example:
     ...     algorithm="lm_steer",
     ...     layers=[11],
     ...     scale=1.0,
-    ...     apply=ApplySpec(phases=["prompt", "generation"]),
+    ...     apply=ApplySpec(prompt="all", generation="all"),
     ... )])
 """
 

@@ -31,7 +31,7 @@ def zero_scale_spec(n_vectors, layers):
                 source=SEAL_VECTOR,
                 scale=0.0,
                 layers=layers,
-                apply=ApplySpec(phases=["prompt", "generation"]),
+                apply=ApplySpec(prompt="all", generation="all"),
             )
             for _ in range(n_vectors)
         ],

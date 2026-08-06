@@ -45,7 +45,6 @@ def _sugar_select(
     from vllm.steer_vectors.api import SelectSpec
 
     return SelectSpec(
-        phases=["prompt", "generation"],
         prompt_tokens=list(token_ids) if token_ids is not None else None,
         generation_tokens=list(token_ids) if token_ids is not None else None,
         prompt_positions=list(positions) if positions is not None else None,
