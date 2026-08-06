@@ -42,12 +42,10 @@ export const playgroundMessages = {
   conflict_error: { en: "error (disallow conflicts)", zh: "error（不允许冲突，直接报错）" },
 
   apply_title: { en: "Apply (where & when)", zh: "生效范围（何处、何时）" },
-  phases_label: { en: "Phases", zh: "阶段" },
-  phase_prompt: { en: "prompt", zh: "prompt（提示阶段）" },
-  phase_generation: { en: "generation", zh: "generation（生成阶段）" },
+  phase_all_label: { en: "Entire phase", zh: "整个阶段" },
   selectors_help: {
-    en: "Include selectors take the union of their matches inside the checked phases; leave them all empty to cover the whole phase.",
-    zh: "包含类选择器在已勾选的阶段内取匹配结果的并集；全部留空则整个阶段都生效。",
+    en: "Each phase is selected only by what you set: \"Entire phase\" or any selector below (they union). A phase with nothing set is untouched.",
+    zh: "每个阶段只由你设置的内容决定：“整个阶段”或下方任一选择器（相互取并集）；什么都不设的阶段不受影响。",
   },
   prompt_group_title: { en: "Prompt", zh: "Prompt 阶段" },
   generation_group_title: { en: "Generation", zh: "生成阶段" },

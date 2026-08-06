@@ -19,7 +19,7 @@ describe("toExtraBody", () => {
             source: "vectors/happy.gguf",
             scale: 2.0,
             layers: [10, 11, 12],
-            apply: { phases: ["prompt", "generation"] },
+            apply: { "prompt": "all", "generation": "all" },
           },
         ],
       },
@@ -34,7 +34,7 @@ describe("toPython", () => {
     expect(code).toContain('source="vectors/happy.gguf"');
     expect(code).toContain("scale=2");
     expect(code).toContain("list(range(10, 13))");
-    expect(code).toContain('ApplySpec(phases=["prompt", "generation"])');
+    expect(code).toContain('ApplySpec(prompt="all", generation="all")');
     expect(code).toContain("enable_steer_vector=True");
     expect(code).toContain('steer_algorithms=["direct"]');
     expect(code).toContain("steering=spec");
@@ -51,7 +51,7 @@ describe("toPython", () => {
       source: `diffmean-${k}.gguf`,
       scale: 2.0,
       layers: [0, 1],
-      apply: { ...defaultApplySpec(), phases: ["prompt"], prompt_positions: [-k] },
+      apply: { ...defaultApplySpec(), prompt_positions: [-k] },
     }));
     const code = toPython(spec);
     expect(code).toContain("steer_multi_vector=True");
@@ -84,7 +84,7 @@ describe("toPython", () => {
   it("renders generation_window as a Python tuple", () => {
     const spec = defaultSteeringSpec();
     spec.vectors[0].source = "vec.gguf";
-    spec.vectors[0].apply.phases = ["generation"];
+    spec.vectors[0].apply.prompt = null;
     spec.vectors[0].apply.generation_window = [0, 8];
     expect(toPython(spec)).toContain("generation_window=(0, 8)");
     spec.vectors[0].apply.generation_window = [2, null];

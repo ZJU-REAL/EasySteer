@@ -54,7 +54,17 @@ interface SpecVectorJson {
   algorithm?: string;
   layers?: number[];
   scale?: number;
-  apply?: { phases?: string[] };
+  apply?: Record<string, unknown>;
+}
+
+/** Which phases a clause covers ("all" or any selector of the phase). */
+function coveredPhases(apply: Record<string, unknown> | undefined): string[] {
+  if (!apply) return [];
+  return ["prompt", "generation"].filter(
+    (phase) =>
+      apply[phase] === "all" ||
+      Object.keys(apply).some((k) => !k.startsWith("exclude_") && k.startsWith(`${phase}_`)),
+  );
 }
 
 /** One line of technical detail for the modal: algorithm, layers, phases. */
@@ -64,7 +74,7 @@ function specSummary(entry: GalleryEntry): string {
   const layers = [...new Set(vs.map((v) => formatIntList(v.layers ?? null)))]
     .filter((s) => s !== "")
     .join(" / ");
-  const phases = [...new Set(vs.flatMap((v) => v.apply?.phases ?? []))].join(" + ");
+  const phases = [...new Set(vs.flatMap((v) => coveredPhases(v.apply)))].join(" + ");
   const parts = [algorithms];
   if (layers) parts.push(t("gallery_layers_chip", { layers }));
   if (phases) parts.push(phases);

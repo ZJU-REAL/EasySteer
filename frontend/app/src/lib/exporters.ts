@@ -42,7 +42,9 @@ function pyWindow(window: [number, number | null]): string {
 }
 
 function pyApply(apply: ApplySpec, indent: string): string {
-  const args: string[] = [`phases=${pyValue(apply.phases)}`];
+  const args: string[] = [];
+  if (apply.prompt === "all") args.push('prompt="all"');
+  if (apply.generation === "all") args.push('generation="all"');
   // Emitted in the schema's wire order: includes first, then excludes.
   const listKeys = [
     "prompt_tokens",

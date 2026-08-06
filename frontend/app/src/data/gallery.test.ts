@@ -44,7 +44,11 @@ describe("gallery entries", () => {
     // seal: generation-phase token-triggered multi-vector.
     const seal = byId["seal"];
     expect(seal.vectors.map((v) => v.scale)).toEqual([0.5, -0.5, -0.5]);
-    expect(seal.vectors.every((v) => v.apply.phases.join() === "generation")).toBe(true);
+    expect(
+      seal.vectors.every(
+        (v) => v.apply.prompt === null && v.apply.generation_tokens !== null,
+      ),
+    ).toBe(true);
 
     // steermoe: single moe_router vector from a config file.
     const steermoe = byId["steermoe"];

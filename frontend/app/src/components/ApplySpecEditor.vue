@@ -2,10 +2,11 @@
 /**
  * Form editor for one ApplySpec (mutates the object in place).
  *
- * `phases` is the outer gate. The selection language is fully
- * symmetric — three selectors per phase, each named for it — so the
- * grid shows one row per selector, grouped by phase, with the include
- * and exclude inputs side by side.
+ * Each phase is selected independently: the "entire phase" toggle is
+ * the widest include selector (`prompt="all"` / `generation="all"`),
+ * and the three narrower selectors per phase union with it. A phase
+ * with nothing set is untouched. The grid shows one row per selector,
+ * grouped by phase, include and exclude inputs side by side.
  */
 import { computed } from "vue";
 import { useI18n } from "../i18n";
@@ -28,44 +29,33 @@ const excludeCount = computed(
     ].filter((v) => v !== null && v !== undefined).length,
 );
 
-function hasPhase(phase: Phase): boolean {
-  return props.apply.phases.includes(phase);
+function isAll(phase: Phase): boolean {
+  return props.apply[phase] === "all";
 }
 
-function togglePhase(phase: Phase): void {
-  if (hasPhase(phase)) {
-    props.apply.phases = props.apply.phases.filter((p) => p !== phase);
-  } else {
-    // Keep canonical prompt-first order.
-    const next = [...props.apply.phases, phase];
-    props.apply.phases = (["prompt", "generation"] as Phase[]).filter((p) =>
-      next.includes(p),
-    );
-  }
+function toggleAll(phase: Phase): void {
+  props.apply[phase] = props.apply[phase] === "all" ? null : "all";
+}
+
+/** A phase is covered when "all" is on or one of its includes is set. */
+function coversPhase(phase: Phase): boolean {
+  if (props.apply[phase] === "all") return true;
+  const keys =
+    phase === "prompt"
+      ? (["prompt_tokens", "prompt_positions", "prompt_window"] as const)
+      : ([
+          "generation_tokens",
+          "generation_positions",
+          "generation_window",
+        ] as const);
+  return keys.some((k) => props.apply[k] !== null && props.apply[k] !== undefined);
 }
 </script>
 
 <template>
   <fieldset class="apply-editor">
     <legend>{{ t("apply_title") }}</legend>
-    <div class="field">
-      <label>{{ t("phases_label") }}</label>
-      <div class="phase-row">
-        <label class="inline-check">
-          <input type="checkbox" :checked="hasPhase('prompt')" @change="togglePhase('prompt')" />
-          {{ t("phase_prompt") }}
-        </label>
-        <label class="inline-check">
-          <input
-            type="checkbox"
-            :checked="hasPhase('generation')"
-            @change="togglePhase('generation')"
-          />
-          {{ t("phase_generation") }}
-        </label>
-      </div>
-      <div class="help-text">{{ t("selectors_help") }}</div>
-    </div>
+    <div class="help-text intro-help">{{ t("selectors_help") }}</div>
 
     <div class="selector-grid">
       <div class="head-row">
@@ -77,13 +67,19 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="group-row" :class="{ 'group-off': !hasPhase('prompt') }">
-        <span class="group-name">{{ t("prompt_group_title") }}</span>
+      <div class="group-row" :class="{ 'group-off': !coversPhase('prompt') }">
+        <span class="group-name">
+          {{ t("prompt_group_title") }}
+          <label class="inline-check all-check">
+            <input type="checkbox" :checked="isAll('prompt')" @change="toggleAll('prompt')" />
+            {{ t("phase_all_label") }}
+          </label>
+        </span>
         <span class="group-rule"></span>
         <span class="group-rule exclude"></span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('prompt') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("prompt_tokens_label") }}
           <span class="help-text">{{ t("prompt_tokens_help") }}</span>
@@ -101,7 +97,7 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('prompt') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("prompt_positions_label") }}
           <span class="help-text">{{ t("prompt_positions_help") }}</span>
@@ -122,7 +118,7 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('prompt') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("prompt_window_label") }}
           <span class="help-text">{{ t("prompt_window_help") }}</span>
@@ -137,13 +133,23 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="group-row" :class="{ 'group-off': !hasPhase('generation') }">
-        <span class="group-name">{{ t("generation_group_title") }}</span>
+      <div class="group-row" :class="{ 'group-off': !coversPhase('generation') }">
+        <span class="group-name">
+          {{ t("generation_group_title") }}
+          <label class="inline-check all-check">
+            <input
+              type="checkbox"
+              :checked="isAll('generation')"
+              @change="toggleAll('generation')"
+            />
+            {{ t("phase_all_label") }}
+          </label>
+        </span>
         <span class="group-rule"></span>
         <span class="group-rule exclude"></span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('generation') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("generation_tokens_label") }}
           <span class="help-text">{{ t("generation_tokens_help") }}</span>
@@ -164,7 +170,7 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('generation') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("generation_positions_label") }}
           <span class="help-text">{{ t("generation_positions_help") }}</span>
@@ -185,7 +191,7 @@ function togglePhase(phase: Phase): void {
         </span>
       </div>
 
-      <div class="sel-row" :class="{ 'sel-off': !hasPhase('generation') }">
+      <div class="sel-row">
         <span class="sel-name">
           {{ t("generation_window_label") }}
           <span class="help-text">{{ t("generation_window_help") }}</span>
@@ -206,6 +212,10 @@ function togglePhase(phase: Phase): void {
 </template>
 
 <style scoped>
+.intro-help {
+  margin: 0 0 10px;
+}
+
 .apply-editor {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -222,11 +232,6 @@ legend {
   text-transform: uppercase;
   color: var(--text-dim);
   padding: 0 6px;
-}
-
-.phase-row {
-  display: flex;
-  gap: 16px;
 }
 
 /* One row per selector, its include and exclude inputs side by side,
@@ -260,6 +265,9 @@ legend {
 }
 
 .group-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.06em;
@@ -268,18 +276,22 @@ legend {
   margin-top: 2px;
 }
 
+/* The whole-phase toggle rides on the group heading. */
+.all-check {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .group-rule {
   border-top: 1px solid var(--border);
   align-self: center;
 }
 
-/* Rows of an unchecked phase stay editable but read as inactive. */
+/* An uncovered phase (no "all", no selector) reads as untouched. */
 .group-off .group-name {
   color: var(--text-dim);
-}
-
-.sel-off {
-  opacity: 0.55;
 }
 
 .sel-name {

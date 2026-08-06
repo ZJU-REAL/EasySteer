@@ -9,6 +9,9 @@ export type Phase = "prompt" | "generation";
 
 const PHASES: Phase[] = ["prompt", "generation"];
 
+/** Per-phase widest include selector: "all" selects the whole phase. */
+export type PhaseAll = "all" | null;
+
 export type ConflictPolicy = "priority" | "sequential" | "error";
 
 export const CONFLICT_POLICIES: ConflictPolicy[] = ["priority", "sequential", "error"];
@@ -41,7 +44,8 @@ const GGUF_ONLY_ALGORITHMS = ["direct", "erase", "replace"];
 export type SpecWindow = [number, number | null];
 
 export interface ApplySpec {
-  phases: Phase[];
+  prompt: PhaseAll;
+  generation: PhaseAll;
   prompt_tokens: number[] | null;
   prompt_positions: number[] | null;
   prompt_window: SpecWindow | null;
@@ -76,7 +80,8 @@ export interface SteeringSpec {
 
 export function defaultApplySpec(): ApplySpec {
   return {
-    phases: ["prompt", "generation"],
+    prompt: "all",
+    generation: "all",
     prompt_tokens: null,
     prompt_positions: null,
     prompt_window: null,
@@ -191,25 +196,64 @@ const WINDOW_SELECTORS = [
   "exclude_generation_window",
 ] as const;
 
-/** The phase a selector's name binds it to (its outer gate). */
+const INCLUDE_SELECTORS = [
+  "prompt_tokens",
+  "prompt_positions",
+  "prompt_window",
+  "generation_tokens",
+  "generation_positions",
+  "generation_window",
+] as const;
+
+const EXCLUDE_SELECTORS = [
+  "exclude_prompt_tokens",
+  "exclude_prompt_positions",
+  "exclude_prompt_window",
+  "exclude_generation_tokens",
+  "exclude_generation_positions",
+  "exclude_generation_window",
+] as const;
+
+/** The phase a selector's name binds it to. */
 function selectorPhase(name: string): Phase {
   return name.includes("generation") ? "generation" : "prompt";
 }
 
+/** Whether the clause selects anything in the given phase. */
+function covers(apply: ApplySpec, phase: Phase): boolean {
+  if (apply[phase] === "all") return true;
+  return INCLUDE_SELECTORS.some(
+    (name) => selectorPhase(name) === phase && apply[name] !== null && apply[name] !== undefined,
+  );
+}
+
 export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[] {
   const issues: SpecIssue[] = [];
-  if (!Array.isArray(apply.phases) || apply.phases.length === 0) {
-    issues.push({ path: `${path}.phases`, message: "phases must be non-empty" });
-  } else {
-    const bad = apply.phases.filter((p) => !PHASES.includes(p));
-    if (bad.length > 0) {
+  for (const phase of PHASES) {
+    const value = apply[phase];
+    if (value !== null && value !== undefined && value !== "all") {
       issues.push({
-        path: `${path}.phases`,
-        message: `unknown phases: ${bad.join(", ")} (allowed: prompt, generation)`,
+        path: `${path}.${phase}`,
+        message: `${phase} must be "all" or null, got ${JSON.stringify(value)}`,
       });
     }
-    if (new Set(apply.phases).size !== apply.phases.length) {
-      issues.push({ path: `${path}.phases`, message: `phases has duplicates: ${apply.phases}` });
+  }
+  if (!covers(apply, "prompt") && !covers(apply, "generation")) {
+    issues.push({
+      path,
+      message:
+        'the clause selects nothing: set prompt="all" / generation="all" or at least one include selector',
+    });
+  }
+  for (const phase of PHASES) {
+    const excludes = EXCLUDE_SELECTORS.filter(
+      (name) => selectorPhase(name) === phase && apply[name] !== null && apply[name] !== undefined,
+    );
+    if (excludes.length > 0 && !covers(apply, phase)) {
+      issues.push({
+        path: `${path}.${excludes[0]}`,
+        message: `${excludes.join(", ")} exclude ${phase} tokens, but the clause selects none; set ${phase}="all" or a ${phase}_* selector`,
+      });
     }
   }
 
@@ -221,7 +265,7 @@ export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[]
     if (isIntArray(ids) && ids.some((t) => t < 0)) {
       issues.push({
         path: `${path}.${name}`,
-        message: `${name} must contain real token ids (>= 0); use phases instead of the -1 sentinel`,
+        message: `${name} must contain real token ids (>= 0); use prompt="all" / generation="all" instead of the -1 sentinel`,
       });
     }
   }
@@ -234,16 +278,6 @@ export function validateApplySpec(apply: ApplySpec, path = "apply"): SpecIssue[]
           `${name} must contain 0-based decode steps (>= 0); the generation ` +
           "length is not known up front, so end-relative steps cannot resolve",
       });
-    }
-  }
-
-  // Every selector requires its own phase in the outer gate.
-  for (const name of [...LIST_SELECTORS, ...WINDOW_SELECTORS]) {
-    if (apply[name] !== null && apply[name] !== undefined) {
-      const phase = selectorPhase(name);
-      if (!apply.phases.includes(phase)) {
-        issues.push({ path: `${path}.${name}`, message: `${name} requires '${phase}' in phases` });
-      }
     }
   }
 
@@ -408,7 +442,8 @@ function vectorToJson(v: VectorSpec): Record<string, unknown> {
 
 /** Wire key order of a selection clause (mirrors SelectSpec.to_wire()). */
 const APPLY_KEYS = [
-  "phases",
+  "prompt",
+  "generation",
   "prompt_tokens",
   "prompt_positions",
   "prompt_window",
@@ -424,9 +459,8 @@ const APPLY_KEYS = [
 ] as const;
 
 function applyToJson(a: ApplySpec): Record<string, unknown> {
-  const out: Record<string, unknown> = { phases: a.phases };
+  const out: Record<string, unknown> = {};
   for (const key of APPLY_KEYS) {
-    if (key === "phases") continue;
     const value = a[key];
     if (value !== null && value !== undefined) out[key] = value;
   }
@@ -501,6 +535,11 @@ function applyFromJson(json: unknown, index: number): ApplySpec {
   }
   const obj = json as Record<string, unknown>;
   const unknown = Object.keys(obj).filter((k) => !(APPLY_KEYS as readonly string[]).includes(k));
+  if (unknown.includes("phases")) {
+    throw new Error(
+      `vectors[${index}].apply.phases was removed: write prompt="all" / generation="all" (or per-phase selectors, which imply their phase) instead`,
+    );
+  }
   if (unknown.length > 0) {
     throw new Error(`unknown apply fields at vectors[${index}].apply: ${unknown.sort().join(", ")}`);
   }
@@ -515,7 +554,8 @@ function applyFromJson(json: unknown, index: number): ApplySpec {
   }
 
   return {
-    phases: (obj.phases as Phase[]) ?? [],
+    prompt: (obj.prompt as PhaseAll) ?? null,
+    generation: (obj.generation as PhaseAll) ?? null,
     prompt_tokens: (obj.prompt_tokens as number[] | null) ?? null,
     prompt_positions: (obj.prompt_positions as number[] | null) ?? null,
     prompt_window: windowOf("prompt_window"),

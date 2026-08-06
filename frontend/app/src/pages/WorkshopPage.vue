@@ -291,7 +291,8 @@ function useInPlayground(): void {
     spec.vectors[0].layers = [training.value.layer];
     spec.vectors[0].apply = {
       ...defaultApplySpec(),
-      phases: ["prompt"],
+      prompt: null,
+      generation: null,
       prompt_positions: [-1],
     };
   }

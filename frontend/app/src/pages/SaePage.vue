@@ -138,7 +138,12 @@ function useInPlayground(): void {
   spec.vectors[0].scale = vectorScale.value;
   if (layer !== null && Number.isInteger(layer)) spec.vectors[0].layers = [layer];
   spec.vectors[0].name = extracted.value.name;
-  spec.vectors[0].apply = { ...defaultApplySpec(), phases: ["prompt"], prompt_positions: [-1] };
+  spec.vectors[0].apply = {
+    ...defaultApplySpec(),
+    prompt: null,
+    generation: null,
+    prompt_positions: [-1],
+  };
   loadCustomSpec(spec);
   router.push("/steer");
 }

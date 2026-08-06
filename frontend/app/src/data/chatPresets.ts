@@ -5,7 +5,7 @@
  * Every preset references its vector by server-side path — including the
  * SAE decoder rows saved as .pt, which the vector store loads by path as
  * long as the spec names the target layer. The legacy `trigger_tokens:
- * [-1]` wildcard becomes "both phases, no selectors" (the whole phase).
+ * [-1]` wildcard becomes `prompt: "all", generation: "all"`.
  *
  * Presets are model-specific: the vector only means something for the
  * model it was extracted from, so each one carries that model id.
@@ -42,7 +42,7 @@ export const chatPresets: ChatPreset[] = [
           algorithm: "direct",
           scale: 2.0,
           layers: range(10, 24),
-          apply: { phases: ["prompt", "generation"] },
+          apply: { "prompt": "all", "generation": "all" },
         },
       ],
     },
@@ -64,7 +64,7 @@ export const chatPresets: ChatPreset[] = [
           scale: 500,
           layers: [31],
           normalize: false,
-          apply: { phases: ["prompt", "generation"] },
+          apply: { "prompt": "all", "generation": "all" },
         },
       ],
     },
@@ -86,7 +86,7 @@ export const chatPresets: ChatPreset[] = [
           scale: 500,
           layers: [31],
           normalize: false,
-          apply: { phases: ["prompt", "generation"] },
+          apply: { "prompt": "all", "generation": "all" },
         },
       ],
     },
@@ -108,7 +108,7 @@ export const chatPresets: ChatPreset[] = [
           scale: -2.0,
           layers: range(0, 28),
           normalize: true,
-          apply: { phases: ["prompt", "generation"] },
+          apply: { "prompt": "all", "generation": "all" },
         },
       ],
     },

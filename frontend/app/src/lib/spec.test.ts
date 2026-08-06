@@ -26,14 +26,33 @@ describe("validateApplySpec", () => {
     expect(validateApplySpec(defaultApplySpec())).toEqual([]);
   });
 
-  it("rejects empty phases", () => {
-    const apply = { ...defaultApplySpec(), phases: [] as never[] };
-    expect(validateApplySpec(apply).map((i) => i.message)).toContain("phases must be non-empty");
+  it("rejects a clause that selects nothing", () => {
+    const apply = { ...defaultApplySpec(), prompt: null, generation: null };
+    expect(validateApplySpec(apply)[0].message).toMatch(/selects nothing/);
   });
 
-  it("rejects duplicate phases", () => {
-    const apply = { ...defaultApplySpec(), phases: ["prompt", "prompt"] as never };
-    expect(validateApplySpec(apply).length).toBeGreaterThan(0);
+  it("rejects bad per-phase values", () => {
+    const apply = { ...defaultApplySpec(), prompt: "some" as never };
+    expect(validateApplySpec(apply)[0].message).toMatch(/must be "all" or null/);
+  });
+
+  it("accepts cross-phase mixed granularity in one clause", () => {
+    // The SHARP shape: last prompt token + the whole generation.
+    const apply = {
+      ...defaultApplySpec(),
+      prompt: null,
+      prompt_positions: [-1],
+    };
+    expect(validateApplySpec(apply)).toEqual([]);
+  });
+
+  it("rejects excludes whose phase has no coverage", () => {
+    const apply = {
+      ...defaultApplySpec(),
+      generation: null,
+      exclude_generation_positions: [0],
+    };
+    expect(validateApplySpec(apply)[0].message).toMatch(/selects none/);
   });
 
   it("rejects empty filter lists (null disables the filter)", () => {
@@ -52,13 +71,13 @@ describe("validateApplySpec", () => {
     expect(validateApplySpec(apply)).toEqual([]);
   });
 
-  it("requires generation phase for generation_window", () => {
+  it("generation_window implies the generation phase", () => {
     const apply = {
       ...defaultApplySpec(),
-      phases: ["prompt"] as never,
+      generation: null,
       generation_window: [0, 8] as [number, number],
     };
-    expect(validateApplySpec(apply)[0].message).toMatch(/requires 'generation'/);
+    expect(validateApplySpec(apply)).toEqual([]);
   });
 
   it("enforces half-open window with stop > start", () => {
@@ -90,13 +109,13 @@ describe("validateApplySpec", () => {
     }
   });
 
-  it("requires prompt phase for prompt_window", () => {
+  it("prompt_window implies the prompt phase", () => {
     const apply = {
       ...defaultApplySpec(),
-      phases: ["generation"] as never,
+      prompt: null,
       prompt_window: [0, 10] as [number, number],
     };
-    expect(validateApplySpec(apply)[0].message).toMatch(/requires 'prompt'/);
+    expect(validateApplySpec(apply)).toEqual([]);
   });
 
   it("rejects same-sign non-increasing prompt windows", () => {
@@ -126,25 +145,23 @@ describe("validateApplySpec", () => {
     ).toBe(true);
   });
 
-  it("requires generation phase for generation_positions", () => {
+  it("generation_positions implies the generation phase", () => {
     const apply = {
       ...defaultApplySpec(),
-      phases: ["prompt"] as never,
+      generation: null,
       generation_positions: [0],
     };
-    expect(validateApplySpec(apply)[0].message).toMatch(/requires 'generation'/);
+    expect(validateApplySpec(apply)).toEqual([]);
   });
 
   it("validates exclude twins with the same rules as their includes", () => {
-    // exclude_prompt_window: phase gate + same-sign ordering.
-    const badPhase = {
+    // exclude_prompt_window: coverage gate + same-sign ordering.
+    const noCoverage = {
       ...defaultApplySpec(),
-      phases: ["generation"] as never,
+      prompt: null,
       exclude_prompt_window: [0, 4] as [number, number],
     };
-    expect(validateApplySpec(badPhase)[0].message).toMatch(
-      /exclude_prompt_window requires 'prompt'/,
-    );
+    expect(validateApplySpec(noCoverage)[0].message).toMatch(/selects none/);
     const mixedSign = {
       ...defaultApplySpec(),
       exclude_prompt_window: [2, -2] as [number, number],
@@ -272,7 +289,9 @@ describe("specToJson / specFromJson round-trip", () => {
     const spec = defaultSteeringSpec();
     spec.vectors[0].source = "vec.gguf";
     const json = specToJson(spec);
-    expect(json).toEqual({ vectors: [{ source: "vec.gguf", apply: { phases: ["prompt", "generation"] } }] });
+    expect(json).toEqual({
+      vectors: [{ source: "vec.gguf", apply: { prompt: "all", generation: "all" } }],
+    });
     const restored = specFromJson(json);
     expect(restored).toEqual(spec);
   });
@@ -289,7 +308,8 @@ describe("specToJson / specFromJson round-trip", () => {
       name: `v${k}`,
       apply: {
         ...defaultApplySpec(),
-        phases: ["prompt"],
+        generation: null,
+        prompt: null,
         prompt_positions: [-k],
       },
     }));
@@ -301,7 +321,7 @@ describe("specToJson / specFromJson round-trip", () => {
   it("round-trips generation_window including null stop", () => {
     const spec = defaultSteeringSpec();
     spec.vectors[0].source = "vec.gguf";
-    spec.vectors[0].apply.phases = ["generation"];
+    spec.vectors[0].apply.prompt = null;
     spec.vectors[0].apply.generation_window = [0, null];
     const restored = specFromJson(specToJson(spec));
     expect(restored.vectors[0].apply.generation_window).toEqual([0, null]);
@@ -332,7 +352,7 @@ describe("specToJson / specFromJson round-trip", () => {
   it("rejects unknown selector names in apply", () => {
     expect(() =>
       specFromJson({
-        vectors: [{ source: "v.gguf", apply: { phases: ["prompt"], prompt_windows: [0, 4] } }],
+        vectors: [{ source: "v.gguf", apply: { prompt: "all", prompt_windows: [0, 4] } }],
       }),
     ).toThrow(/unknown apply fields/);
   });
@@ -340,10 +360,10 @@ describe("specToJson / specFromJson round-trip", () => {
   it("rejects unknown fields at every level (extra=forbid)", () => {
     expect(() => specFromJson({ vectors: [], bogus: 1 })).toThrow(/unknown steering spec fields/);
     expect(() =>
-      specFromJson({ vectors: [{ apply: { phases: ["prompt"] }, bogus: 1 }] }),
+      specFromJson({ vectors: [{ apply: { prompt: "all" }, bogus: 1 }] }),
     ).toThrow(/unknown vector fields/);
     expect(() =>
-      specFromJson({ vectors: [{ apply: { phases: ["prompt"], bogus: 1 } }] }),
+      specFromJson({ vectors: [{ apply: { prompt: "all", bogus: 1 } }] }),
     ).toThrow(/unknown apply fields/);
   });
 
