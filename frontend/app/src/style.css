@@ -153,6 +153,47 @@ label {
   margin-bottom: 2px;
 }
 
+/* Layout primitives */
+.page {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.page-intro {
+  margin: 0 0 16px;
+  max-width: 72ch;
+  color: var(--text-dim);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Shared form helpers */
+.full {
+  width: 100%;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  margin: 0;
+}
+
 .field {
   margin-bottom: 8px;
 }

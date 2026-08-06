@@ -1,53 +1,99 @@
 <script setup lang="ts">
-/** Landing page: one card per replication notebook. */
+/**
+ * Demo gallery: slim cards (method, tagline, chips, paper link); the full
+ * description, prompt and spec JSON live in an expandable detail opened
+ * before "open in playground".
+ */
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { galleryEntries, type GalleryEntry } from "../data/gallery";
 import { useI18n } from "../i18n";
 import { loadGalleryEntry } from "../lib/playgroundStore";
 import { settings } from "../lib/settings";
+import { formatIntList } from "../lib/spec";
 
 const router = useRouter();
 const { t } = useI18n();
 
-function algorithms(entry: GalleryEntry): string[] {
-  const vectors = entry.spec.vectors as { algorithm?: string }[];
-  return [...new Set(vectors.map((v) => v.algorithm ?? "direct"))];
+const expandedId = ref<string | null>(null);
+
+interface SpecVectorJson {
+  algorithm?: string;
+  layers?: number[];
+  apply?: { phases?: string[] };
 }
 
-function vectorCount(entry: GalleryEntry): number {
-  return (entry.spec.vectors as unknown[]).length;
+function vectors(entry: GalleryEntry): SpecVectorJson[] {
+  return entry.spec.vectors as SpecVectorJson[];
+}
+
+/** Card chips: algorithm, layer range, phases (plus vector count). */
+function chips(entry: GalleryEntry): string[] {
+  const vs = vectors(entry);
+  const out = [...new Set(vs.map((v) => v.algorithm ?? "direct"))];
+  const layerSets = [...new Set(vs.map((v) => formatIntList(v.layers ?? null)))].filter(
+    (s) => s !== "",
+  );
+  if (layerSets.length === 1) {
+    out.push(t("gallery_layers_chip", { layers: layerSets[0] }));
+  }
+  const phases = [...new Set(vs.flatMap((v) => v.apply?.phases ?? []))];
+  out.push(phases.join(" + "));
+  if (vs.length > 1) out.push(t("gallery_vectors_chip", { n: vs.length }));
+  return out;
+}
+
+function toggle(entry: GalleryEntry): void {
+  expandedId.value = expandedId.value === entry.id ? null : entry.id;
 }
 
 function openEntry(entry: GalleryEntry): void {
   loadGalleryEntry(entry);
   router.push("/playground");
 }
+
+function specJson(entry: GalleryEntry): string {
+  return JSON.stringify(entry.spec, null, 2);
+}
 </script>
 
 <template>
-  <div>
-    <h1>{{ t("gallery_title") }}</h1>
-    <p class="dim intro">{{ t("gallery_intro") }}</p>
+  <div class="page">
+    <div class="page-header">
+      <h1>{{ t("gallery_title") }}</h1>
+    </div>
+    <p class="page-intro">{{ t("gallery_intro") }}</p>
+
     <div class="card-grid">
-      <div v-for="entry in galleryEntries" :key="entry.id" class="card panel" @click="openEntry(entry)">
-        <div class="card-header">
-          <h2>{{ entry.method }}</h2>
-          <span v-for="algo in algorithms(entry)" :key="algo" class="badge accent mono">{{
-            algo
-          }}</span>
-          <span v-if="vectorCount(entry) > 1" class="badge mono"
-            >{{ vectorCount(entry) }}x</span
-          >
-        </div>
-        <div class="card-model mono dim">{{ entry.model }}</div>
-        <p class="card-description">{{ entry.description[settings.language] }}</p>
-        <p v-if="entry.note" class="card-note dim">{{ entry.note[settings.language] }}</p>
-        <div class="card-prompt mono">"{{ entry.prompt }}"</div>
-        <div class="card-footer">
-          <a :href="entry.paper.url" target="_blank" rel="noopener" @click.stop>
-            {{ t("gallery_paper") }}: {{ entry.paper.title }}
+      <div
+        v-for="entry in galleryEntries"
+        :key="entry.id"
+        class="card panel"
+        :class="{ expanded: expandedId === entry.id }"
+      >
+        <div class="card-main" @click="toggle(entry)">
+          <div class="card-header">
+            <h2>{{ entry.method }}</h2>
+            <span class="expand-hint dim">{{ expandedId === entry.id ? "▾" : "▸" }}</span>
+          </div>
+          <p class="card-tagline">{{ entry.tagline[settings.language] }}</p>
+          <div class="chip-row">
+            <span v-for="chip in chips(entry)" :key="chip" class="badge mono">{{ chip }}</span>
+          </div>
+          <a class="paper-link" :href="entry.paper.url" target="_blank" rel="noopener" @click.stop>
+            {{ t("gallery_paper") }} ↗
           </a>
-          <button class="small primary" @click.stop="openEntry(entry)">
+        </div>
+
+        <div v-if="expandedId === entry.id" class="card-detail">
+          <div class="detail-model mono dim">{{ entry.model }}</div>
+          <p class="detail-description">{{ entry.description[settings.language] }}</p>
+          <p v-if="entry.note" class="detail-note dim">{{ entry.note[settings.language] }}</p>
+          <div class="detail-label">{{ t("gallery_prompt") }}</div>
+          <div class="detail-prompt mono">{{ entry.prompt }}</div>
+          <div class="detail-label">{{ t("gallery_spec_preview") }}</div>
+          <pre class="code-block detail-spec">{{ specJson(entry) }}</pre>
+          <button class="primary open-btn" @click="openEntry(entry)">
             {{ t("open_in_playground") }}
           </button>
         </div>
@@ -57,85 +103,107 @@ function openEntry(entry: GalleryEntry): void {
 </template>
 
 <style scoped>
-.intro {
-  margin-top: 0;
-  max-width: 70ch;
-}
-
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
   transition: border-color 0.15s;
 }
 
-.card:hover {
+.card:hover,
+.card.expanded {
   border-color: var(--accent);
+}
+
+.card-main {
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  justify-content: space-between;
 }
 
 .card-header h2 {
   margin: 0;
-  margin-right: 4px;
 }
 
-.card-model {
-  font-size: 11.5px;
-}
-
-.card-description {
+.card-tagline {
   margin: 0;
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
-.card-note {
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.paper-link {
+  font-size: 11.5px;
+}
+
+.card-detail {
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-model {
+  font-size: 11.5px;
+}
+
+.detail-description {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.detail-note {
   margin: 0;
   font-size: 11.5px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.card-prompt {
-  font-size: 11.5px;
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-dim);
-  background: var(--bg-inset);
-  border-radius: 5px;
-  padding: 5px 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
-.card-footer {
-  margin-top: auto;
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.card-footer a {
+.detail-prompt {
   font-size: 11.5px;
-  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  max-height: 80px;
+  overflow-y: auto;
 }
 
-.card-footer button {
-  flex-shrink: 0;
+.detail-spec {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 11px;
+}
+
+.open-btn {
+  align-self: flex-start;
 }
 </style>

@@ -19,6 +19,8 @@ describe("gallery entries", () => {
 
   it("every entry has bilingual descriptions, a prompt and a paper link", () => {
     for (const entry of galleryEntries) {
+      expect(entry.tagline.en.length, entry.id).toBeGreaterThan(10);
+      expect(entry.tagline.zh.length, entry.id).toBeGreaterThan(5);
       expect(entry.description.en.length, entry.id).toBeGreaterThan(50);
       expect(entry.description.zh.length, entry.id).toBeGreaterThan(20);
       expect(entry.prompt.length, entry.id).toBeGreaterThan(0);

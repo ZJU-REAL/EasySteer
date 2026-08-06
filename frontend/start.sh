@@ -20,7 +20,7 @@ echo "[1/3] Checking and installing dependencies..."
 pip3 install -r requirements.txt
 
 echo ""
-echo "[2/3] Starting backend server..."
+echo "[2/3] Starting job backend (extraction / training / SAE)..."
 python3 app.py &
 BACKEND_PID=$!
 
@@ -29,38 +29,37 @@ echo "[*] Waiting for server to start..."
 sleep 3
 
 echo ""
-echo "[3/3] Starting frontend server..."
-python3 -m http.server $FRONTEND_PORT &
-FRONTEND_PID=$!
+echo "[3/3] Starting web UI..."
+# The web UI is the Vite app in app/; serve the production build if present.
+FRONTEND_PID=""
+if [ -d "app/dist" ]; then
+    (cd app/dist && python3 -m http.server "$FRONTEND_PORT") &
+    FRONTEND_PID=$!
+    FRONTEND_URL="http://localhost:$FRONTEND_PORT/"
+else
+    echo "[WARN] app/dist not found. Build the UI first:"
+    echo "       cd app && npm install && npm run build"
+    echo "       (or run it in dev mode: cd app && npm run dev)"
+    FRONTEND_URL="(not started)"
+fi
 
-# Wait for frontend server to start
-sleep 2
+sleep 1
 
 echo ""
 echo "========================================"
 echo "Startup Complete!"
 echo ""
 echo "Backend API:   http://localhost:$BACKEND_PORT"
-echo "Frontend UI:   http://localhost:$FRONTEND_PORT/"
+echo "Frontend UI:   $FRONTEND_URL"
 echo ""
-echo "Opening browser..."
+echo "Note: text generation goes through the vllm-steer OpenAI-compatible"
+echo "server (configure its URL in the UI), not this backend."
 echo "========================================"
-
-# Open browser based on OS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    open http://localhost:$FRONTEND_PORT/index.html
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    xdg-open http://localhost:$FRONTEND_PORT/index.html 2>/dev/null || \
-    sensible-browser http://localhost:$FRONTEND_PORT/index.html 2>/dev/null || \
-    echo "Please manually open browser and visit: http://localhost:$FRONTEND_PORT/index.html"
-fi
 
 echo ""
 echo "Press Ctrl+C to stop all services"
 echo ""
 
 # Wait for user interrupt
-trap "echo 'Stopping services...'; kill $BACKEND_PID $FRONTEND_PID; exit" INT TERM
-wait 
+trap "echo 'Stopping services...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT TERM
+wait

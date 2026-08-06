@@ -56,7 +56,7 @@ function onJsonReplace(spec: SteeringSpec): void {
 </script>
 
 <template>
-  <div>
+  <div class="page">
     <div class="page-header">
       <h1>{{ t("playground_title") }}</h1>
       <template v-if="preset">
@@ -101,27 +101,27 @@ function onJsonReplace(spec: SteeringSpec): void {
 </template>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.page-header h1 {
-  margin: 0;
-}
-
-.spacer {
-  flex: 1;
-}
-
 .builder-grid {
   display: grid;
-  grid-template-columns: minmax(380px, 1fr) minmax(320px, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
-  margin-bottom: 14px;
-  align-items: start;
+  margin: 12px 0 14px;
+  align-items: stretch;
+}
+
+.builder-col,
+.json-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.builder-col h2 {
+  margin-bottom: 8px;
+}
+
+.json-col :deep(.json-panel) {
+  flex: 1;
 }
 
 @media (max-width: 1100px) {

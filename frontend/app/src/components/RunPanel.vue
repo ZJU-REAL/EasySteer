@@ -211,19 +211,11 @@ const titleB = computed(() =>
 </template>
 
 <style scoped>
-.full {
-  width: 100%;
-}
-
 .button-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 8px 0;
-}
-
-.spacer {
-  flex: 1;
 }
 
 .output-grid {

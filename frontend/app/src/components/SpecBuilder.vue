@@ -71,18 +71,6 @@ function duplicateVector(index: number): void {
   padding-bottom: 6px;
 }
 
-.inline-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  font-size: 12.5px;
-}
-
-.full {
-  width: 100%;
-}
-
 .vector-list {
   display: flex;
   flex-direction: column;

@@ -61,10 +61,6 @@ async function copy(code: string): Promise<void> {
   margin: 0;
 }
 
-.spacer {
-  flex: 1;
-}
-
 .code-block {
   overflow: auto;
   flex: 1;

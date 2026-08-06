@@ -19,6 +19,8 @@ export interface GalleryEntry {
   id: string;
   /** Short method name shown as the card title. */
   method: string;
+  /** One-line card summary; long descriptions live in the card detail. */
+  tagline: LocalizedText;
   paper: { title: string; url: string };
   model: string;
   prompt: string;
@@ -45,6 +47,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "bipo",
     method: "BiPO",
+    tagline: {
+      en: "Preference-optimized vectors flip an aligned model toward power-seeking.",
+      zh: "偏好优化向量使对齐模型转向权力寻求。",
+    },
     paper: {
       title:
         "Personalized Steering of LLMs: Versatile Steering Vectors Through Bi-directional Preference Optimization",
@@ -76,6 +82,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "cast",
     method: "CAST",
+    tagline: {
+      en: "A PCA refusal direction turns a compliant answer into a refusal.",
+      zh: "PCA 拒绝方向使原本照答的请求被拒绝。",
+    },
     paper: {
       title: "Programming Refusal with Conditional Activation Steering",
       url: "https://arxiv.org/abs/2409.05907",
@@ -102,6 +112,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "controlingthinkingspeed",
     method: "Thinking Speed",
+    tagline: {
+      en: "One direction dials a reasoning model between slow and fast thinking.",
+      zh: "单一方向调节推理模型的快慢思考。",
+    },
     paper: {
       title: "Controlling Thinking Speed in Reasoning Models",
       url: "https://arxiv.org/abs/2507.03704",
@@ -127,6 +141,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "creative_writing",
     method: "Creativity Steering",
+    tagline: {
+      en: "A creative-vs-boring persona contrast amplifies story creativity.",
+      zh: "创意与平淡人格的对比方向放大故事创意。",
+    },
     paper: {
       title: "Steering Large Language Models to Evaluate and Amplify Creativity",
       url: "https://arxiv.org/abs/2412.06060",
@@ -151,6 +169,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "fractreason",
     method: "Fractional Reasoning",
+    tagline: {
+      en: "Continuous control over reasoning depth via a tunable latent scale.",
+      zh: "以可调缩放连续控制推理深度。",
+    },
     paper: {
       title:
         "Fractional Reasoning via Latent Steering Vectors Improves Inference Time Compute",
@@ -178,6 +200,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "improve_reasoning",
     method: "Reasoning Boost",
+    tagline: {
+      en: "A sound-reasoning direction fixes arithmetic mistakes.",
+      zh: "正确推理方向修复算术错误。",
+    },
     paper: {
       title:
         "Improving Reasoning Performance in Large Language Models via Representation Engineering",
@@ -203,6 +229,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "lm_steer",
     method: "LM-Steer",
+    tagline: {
+      en: "Low-rank word-embedding steers shift GPT-2 sentiment.",
+      zh: "低秩词嵌入引导调节 GPT-2 情感。",
+    },
     paper: {
       title: "Word Embeddings Are Steers for Language Models",
       url: "https://arxiv.org/abs/2305.12798",
@@ -232,6 +262,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "loreft",
     method: "LoReFT",
+    tagline: {
+      en: "A trained rank-4 intervention makes the model answer in emojis.",
+      zh: "训练的秩 4 干预让模型用表情符号回答。",
+    },
     paper: {
       title: "ReFT: Representation Finetuning for Language Models",
       url: "https://arxiv.org/abs/2404.03592",
@@ -260,6 +294,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "refusal_direction",
     method: "Refusal Direction",
+    tagline: {
+      en: "Adding one direction makes the model refuse harmless requests.",
+      zh: "加回单一方向使模型拒绝无害请求。",
+    },
     paper: {
       title: "Refusal in Language Models Is Mediated by a Single Direction",
       url: "https://arxiv.org/abs/2406.11717",
@@ -283,6 +321,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "sae_entities",
     method: "SAE Known-Entity",
+    tagline: {
+      en: "An SAE 'known entity' feature restores knowledge awareness.",
+      zh: "SAE『已知实体』特征恢复知识感知。",
+    },
     paper: {
       title:
         "Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models",
@@ -313,6 +355,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "sake",
     method: "SAKE",
+    tagline: {
+      en: "An affine map edits a fact (UK capital to Paris) without touching weights.",
+      zh: "仿射映射不改权重即可编辑事实（英国首都改为巴黎）。",
+    },
     paper: {
       title: "SAKE: Steering Activations for Knowledge Editing",
       url: "https://arxiv.org/abs/2503.01751",
@@ -341,6 +387,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "seal",
     method: "SEAL",
+    tagline: {
+      en: "Category vectors at paragraph breaks trim redundant chain-of-thought.",
+      zh: "段落分隔处的类别向量裁剪冗余思维链。",
+    },
     paper: {
       title: "SEAL: Steerable Reasoning Calibration of Large Language Models for Free",
       url: "https://arxiv.org/abs/2504.07986",
@@ -383,6 +433,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "sharp",
     method: "SHARP",
+    tagline: {
+      en: "A task vector suppresses leading-question hallucinations in LVLMs.",
+      zh: "任务向量抑制视觉语言模型的诱导性幻觉。",
+    },
     paper: {
       title: "SHARP: Steering Hallucination in LVLMs via Representation Engineering",
       url: "https://aclanthology.org/2025.emnlp-main.725/",
@@ -417,6 +471,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "steerable_chatbot",
     method: "Steerable Chatbot",
+    tagline: {
+      en: "A preference axis shifts replies between adult- and kid-oriented.",
+      zh: "偏好轴在成人向与亲子向回复间切换。",
+    },
     paper: {
       title:
         "Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering",
@@ -447,6 +505,10 @@ export const galleryEntries: GalleryEntry[] = [
   {
     id: "steermoe",
     method: "SteerMoE",
+    tagline: {
+      en: "Deactivating 200 experts flips counting from words to digits.",
+      zh: "停用 200 个专家使计数从单词变为数字。",
+    },
     paper: {
       title: "Steering MoE LLMs via Expert (De)Activation",
       url: "https://arxiv.org/abs/2509.09660",

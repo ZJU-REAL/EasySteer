@@ -284,9 +284,11 @@ refreshPresets();
 </script>
 
 <template>
-  <div>
-    <h1>{{ t("workshop_title") }}</h1>
-    <p class="dim intro">{{ t("workshop_intro") }}</p>
+  <div class="page">
+    <div class="page-header">
+      <h1>{{ t("workshop_title") }}</h1>
+    </div>
+    <p class="page-intro">{{ t("workshop_intro") }}</p>
 
     <SettingsBar :show-flask="true" />
 
@@ -533,11 +535,6 @@ refreshPresets();
 </template>
 
 <style scoped>
-.intro {
-  margin-top: 0;
-  max-width: 70ch;
-}
-
 .kind-tabs {
   display: flex;
   gap: 8px;
@@ -546,7 +543,7 @@ refreshPresets();
 
 .workshop-grid {
   display: grid;
-  grid-template-columns: minmax(420px, 3fr) minmax(300px, 2fr);
+  grid-template-columns: minmax(420px, 5fr) minmax(320px, 4fr);
   gap: 14px;
   align-items: start;
 }
@@ -557,10 +554,6 @@ refreshPresets();
   }
 }
 
-.full {
-  width: 100%;
-}
-
 .gpu-field {
   flex: 0 0 160px !important;
 }
@@ -569,14 +562,6 @@ refreshPresets();
   flex: 0 0 auto !important;
   align-self: end;
   padding-bottom: 22px;
-}
-
-.inline-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  font-size: 12.5px;
 }
 
 .preset-controls {

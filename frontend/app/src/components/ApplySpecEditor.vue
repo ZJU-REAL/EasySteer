@@ -156,15 +156,6 @@ legend {
   gap: 16px;
 }
 
-.inline-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text);
-  font-size: 12.5px;
-  margin: 0;
-}
-
 .excludes-toggle {
   display: inline-flex;
   align-items: center;

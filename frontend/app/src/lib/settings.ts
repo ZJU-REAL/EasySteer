@@ -20,6 +20,7 @@ export interface Settings {
   theme: "dark" | "light";
   temperature: number;
   maxTokens: number;
+  neuronpediaApiKey: string;
 }
 
 const defaults: Settings = {
@@ -27,9 +28,11 @@ const defaults: Settings = {
   flaskBaseUrl: "",
   model: "",
   language: "en",
-  theme: "dark",
+  // Light by default; a persisted user choice (stored settings) wins.
+  theme: "light",
   temperature: 0,
   maxTokens: 256,
+  neuronpediaApiKey: "",
 };
 
 function load(): Settings {

@@ -113,3 +113,60 @@ export function listTrainingConfigs(): Promise<{ configs: { name: string; displa
 export function getTrainingConfig(name: string): Promise<TrainingConfig> {
   return getJson(`/api/train-config/${encodeURIComponent(name)}`);
 }
+
+// ---- SAE feature exploration (Neuronpedia proxied by the Flask backend) ----
+
+export interface SaeSearchResult {
+  modelId: string;
+  layer: string;
+  index: string | number;
+  description: string | null;
+  explanationModelName: string | null;
+  typeName: string | null;
+  cosine_similarity: number | null;
+}
+
+export interface SaeFeatureDetails {
+  basic_info: { modelId: string | null; layer: string | null; index: number | null };
+  explanation: string | null;
+  sparsity: number | null;
+  top_activating_tokens: { token: string; activation_value: number }[];
+  top_inhibiting_tokens: { token: string; activation_value: number }[];
+  activation_example: { max_value: number; trigger_token: string; context: string } | null;
+}
+
+export interface SaeExtractedVector {
+  name: string;
+  feature_index: number;
+  file_path: string;
+  scale: number;
+}
+
+export function searchSaeFeatures(params: {
+  model_id: string;
+  sae_id: string;
+  query: string;
+  api_key: string;
+}): Promise<{ success: boolean; results: SaeSearchResult[] }> {
+  return postJson("/api/sae/search", params);
+}
+
+export function getSaeFeature(
+  modelId: string,
+  saeId: string,
+  featureIndex: number,
+  apiKey: string,
+): Promise<{ success: boolean; feature: SaeFeatureDetails }> {
+  const query = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+  return getJson(
+    `/api/sae/feature/${encodeURIComponent(modelId)}/${encodeURIComponent(saeId)}/${featureIndex}${query}`,
+  );
+}
+
+export function extractSaeVector(params: {
+  feature_index: number;
+  vector_name: string;
+  scale: number;
+}): Promise<{ success: boolean; vector?: SaeExtractedVector; error?: string }> {
+  return postJson("/api/sae/extract-vector", params);
+}

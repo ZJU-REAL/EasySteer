@@ -72,10 +72,6 @@ async function checkConnection(): Promise<void> {
   flex: 0 0 auto !important;
 }
 
-.full {
-  width: 100%;
-}
-
 .field {
   margin-bottom: 0;
 }

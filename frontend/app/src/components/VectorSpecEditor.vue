@@ -77,7 +77,7 @@ function onParamsInput(): void {
       <span class="spacer"></span>
       <button class="small" @click="emit('duplicate')">{{ t("duplicate_vector_btn") }}</button>
       <button v-if="removable" class="small" @click="emit('remove')">
-        {{ t("remove_vector_btn") }}
+        {{ t("remove_btn") }}
       </button>
     </div>
 
@@ -153,22 +153,6 @@ function onParamsInput(): void {
 
 .vector-header h3 {
   margin: 0;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.full {
-  width: 100%;
-}
-
-.inline-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  font-size: 12.5px;
 }
 
 .inline-data-notice {

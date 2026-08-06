@@ -1,16 +1,22 @@
 import { createRouter, createWebHashHistory } from "vue-router";
+import ChatPage from "./pages/ChatPage.vue";
 import GalleryPage from "./pages/GalleryPage.vue";
+import HomePage from "./pages/HomePage.vue";
 import PlaygroundPage from "./pages/PlaygroundPage.vue";
+import SaePage from "./pages/SaePage.vue";
 import WorkshopPage from "./pages/WorkshopPage.vue";
 
 export const router = createRouter({
   // Hash history keeps the built app servable from any static path
-  // (including the Flask static dir) without server-side rewrites.
+  // without server-side rewrites.
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: "/gallery" },
-    { path: "/gallery", name: "gallery", component: GalleryPage },
+    { path: "/", redirect: "/home" },
+    { path: "/home", name: "home", component: HomePage },
+    { path: "/chat", name: "chat", component: ChatPage },
     { path: "/playground", name: "playground", component: PlaygroundPage },
+    { path: "/gallery", name: "gallery", component: GalleryPage },
     { path: "/workshop", name: "workshop", component: WorkshopPage },
+    { path: "/sae", name: "sae", component: SaePage },
   ],
 });

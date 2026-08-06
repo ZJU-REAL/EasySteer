@@ -101,92 +101,19 @@ class ResourceManager:
     @staticmethod
     def cleanup_llm_instances() -> Dict[str, int]:
         """
-        Clean up all cached LLM instances across all API modules.
-        
+        Clean up all LLM instances cached by the shared core llm_manager.
+
         Returns:
-            dict: Count of instances cleaned up from each module
+            dict: Count of instances cleaned up
         """
-        result = {
-            'inference_count': 0,
-            'chat_count': 0,
-            'total_count': 0
-        }
-        
-        # Clean up inference_api instances
+        result = {'total_count': 0}
         try:
-            from inference_api import llm_instances
-            logger.info("Cleaning up inference LLM instances...")
-            count = len(llm_instances)
-            for key in list(llm_instances.keys()):
-                try:
-                    logger.info(f"Deleting inference LLM instance: {key}")
-                    del llm_instances[key]
-                except Exception as e:
-                    logger.error(f"Failed to delete inference LLM instance {key}: {str(e)}")
-            llm_instances.clear()
-            result['inference_count'] = count
-            logger.info(f"Cleared {count} inference LLM instances")
-        except ImportError:
-            logger.info("inference_api module not available")
+            from core import llm_manager
+            result['total_count'] = llm_manager.clear_all_instances()
         except Exception as e:
-            logger.error(f"Error cleaning up inference LLM instances: {str(e)}")
-        
-        # Clean up chat_api instances
-        try:
-            from chat_api import chat_llm_instances
-            logger.info("Cleaning up chat LLM instances...")
-            count = len(chat_llm_instances)
-            for key in list(chat_llm_instances.keys()):
-                try:
-                    logger.info(f"Deleting chat LLM instance: {key}")
-                    del chat_llm_instances[key]
-                except Exception as e:
-                    logger.error(f"Failed to delete chat LLM instance {key}: {str(e)}")
-            chat_llm_instances.clear()
-            result['chat_count'] = count
-            logger.info(f"Cleared {count} chat LLM instances")
-        except ImportError:
-            logger.info("chat_api module not available")
-        except Exception as e:
-            logger.error(f"Error cleaning up chat LLM instances: {str(e)}")
-        
-        result['total_count'] = result['inference_count'] + result['chat_count']
+            logger.error(f"Error cleaning up LLM instances: {str(e)}")
         return result
-    
-    @staticmethod
-    def cleanup_tokenizer_cache() -> int:
-        """
-        Clean up tokenizer cache.
-        
-        Returns:
-            int: Number of tokenizers cleared
-        """
-        count = 0
-        
-        # Clean up prompt_formatter's tokenizer cache
-        try:
-            from core.prompt_utils import prompt_formatter
-            logger.info("Cleaning up prompt_formatter tokenizer cache...")
-            count += prompt_formatter.clear_tokenizer_cache()
-        except Exception as e:
-            logger.error(f"Error cleaning up prompt_formatter cache: {str(e)}")
-        
-        # Clean up legacy tokenizer_cache from inference_api (if exists)
-        try:
-            from inference_api import tokenizer_cache
-            logger.info("Cleaning up legacy inference_api tokenizer cache...")
-            legacy_count = len(tokenizer_cache)
-            tokenizer_cache.clear()
-            count += legacy_count
-            logger.info(f"Cleared {legacy_count} legacy tokenizers")
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.error(f"Error cleaning up legacy tokenizer cache: {str(e)}")
-        
-        logger.info(f"Total tokenizers cleared: {count}")
-        return count
-    
+
     @staticmethod
     def force_garbage_collection() -> Dict[str, int]:
         """
@@ -211,33 +138,28 @@ class ResourceManager:
         
         This method:
         1. Cleans up LLM instances
-        2. Cleans up tokenizer cache
-        3. Forces garbage collection
-        4. Cleans up GPU memory
-        
+        2. Forces garbage collection
+        3. Cleans up GPU memory
+
         Returns:
             dict: Detailed information about cleanup operations
         """
         logger.info("Starting complete resource cleanup...")
-        
+
         result = {
             'timestamp': time.time(),
             'llm_cleanup': {},
-            'tokenizer_cleanup': 0,
             'gc_info': {},
             'gpu_cleanup': {}
         }
-        
+
         # Step 1: Clean up LLM instances
         result['llm_cleanup'] = ResourceManager.cleanup_llm_instances()
-        
-        # Step 2: Clean up tokenizer cache
-        result['tokenizer_cleanup'] = ResourceManager.cleanup_tokenizer_cache()
-        
-        # Step 3: Force garbage collection
+
+        # Step 2: Force garbage collection
         result['gc_info'] = ResourceManager.force_garbage_collection()
-        
-        # Step 4: Clean up GPU memory
+
+        # Step 3: Clean up GPU memory
         result['gpu_cleanup'] = ResourceManager.cleanup_gpu_memory()
         
         logger.info("Complete resource cleanup finished")
