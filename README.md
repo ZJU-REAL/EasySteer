@@ -23,6 +23,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/08/22] The [EasySteer paper](https://arxiv.org/abs/2509.25175) has been accepted to EMNLP 2026 System Demonstrations 🎉
 - [2026/08/03] Migrated to vLLM v0.26.0 (V2 model runner): v2 steering API, redesigned hidden-state capture (select clauses, labeled rows, per-request capture), and our new [documentation site](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
 - [2026/03/31] Initial support for vLLM v0.17.1, with server-level steering and CUDA graph support

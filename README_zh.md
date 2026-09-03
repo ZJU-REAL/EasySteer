@@ -23,6 +23,7 @@
 <a id="news"></a>
 ## 新闻 🔥
 
+- [2026/08/22] [EasySteer 论文](https://arxiv.org/abs/2509.25175)被 EMNLP 2026 System Demonstrations 接收 🎉
 - [2026/08/03] 迁移至 vLLM v0.26.0（V2 模型运行器）：v2 干预 API、重新设计的隐状态捕获（选择子句、行标签、按请求捕获），并上线了[文档站](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
 - [2026/03/31] 初步支持 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速
