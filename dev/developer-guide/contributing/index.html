@@ -1026,10 +1026,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#module-map-vllm-steervllmsteer_vectors" class="md-nav__link">
+  <a href="#shared-model-hooks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module map (vllm-steer/vllm/steer_vectors/)
+        Shared model hooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steering-modules-model_hookssteering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steering modules (model_hooks/steering/)
       
     </span>
   </a>
@@ -1041,17 +1052,6 @@
     <span class="md-ellipsis">
       
         Ground rules
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#engineering-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Engineering records
       
     </span>
   </a>
@@ -1276,10 +1276,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#module-map-vllm-steervllmsteer_vectors" class="md-nav__link">
+  <a href="#shared-model-hooks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module map (vllm-steer/vllm/steer_vectors/)
+        Shared model hooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steering-modules-model_hookssteering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steering modules (model_hooks/steering/)
       
     </span>
   </a>
@@ -1291,17 +1302,6 @@
     <span class="md-ellipsis">
       
         Ground rules
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#engineering-records" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Engineering records
       
     </span>
   </a>
@@ -1338,40 +1338,69 @@
 <ol>
 <li><strong>Replications</strong> — reproduce a steering paper as a notebook under <code>replications/</code>
    (README + notebook + vectors) and add it to the replications table.</li>
-<li><strong>New steering algorithms</strong> — subclass <code>AlgorithmTemplate</code> and register it.</li>
-<li><strong>Component-level steers</strong> — interfaces for steering attention/MLP modules are
-   reserved in <code>vllm-steer/vllm/steer_vectors/models.py</code> and are a key focus of future
-   updates.</li>
+<li><strong>New steering algorithms</strong> — subclass <code>BaseSteerVectorAlgorithm</code> and register it.</li>
+<li><strong>Model and component support</strong> — extend module discovery and steering controllers,
+   with tests for the model's hidden-state and residual layout.</li>
 </ol>
 <h2 id="adding-a-steering-algorithm">Adding a steering algorithm<a class="headerlink" href="#adding-a-steering-algorithm" title="Permanent link">&para;</a></h2>
-<p>An algorithm needs exactly two methods:</p>
+<p>An algorithm implements <code>_transform</code>, which receives the selected hidden-state rows
+and one layer's canonical payload. Declare its payload kind in <code>capabilities.py</code>;
+the shared loader handles supported native files, validation and materialization.
+For example, this additive algorithm consumes the same <code>direction</code> payload as
+<code>direct</code>, <code>erase</code>, and <code>replace</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors.algorithms.template</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmTemplate</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors.algorithms.factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_algorithm</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.model_hooks.steering.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseSteerVectorAlgorithm</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.model_hooks.steering.algorithms.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_algorithm</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nd">@register_algorithm</span><span class="p">(</span><span class="s2">&quot;my_algorithm&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyAlgorithm</span><span class="p">(</span><span class="n">AlgorithmTemplate</span><span class="p">):</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nd">@register_algorithm</span><span class="p">(</span><span class="s2">"my_algorithm"</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyAlgorithm</span><span class="p">(</span><span class="n">BaseSteerVectorAlgorithm</span><span class="p">):</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hidden_states</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">payload</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply the intervention. `payload` is one layer&#39;s entry from</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="sd">        load_from_path&#39;s layer_payloads (Tensor or dict — your choice).&quot;&quot;&quot;</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="k">return</span> <span class="n">hidden_states</span> <span class="o">+</span> <span class="n">payload</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="nd">@classmethod</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load_from_path</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">target_layers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Load per-layer payloads from a file (.gguf, .pt, ...).</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="sd">        Returns {&quot;layer_payloads&quot;: {layer_id: payload}}. Raise on</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="sd">        underspecified inputs instead of assuming defaults.&quot;&quot;&quot;</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">target_layers</span><span class="p">:</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;my_algorithm requires target_layers&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="n">vector</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">map_location</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">weights_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;layer_payloads&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">l</span><span class="p">:</span> <span class="n">vector</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">adapter_dtype</span><span class="p">)</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                                   <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">target_layers</span><span class="p">}}</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="c1"># Tensor payloads have already been multiplied by the requested scale.</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">transformed</span> <span class="o">=</span> <span class="n">hidden_states</span> <span class="o">+</span> <span class="n">payload</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">:</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_renormalize</span><span class="p">(</span><span class="n">hidden_states</span><span class="p">,</span> <span class="n">transformed</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="k">return</span> <span class="n">transformed</span>
 </code></pre></div>
-<p>Then export it from <code>vllm-steer/vllm/steer_vectors/algorithms/__init__.py</code>. The shared
-template handles triggers (where-clauses), scaling, and normalization; your algorithm
-only defines the math and the file format.</p>
-<h2 id="module-map-vllm-steervllmsteer_vectors">Module map (<code>vllm-steer/vllm/steer_vectors/</code>)<a class="headerlink" href="#module-map-vllm-steervllmsteer_vectors" title="Permanent link">&para;</a></h2>
+<p>Its entry in <code>capabilities.py</code> is
+<code>"my_algorithm": AlgorithmCapabilities("direction", "gguf", normalize=True)</code>.
+Algorithms sharing a payload kind also share its loader. Add a native format
+reader to <code>loading.py</code> only when a new EasySteer schema is needed; third-party
+checkpoint layouts belong in explicit <code>easysteer.vectors</code> adapters. File and
+in-memory paths must produce equivalent canonical payloads.</p>
+<p>Import the class from <code>vllm-steer/vllm/model_hooks/steering/algorithms/__init__.py</code> so every
+engine process registers it, then include <code>"my_algorithm"</code> in <code>steer_algorithms</code>.
+The controllers handle selection and conflict resolution; the base class prepares
+scaled tensor payloads and provides <code>_renormalize</code>. Each algorithm decides how to
+apply normalization in its transformation.</p>
+<p>New algorithms run in eager or <code>split</code> mode by default. To support <code>in_graph</code>, also
+declare a <code>graph_family</code> and implement <code>graph_lower</code> with matching math; low-rank
+families need <code>wire_rank</code> for admission checks. Use the existing algorithm classes
+and <a href="https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/design/steer_vectors.md">engine architecture</a>
+as references. Test eager and graph implementations against the same inputs.</p>
+<p>Declare the payload kind, source format, normalization support and allowed
+<code>VectorSpec.params</code> in <code>capabilities.py</code>. Run <code>python tools/export_client_contracts.py</code>
+from the repository root to update the packaged browser and HF client rules.
+Provide a client-side checkpoint adapter when needed. Graph capabilities remain
+on the algorithm class.</p>
+<h2 id="shared-model-hooks">Shared model hooks<a class="headerlink" href="#shared-model-hooks" title="Permanent link">&para;</a></h2>
+<p>The public Python APIs remain <code>vllm.steer_vectors</code> and <code>vllm.capture</code>.
+Their implementation lives under <code>vllm-steer/vllm/model_hooks/</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>model_hooks/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  selection/              # Selection specs, token matching and batch geometry
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  components/             # Model discovery and component output adapters
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  steering/
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    algorithms/           # Transformations and their registration
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    controllers/          # Hidden-state and router-logit execution
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    graph/                # Eligibility, persistent state and kernels
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  capture/                # Capture sessions, selection, storage and serialization
+</code></pre></div>
+<p>Capture and steering independently consume <code>selection</code> and <code>components</code>.
+Capture can run without a steering declaration, algorithm or payload cache.
+The shared packages have no dependency on either consumer.
+<code>selection/spec.py</code> defines <code>SelectSpec</code>, <code>schema.py</code> defines its fields, and
+<code>runtime.py</code> resolves token selections against batch geometry.</p>
+<h2 id="steering-modules-model_hookssteering">Steering modules (<code>model_hooks/steering/</code>)<a class="headerlink" href="#steering-modules-model_hookssteering" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1386,23 +1415,59 @@ only defines the math and the file format.</p>
 </tr>
 <tr>
 <td><code>request.py</code></td>
-<td>Internal engine request struct + field registry</td>
+<td><code>SteeringRequest</code> with an ordered list of <code>ResolvedVector</code> payloads and application fields</td>
+</tr>
+<tr>
+<td><code>defaults.py</code></td>
+<td>Default configuration snapshots and per-request inheritance / override resolution</td>
+</tr>
+<tr>
+<td><code>input_validation.py</code></td>
+<td>Shared source, data and algorithm-parameter validation before file loading</td>
+</tr>
+<tr>
+<td><code>loading.py</code></td>
+<td>Native file adapters and content snapshots before request admission</td>
+</tr>
+<tr>
+<td><code>payloads.py</code></td>
+<td>Canonical payload validation, content identity and materialization</td>
+</tr>
+<tr>
+<td><code>capabilities.py</code></td>
+<td>Algorithm authoring rules shared with packaged clients</td>
 </tr>
 <tr>
 <td><code>worker_manager.py</code></td>
-<td>Config slots, fingerprints, vector store owner</td>
+<td><code>WorkerSteeringState</code>: config slots, fingerprints and payload-cache ownership</td>
 </tr>
 <tr>
-<td><code>store.py</code></td>
-<td>Versioned vector store (dedup + reload)</td>
+<td><code>payload_cache.py</code></td>
+<td><code>PayloadCache</code> of content-addressed, materialized per-layer payload dictionaries</td>
 </tr>
 <tr>
-<td><code>models.py</code></td>
-<td>Controller discovery &amp; vector loading</td>
+<td><code>controllers/base.py</code></td>
+<td>Shared slot lifecycle and graph-buffer interface</td>
 </tr>
 <tr>
-<td><code>layers.py</code></td>
-<td>Slot-routed steering controllers (decoder/MoE gate)</td>
+<td><code>controllers/hidden_states.py</code> / <code>controllers/router_logits.py</code></td>
+<td>Component-specific steering, with eager and graph execution kept together</td>
+</tr>
+<tr>
+<td><code>controllers/manager.py</code></td>
+<td>Index controllers by component and layer; attach hooks and install/release slot payloads</td>
+</tr>
+<tr>
+<td><code>graph/policy.py</code></td>
+<td>Graph mode resolution and request admission</td>
+</tr>
+<tr>
+<td><code>graph/state.py</code></td>
+<td>Persistent graph tables, slot distribution and step masks</td>
+</tr>
+<tr>
+<td><code>graph/kernels.py</code></td>
+<td>Steering tensor kernels</td>
 </tr>
 <tr>
 <td><code>ops.py</code></td>
@@ -1418,6 +1483,29 @@ only defines the math and the file format.</p>
 </tr>
 </tbody>
 </table>
+<p>Single-vector and multi-vector specs use the same internal request structure;
+each resolved vector carries a canonical <code>payload</code> regardless of its input format.
+The original <code>source</code> is retained for reporting and preload policy, while worker
+caches use payload content and broadcast layer targets. HTTP management routes
+live in <code>vllm/entrypoints/serve/steering/api_router.py</code>.</p>
+<p><code>components/registry.py</code> supplies shared component descriptors and hook targets;
+<code>components/discovery.py</code> locates decoder layers and accessible MoE gates;
+<code>components/outputs.py</code> handles component output layouts. Steering and capture
+consume the same discovered component targets. Standard decoder
+stacks use their global stack indices; pipeline-parallel placeholders retain
+those indices. Architecture exceptions belong in discovery and output-layout
+rules, rather than separate name parsing in each consumer. ReFT uses its own
+Transformers model profiles; repeated decoder layouts share an implementation,
+while component dimensions and special layouts remain explicit.</p>
+<p>Controllers declare their graph mask names and allocate their own component
+tables. Shared graph state calls that interface without branching on concrete
+controller classes. A new component supplies its discovery, output adapter,
+controller and graph-buffer contract; its algorithms still own their graph math.</p>
+<p>Capture keeps its session, graph dispatch, selection, store and serialization
+modules together under <code>model_hooks/capture/</code>. Its selection module attaches
+capture row labels and reduction plans to the shared token-selection result.
+<code>serialization.py</code> owns the dtype and wire-format contract in both directions;
+<code>store.py</code> owns buffered values, row budgets and clearing.</p>
 <h2 id="ground-rules">Ground rules<a class="headerlink" href="#ground-rules" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Run the relevant <a href="../testing/">test suites</a> before submitting.</li>
@@ -1426,25 +1514,9 @@ only defines the math and the file format.</p>
 <li>Update the docs: the relevant page under <code>docs/</code>, and the README pointer line if a
   user-facing surface changed (the PR template has a checklist).</li>
 </ul>
-<h2 id="engineering-records">Engineering records<a class="headerlink" href="#engineering-records" title="Permanent link">&para;</a></h2>
-<p>Internal design documents live in
-<a href="https://github.com/ZJU-REAL/EasySteer/tree/main/docs/design"><code>docs/design/</code></a>. They are
-records of <em>why</em> things are the way they are — kept out of the rendered site nav, but
-worth reading before touching the corresponding subsystem:</p>
-<ul>
-<li><a href="https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md"><code>STEERING_API_V2.md</code></a>
-  — design of the v2 spec API (<code>SteeringSpec</code>/<code>VectorSpec</code>/<code>ApplySpec</code>), the semantics
-  it fixed, and what was deleted from v1.</li>
-<li><a href="https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/CAPTURE_REDESIGN_PROPOSAL.md"><code>CAPTURE_REDESIGN_PROPOSAL.md</code></a>
-  — the hook-based hidden-state capture redesign (<code>capture()</code> / <code>CaptureResult</code>).</li>
-<li><a href="https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/MIGRATION_PLAN_vllm-0.26.0.md"><code>MIGRATION_PLAN_vllm-0.26.0.md</code></a>
-  — plan and validation notes for porting the fork onto vLLM 0.26.0.</li>
-<li><a href="https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/README-pre-docs-site.md"><code>README-pre-docs-site.md</code></a>
-  — snapshot of the full pre-docs-site README, kept during the transition to the
-  shopfront README + docs-site split.</li>
-</ul>
-<!-- TODO: code style/linting instructions for the easysteer package itself
-(the vllm-steer fork follows upstream vLLM's pre-commit setup). -->
+<p>For the current public contracts, read the <a href="../../user-guide/steering/">steering guide</a>,
+<a href="../../user-guide/hidden-state-capture/">capture guide</a>, and the engine architecture
+linked above. The <code>vllm-steer</code> fork follows upstream vLLM's pre-commit configuration.</p>
 
 
 

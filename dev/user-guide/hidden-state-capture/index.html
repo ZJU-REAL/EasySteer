@@ -784,6 +784,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#prefix-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prefix caching
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1364,6 +1375,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#prefix-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prefix caching
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1390,29 +1412,45 @@
 
 
 <h1 id="hidden-state-capture">Hidden-state capture<a class="headerlink" href="#hidden-state-capture" title="Permanent link">&para;</a></h1>
-<p><code>easysteer.hidden_states</code> extracts intermediate activations from a running vLLM engine —
-the raw material for steering vectors.</p>
+<p><code>easysteer.hidden_states</code> extracts intermediate activations from a running vLLM
+engine for analysis, training data and steering-vector extraction. Capture works
+without enabling steering.</p>
 <h2 id="engine-requirements">Engine requirements<a class="headerlink" href="#engine-requirements" title="Permanent link">&para;</a></h2>
+<p>Capture requires the V2 GPU model runner, which vLLM 0.29 selects by default.
+Models or features that fall back to V1, and standalone multimodal encoder
+runners, cannot use capture. Steering and capture currently require token-ID
+prompts; prompt embeddings are not supported.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">easysteer.hidden_states</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">hs</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen2.5-1.5B-Instruct&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">enforce_eager</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>           <span class="c1"># capture requires eager execution</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">enable_prefix_caching</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># cache-hit tokens are never recomputed,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                  <span class="c1"># so they cannot be captured</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span> <span class="n">tensor_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Capture chooses its execution path automatically. Admission skips</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># prefix-cache reads when necessary to compute selected prompt rows.</span>
 </code></pre></div>
+<p>The client helper requires a single worker. Tensor-parallel capture returns
+per-rank shards and is rejected rather than merging them implicitly. Capture
+also depends on the engine being able to discover the model's decoder layers
+or MoE gates; test new model architectures before relying on their activations.</p>
+<p>Eligible FULL-graph batches use a separate CUDA graph that records activations.
+This path requires one worker, no LoRA or speculative decoding, and steering
+either disabled or running <code>in_graph</code>. Other batches that need captured rows
+run eagerly; steps with no selected rows keep ordinary model execution.
+The first eligible batch records the capture graph. One component/layer
+combination stays cached across <code>capture()</code> calls; changing the selected token
+positions, storage dtype or reduction does not require recording it again.
+Changing components or layers replaces that cached graph. Ordinary model graphs
+do not contain capture operations.</p>
 <h2 id="hscapture"><code>hs.capture()</code><a class="headerlink" href="#hscapture" title="Permanent link">&para;</a></h2>
 <p>One call captures a batch of prompts and returns a labelled
 <a href="../../api-reference/hidden-states/"><code>CaptureResult</code></a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">llm</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">prompts</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;What is steering?&quot;</span><span class="p">,</span> <span class="s2">&quot;Explain PCA.&quot;</span><span class="p">],</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>          <span class="c1"># 1 = prompt-only forward pass</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>   <span class="c1"># true layer ids; None = all hooked layers</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float16&quot;</span><span class="p">,</span>       <span class="c1"># engine-side storage dtype (optional)</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">prompts</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"What is steering?"</span><span class="p">,</span> <span class="s2">"Explain PCA."</span><span class="p">]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">llm</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">prompts</span><span class="o">=</span><span class="n">prompts</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>          <span class="c1"># 1 = prompt-only forward pass</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>   <span class="c1"># true layer ids; None = all hooked layers</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">dtype</span><span class="o">=</span><span class="s2">"float16"</span><span class="p">,</span>       <span class="c1"># engine-side storage dtype (optional)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
 </code></pre></div>
 <p>Key arguments (full signature in the <a href="../../api-reference/hidden-states/">API reference</a>):</p>
 <table>
@@ -1433,7 +1471,7 @@ the raw material for steering vectors.</p>
 </tr>
 <tr>
 <td><code>dtype</code></td>
-<td>Engine-side storage dtype, e.g. <code>"float16"</code>.</td>
+<td>Engine-side storage dtype: <code>"float16"</code>, <code>"bfloat16"</code>, <code>"float32"</code>, <code>"float64"</code>, <code>"int32"</code> or <code>"int64"</code>. <code>None</code> preserves the model output dtype.</td>
 </tr>
 <tr>
 <td><code>select</code></td>
@@ -1441,11 +1479,15 @@ the raw material for steering vectors.</p>
 </tr>
 <tr>
 <td><code>per_prompt_selects</code></td>
-<td>One <code>SelectSpec</code> per prompt, overriding the global selection (<code>None</code> entries keep the global one).</td>
+<td>One <code>SelectSpec</code> or wire dict per prompt, overriding the global selection (<code>None</code> entries keep the global one). The list length must match <code>prompts</code>.</td>
 </tr>
 <tr>
 <td><code>stream</code></td>
 <td><code>"hidden_states"</code> (default) or <code>"router_logits"</code> (MoE).</td>
+</tr>
+<tr>
+<td><code>steering</code></td>
+<td><code>SteeringSpec</code> or per-prompt list, as in <code>LLM.generate()</code>. Captured values include steering.</td>
 </tr>
 <tr>
 <td><code>**generate_kwargs</code></td>
@@ -1454,24 +1496,31 @@ the raw material for steering vectors.</p>
 </tbody>
 </table>
 <h3 id="select-clauses">Select clauses<a class="headerlink" href="#select-clauses" title="Permanent link">&para;</a></h3>
-<p>Row selection reuses the same <code>SelectSpec</code> language as steering's <code>ApplySpec</code> — phases,
-token/position filters, exclusions, generation window — resolved identically by the
-engine, so a clause means the same thing in both systems:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
+<p>Capture's <code>SelectSpec</code> and steering's <code>ApplySpec</code> share one selection language —
+per-phase <code>"all"</code> (<code>prompt="all"</code> / <code>generation="all"</code>), six phase-scoped include
+selectors (prompt tokens/positions/window, generation tokens/positions/window)
+and their symmetric exclude twins — resolved identically by the engine, so a
+clause means the same thing in both systems:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Keep only the last prompt token of each sample</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span><span class="n">llm</span><span class="p">,</span> <span class="n">prompts</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">],</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
 </code></pre></div>
-<p><code>per_prompt_selects</code> requires <code>positions='all'</code> semantics (no reductions).</p>
+<p>The helper returns selected rows without engine-side reduction. It does not
+accept <code>positions</code> or <code>reduce</code> arguments: express positions in <code>SelectSpec</code>, then
+reduce the returned tensors if needed. With <code>max_tokens=1</code>, generation-only
+selectors have no decode-forward rows to capture. Use a longer generation when
+selecting decode rows. An empty selection returns no layers and empty sample
+views.</p>
 <h2 id="working-with-captureresult">Working with <code>CaptureResult</code><a class="headerlink" href="#working-with-captureresult" title="Permanent link">&para;</a></h2>
 <p>Rows are grouped by their owning request via engine labels and ordered by sequence
 position — the only correct grouping under continuous batching.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span><span class="o">.</span><span class="n">layer_ids</span>          <span class="c1"># sorted true layer ids</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">result</span><span class="o">.</span><span class="n">rows</span><span class="p">(</span><span class="mi">12</span><span class="p">)</span>           <span class="c1"># Tensor(total_rows, dim) for layer 12, all samples</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>          <span class="c1"># {layer_id: Tensor(rows, dim)} for sample 0</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_positions</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># absolute sequence positions of sample 0&#39;s rows</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_token_ids</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># input token ids of sample 0&#39;s rows</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_positions</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># absolute sequence positions of sample 0's rows</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_token_ids</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># input token ids of sample 0's rows</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">result</span><span class="o">.</span><span class="n">outputs</span>            <span class="c1"># the vLLM RequestOutput list, prompt order</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">result</span><span class="o">.</span><span class="n">to_nested</span><span class="p">()</span>        <span class="c1"># legacy shape: [sample][layer_pos] tensors</span>
 </code></pre></div>
@@ -1482,15 +1531,39 @@ position — the only correct grouping under continuous batching.</p>
 router logits instead of hidden states (used e.g. by the
 <a href="../../replications/">SteerMoE replication</a>).</p>
 <h2 id="compatibility-wrappers">Compatibility wrappers<a class="headerlink" href="#compatibility-wrappers" title="Permanent link">&para;</a></h2>
-<p><code>get_all_hidden_states_generate</code> and <code>get_moe_router_logits_generate</code> predate
-<code>capture()</code> and keep their original nested-list signatures, but are now thin
-wrappers over it — splitting is always exact and label-driven. Prefer
-<code>capture()</code> for new code; it additionally exposes select clauses, layer
-subsets and per-sample metadata. The embed-task variants
+<p><code>get_all_hidden_states_generate</code> and <code>get_moe_router_logits_generate</code> are thin
+wrappers over <code>capture()</code>. The hidden-state wrapper returns
+<code>(hidden_states, outputs)</code>, with nested <code>[sample][layer]</code> tensors by default or
+concatenated <code>[layer]</code> tensors when <code>split_by_samples=False</code>. The router-logit
+wrapper returns <code>(router_logits, outputs)</code>, with a <code>{layer_id: tensor}</code> dictionary
+by default or one such dictionary per sample when <code>split_by_samples=True</code>.</p>
+<p>Prefer <code>capture()</code> for new code: it preserves true layer IDs and per-sample
+metadata. In particular, pass the <code>CaptureResult</code> directly to the vector
+extractors when capturing a layer subset; converting to a plain nested list
+loses the mapping from list positions to true layer IDs. The embed-task variants
 (<code>get_all_hidden_states</code>, <code>get_moe_router_logits</code>) and the <code>vllm.hidden_states</code>
 alias package were removed.</p>
-<!-- TODO: document capture of multimodal (VLM) prompts and streaming/chunked capture
-sessions in more depth. -->
+<p>Multimodal prompts use the same list of input dictionaries as <code>LLM.generate</code>,
+including <code>prompt</code> and <code>multi_modal_data</code>; capture preserves their cache salts.</p>
+<h2 id="prefix-caching">Prefix caching<a class="headerlink" href="#prefix-caching" title="Permanent link">&para;</a></h2>
+<p>KV blocks do not contain the hidden states or router logits skipped by a prefix
+hit. Request admission therefore sets <code>skip_reading_prefix_cache=True</code> when
+the effective selection requires those prompt rows. Generation-only selection,
+the last prompt token, and other selections proven unaffected by prefix hits
+can reuse cached blocks. Per-prompt overrides participate in this decision.</p>
+<p>This policy applies both to <code>hs.capture()</code> and to requests submitted through the
+same engine after a successful <code>start_capture</code> RPC. Cache writes remain enabled
+under the ordinary cache key, so subsequent matching requests can reuse them;
+capture does not add a random salt. Existing steering fingerprints still isolate
+different interventions. If capture starts after a request has already reused
+selected prompt rows, fetching that incomplete capture raises an error. The check
+uses the stream's selection and any per-request override; selections confined to
+uncached rows can still be captured. Existing requests are checked when they
+first run in a batch after capture starts, so a completed request awaiting worker
+cleanup does not affect the new stream.</p>
+<p>If steering fails for a request, fetching its captured rows also reports that
+failure. Other requests remain available through a fetch restricted to their
+request IDs; clearing the stream removes its retained rows and errors.</p>
 
 
 

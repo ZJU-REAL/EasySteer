@@ -819,10 +819,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-level-engine-default-steering" class="md-nav__link">
+  <a href="#default-steering" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Server-level (engine default) steering
+        Default steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#management-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management endpoints
       
     </span>
   </a>
@@ -1276,10 +1287,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-level-engine-default-steering" class="md-nav__link">
+  <a href="#default-steering" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Server-level (engine default) steering
+        Default steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#management-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Management endpoints
       
     </span>
   </a>
@@ -1312,73 +1334,172 @@
 
 
 <h1 id="openai-compatible-server">OpenAI-compatible server<a class="headerlink" href="#openai-compatible-server" title="Permanent link">&para;</a></h1>
-<p>EasySteer serves steering over vLLM's standard OpenAI-compatible HTTP API.</p>
+<p>EasySteer exposes steering through vLLM's OpenAI-compatible HTTP API.</p>
 <h2 id="start-the-server">Start the server<a class="headerlink" href="#start-the-server" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen2.5-1.5B-Instruct<span class="w"> </span>--enable-steer-vector<span class="w"> </span>--port<span class="w"> </span><span class="m">8017</span><span class="w"> </span>--enforce-eager
+<p>Run from the EasySteer repository root so the server can resolve the examples'
+relative <code>vectors/</code> paths:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen2.5-1.5B-Instruct<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--enable-steer-vector<span class="w"> </span>--steer-algorithms<span class="w"> </span>direct<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">8017</span><span class="w"> </span>--enforce-eager
 </code></pre></div>
+<p>The example uses eager execution. Omit <code>--enforce-eager</code> to use the graph mode
+selected from the declared algorithms. Multi-vector requests also require
+<code>--steer-multi-vector</code>; see the <a href="../steering/">steering guide</a>.</p>
 <h2 id="per-request-steering">Per-request steering<a class="headerlink" href="#per-request-steering" title="Permanent link">&para;</a></h2>
-<p>Pass the <code>SteeringSpec</code> as JSON in the <code>steering</code> field — via <code>extra_body</code> with the
-OpenAI SDK, or directly with <code>curl</code>:</p>
+<p>Pass the <code>SteeringSpec</code> as JSON in the <code>steering</code> field, using <code>extra_body</code> with
+the OpenAI SDK or sending the field directly with <code>curl</code>. Both examples use the
+README's happy-vector and Alice prompt:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Python (OpenAI SDK)</label><label for="__tabbed_1_2">curl</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">openai</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAI</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:8017/v1&quot;</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;EMPTY&quot;</span><span class="p">)</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">steering</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="s2">&quot;vectors&quot;</span><span class="p">:</span> <span class="p">[{</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="s2">&quot;vectors/happy_diffmean.gguf&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="s2">&quot;scale&quot;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="s2">&quot;layers&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">)),</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="s2">&quot;normalize&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="s2">&quot;apply&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;phases&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">,</span> <span class="s2">&quot;generation&quot;</span><span class="p">]},</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="p">}]</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">}</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">chat</span><span class="o">.</span><span class="n">completions</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen2.5-1.5B-Instruct&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">messages</span><span class="o">=</span><span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&#39;s dog has passed away. Please comfort her.&quot;</span><span class="p">}],</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">extra_body</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;steering&quot;</span><span class="p">:</span> <span class="n">steering</span><span class="p">},</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">)</span>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">client</span> <span class="o">=</span> <span class="n">OpenAI</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">"http://localhost:8017/v1"</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="s2">"EMPTY"</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">steering</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s2">"vectors"</span><span class="p">:</span> <span class="p">[{</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">"source"</span><span class="p">:</span> <span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">"algorithm"</span><span class="p">:</span> <span class="s2">"direct"</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="s2">"scale"</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="s2">"layers"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">)),</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="s2">"apply"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"prompt"</span><span class="p">:</span> <span class="s2">"all"</span><span class="p">,</span> <span class="s2">"generation"</span><span class="p">:</span> <span class="s2">"all"</span><span class="p">},</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="p">}]</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">}</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">chat</span><span class="o">.</span><span class="n">completions</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">messages</span><span class="o">=</span><span class="p">[{</span><span class="s2">"role"</span><span class="p">:</span> <span class="s2">"user"</span><span class="p">,</span> <span class="s2">"content"</span><span class="p">:</span> <span class="s2">"Alice's dog has passed away. Please comfort her."</span><span class="p">}],</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">extra_body</span><span class="o">=</span><span class="p">{</span><span class="s2">"steering"</span><span class="p">:</span> <span class="n">steering</span><span class="p">},</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="p">)</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>http://localhost:8017/v1/chat/completions<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s1">    &quot;model&quot;: &quot;Qwen/Qwen2.5-1.5B-Instruct&quot;,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s1">    &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Comfort Alice about her dog.&quot;}],</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s1">    &quot;max_tokens&quot;: 128,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s1">    &quot;steering&quot;: {</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s1">      &quot;vectors&quot;: [{</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s1">        &quot;source&quot;: &quot;vectors/happy_diffmean.gguf&quot;,</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s1">        &quot;scale&quot;: 2.0,</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="s1">        &quot;layers&quot;: [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="s1">        &quot;apply&quot;: {&quot;phases&quot;: [&quot;prompt&quot;, &quot;generation&quot;]}</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="s1">      }]</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="s1">    }</span>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="s1">  }&#39;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--data-binary<span class="w"> </span>@-<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s">{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s">  "model": "Qwen/Qwen2.5-1.5B-Instruct",</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s">  "messages": [{"role": "user", "content": "Alice's dog has passed away. Please comfort her."}],</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s">  "max_tokens": 128,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s">  "temperature": 0.0,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s">  "steering": {</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s">    "vectors": [{</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="s">      "source": "vectors/happy_diffmean.gguf",</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="s">      "algorithm": "direct",</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="s">      "scale": 2.0,</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="s">      "layers": [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="s">      "apply": {"prompt": "all", "generation": "all"}</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="s">    }]</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="s">  }</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="s">}</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="s">JSON</span>
 </code></pre></div>
 </div>
 </div>
 </div>
-<p>The JSON shape mirrors the Python spec exactly (<code>vectors</code> / <code>conflict</code> / <code>debug</code>, each
-vector with <code>source</code>, <code>algorithm</code>, <code>scale</code>, <code>layers</code>, <code>normalize</code>, <code>apply</code>, <code>params</code>).</p>
-<h2 id="server-level-engine-default-steering">Server-level (engine default) steering<a class="headerlink" href="#server-level-engine-default-steering" title="Permanent link">&para;</a></h2>
-<p>Apply one spec to every request:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>&lt;model&gt;<span class="w"> </span>--enable-steer-vector<span class="w"> </span>--steering-config<span class="w"> </span>spec.json
+<p>Set <code>scale</code> to <code>0.0</code> for the baseline comparison. <code>normalize</code> defaults to <code>false</code>
+in both examples.</p>
+<p>The JSON shape mirrors the Python spec (<code>vectors</code> / <code>conflict</code>, each vector with
+<code>source</code> or <code>data</code>, <code>algorithm</code>, <code>scale</code>, <code>layers</code>, <code>normalize</code>, <code>apply</code>, <code>params</code>,
+and <code>name</code>). A <code>source</code> is a path on the server. For an in-memory payload,
+base64-encode the tensor bytes before sending its wire dictionary as a vector's
+<code>data</code> field:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_gguf</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">payload</span> <span class="o">=</span> <span class="n">from_gguf</span><span class="p">(</span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">wire</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">to_wire</span><span class="p">()</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">wire</span><span class="p">[</span><span class="s2">"tensors"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">tensor</span><span class="p">[</span><span class="s2">"data"</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">tensor</span><span class="p">[</span><span class="s2">"data"</span><span class="p">])</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Use {"data": wire, "algorithm": "direct", "apply": {...}} in vectors.</span>
 </code></pre></div>
-<p>Replace it at runtime (this resets the prefix cache):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8017/v1/steering<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;: {&quot;vectors&quot;: [...]}}&#39;</span>
+<h2 id="default-steering">Default steering<a class="headerlink" href="#default-steering" title="Permanent link">&para;</a></h2>
+<p>Save a complete spec as <code>spec.json</code>, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">"vectors"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">"algorithm"</span><span class="p">:</span><span class="w"> </span><span class="s2">"direct"</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">"scale"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nt">"layers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">11</span><span class="p">,</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="mi">13</span><span class="p">,</span><span class="w"> </span><span class="mi">14</span><span class="p">,</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">17</span><span class="p">,</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">23</span><span class="p">,</span><span class="w"> </span><span class="mi">24</span><span class="p">,</span><span class="w"> </span><span class="mi">25</span><span class="p">],</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="nt">"apply"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"prompt"</span><span class="p">:</span><span class="w"> </span><span class="s2">"all"</span><span class="p">,</span><span class="w"> </span><span class="nt">"generation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"all"</span><span class="p">}</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="p">}]</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">}</span>
 </code></pre></div>
-<p>Server-level and per-request steering cannot be combined in one request.</p>
-<!-- TODO: document the /v1/steering GET/DELETE surface (if present) and auth story. -->
+<p>Start an engine that uses it when a request omits steering. The startup spec
+supplies the algorithm declaration:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen2.5-1.5B-Instruct<span class="w"> </span>--steering-config<span class="w"> </span>spec.json<span class="w"> </span>--port<span class="w"> </span><span class="m">8017</span>
+</code></pre></div>
+<p>An omitted or <code>null</code> <code>steering</code> field inherits the default. A request spec
+overrides it completely; <code>"steering": false</code> explicitly disables steering.
+For example, use <code>extra_body={"steering": False}</code> for an unsteered comparison
+with the OpenAI Python client.</p>
+<h2 id="management-endpoints">Management endpoints<a class="headerlink" href="#management-endpoints" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Request / result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /v1/steering</code></td>
+<td>Returns <code>{"active": false}</code> when no default is configured, otherwise its status and authoring spec. In-memory tensor data is omitted and summarized by payload kind and content hash.</td>
+</tr>
+<tr>
+<td><code>POST /v1/steering</code></td>
+<td>Sets or replaces the default with <code>{"spec": ...}</code>; <code>{"spec": null}</code> clears it. Requires steering to be enabled, with the requested algorithms declared.</td>
+</tr>
+<tr>
+<td><code>GET /v1/steering/vectors</code></td>
+<td>Lists preloaded paths as <code>{"preloaded": [...]}</code>.</td>
+</tr>
+<tr>
+<td><code>POST /v1/steering/vectors</code></td>
+<td>Preloads <code>{"paths": [...], "algorithm": "direct", "params": {...}}</code>. <code>params</code> is optional. Requires steering to be enabled.</td>
+</tr>
+</tbody>
+</table>
+<p>For example, replace the engine default from a revised <code>spec.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json; print(json.dumps({"spec": json.load(open("spec.json"))}))'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8017/v1/steering<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">      </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>--data-binary<span class="w"> </span>@-
+</code></pre></div>
+<p>Updates must stay within the engine's declared algorithms, multi-vector support,
+and graph capabilities. Invalid specs or malformed management request bodies
+return HTTP 400; worker failures remain server errors. Preload <code>paths</code> must be a
+non-empty list of non-empty strings, and <code>params</code> must be an object or <code>null</code>.
+A server started without a
+default can set one later if steering is enabled and its algorithms are declared.
+Updates apply only to new requests; admitted requests retain their configuration
+and weight snapshot. Prefix-cache entries remain separated by the effective
+configuration, so updates do not require a cache reset.</p>
+<p>Runtime default updates require one API frontend (<code>--api-server-count=1</code>). A
+startup default and explicit per-request steering also work with multiple API
+frontends; runtime updates are rejected there rather than updating only one
+frontend.</p>
+<p>Clear the default without restarting the server:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8017/v1/steering<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{"spec": null}'</span>
+</code></pre></div>
+<p>To require advance loading of file-backed vectors, start the server with
+<code>--steer-require-preload</code>, then preload the file before sending generation requests:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8017/v1/steering/vectors<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"paths": ["vectors/happy_diffmean.gguf"], "algorithm": "direct"}'</span>
+</code></pre></div>
+<p>Preloading records the algorithm and content snapshot. After changing a source
+file, preload it again before using the new contents with
+<code>--steer-require-preload</code>. Router parameters that change the payload must match
+between preloading and the request. For example, preload a router file with
+<code>{"paths": ["router.json"], "algorithm": "moe_router", "params": {"mode": "soft", "lambda": 0.7}}</code>
+before using that file with the same <code>VectorSpec.params</code>. Changing only the
+request's scale, layer subset or selection reuses the preloaded payload.</p>
+<p>The Python equivalent is
+<code>llm.preload_steer_vectors(paths, algorithm="moe_router", params={"mode": "soft", "lambda": 0.7})</code>.</p>
+<p>When <code>vllm serve</code> is configured with <code>--api-key</code>, include
+<code>Authorization: Bearer &lt;key&gt;</code> on these requests, just as for generation requests.</p>
 
 
 

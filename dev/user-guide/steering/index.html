@@ -1422,9 +1422,7 @@
 
 
 <h1 id="steering-v2-api">Steering (v2 API)<a class="headerlink" href="#steering-v2-api" title="Permanent link">&para;</a></h1>
-<p>Steering is configured with three objects from <code>vllm.steer_vectors</code>
-(see <a href="https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md"><code>STEERING_API_V2.md</code></a>
-for the design rationale):</p>
+<p>Steering is configured with three objects from <code>vllm.steer_vectors</code>:</p>
 <ol>
 <li><strong><code>ApplySpec</code></strong> — <em>where and when</em> a vector applies (phases, token/position filters,
    generation window).</li>
@@ -1432,53 +1430,114 @@ for the design rationale):</p>
    algorithm-specific <code>params</code>, and its <code>apply</code> clause.</li>
 <li><strong><code>SteeringSpec</code></strong> — an ordered list of <code>VectorSpec</code>s plus a conflict policy.</li>
 </ol>
-<p>Specs are backend-independent: eager, piecewise, and full CUDA-graph engines accept the
-same spec; a backend that cannot run a spec rejects it at admission.</p>
+<p>Eager, <code>split</code>, and <code>in_graph</code> engines share the same spec API, with the graph
+payload conditions described below. A request using an algorithm outside the engine's declared <code>steer_algorithms</code>
+is rejected at admission. Set <code>steer_algorithms=["direct"]</code> for direct steering,
+or <code>steer_algorithms="all"</code> to serve all registered algorithms in <code>split</code> mode.
+An engine-default <code>steering_config</code> can infer the declaration from its spec.
+Requests with multiple vectors require <code>steer_multi_vector=True</code>
+(<code>--steer-multi-vector</code> on the CLI), which is also implied by an <code>"all"</code>
+declaration or a multi-vector engine-default spec.</p>
 <h2 id="attaching-a-spec">Attaching a spec<a class="headerlink" href="#attaching-a-spec" title="Permanent link">&para;</a></h2>
-<p>Same object, two scopes:</p>
-<ul>
-<li><strong>Per request</strong>: <code>llm.generate(prompts, steering=spec, ...)</code>, or the JSON field
-  <code>"steering"</code> on HTTP requests (see <a href="../openai-server/">OpenAI-compatible server</a>).</li>
-<li><strong>Engine default</strong>: <code>--steering-config spec.json</code> (or inline JSON) at startup,
-  replaceable at runtime via <code>POST /v1/steering {"spec": {...}}</code> (resets the prefix
-  cache).</li>
-</ul>
-<p>Server-level and per-request steering cannot currently be combined in one request.</p>
-<h2 id="applyspec-the-where-clause"><code>ApplySpec</code>: the where-clause<a class="headerlink" href="#applyspec-the-where-clause" title="Permanent link">&para;</a></h2>
-<p><code>ApplySpec</code> shares its selection language with hidden-state capture (both subclass
-<code>SelectSpec</code>), so a clause means the same thing in both systems.</p>
+<p>Every request resolves one effective configuration at admission. Python and HTTP
+use the same rules:</p>
 <table>
 <thead>
 <tr>
-<th>Field</th>
-<th>Meaning</th>
+<th><code>steering</code> value</th>
+<th>Effective configuration</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>phases</code></td>
-<td><strong>Required, non-empty.</strong> Which token kinds to select: <code>"prompt"</code>, <code>"generation"</code>. With no other filters, selects every token of the listed phases.</td>
+<td>Omitted or <code>None</code> (<code>null</code> in JSON)</td>
+<td>The current default, if one exists.</td>
 </tr>
 <tr>
-<td><code>tokens</code></td>
-<td>Token-id allowlist (real ids, <code>&gt;= 0</code>).</td>
+<td><code>False</code> (<code>false</code> in JSON)</td>
+<td>No steering for this request.</td>
 </tr>
 <tr>
-<td><code>positions</code></td>
-<td>Absolute sequence positions; negative values are Python-style from the end of the <em>prompt</em> (<code>-1</code> = last prompt token), stable across prefill chunks.</td>
-</tr>
-<tr>
-<td><code>exclude_tokens</code> / <code>exclude_positions</code></td>
-<td>Always subtract, in every case.</td>
-</tr>
-<tr>
-<td><code>generation_window</code></td>
-<td>Half-open <code>(start, stop)</code> over 0-based decode steps; <code>stop=None</code> = unbounded. <code>(0, k)</code> steers exactly the first <code>k</code> decode steps. Requires <code>"generation"</code> in <code>phases</code>.</td>
+<td>A <code>SteeringSpec</code></td>
+<td>This complete spec, overriding the default.</td>
 </tr>
 </tbody>
 </table>
-<p>Within the selected phases, <code>tokens</code> and <code>positions</code> select the <strong>union</strong> of their
-matches; exclusions always subtract.</p>
+<p><code>llm.generate(prompts, steering=spec, ...)</code> applies one spec to the batch. A list
+such as <code>steering=[None, False, spec]</code> resolves these choices separately for each
+prompt. Defaults and overrides are not stacked.</p>
+<p>Set an initial default with <code>LLM(steering_config=...)</code> or
+<code>--steering-config spec.json</code> (inline JSON is also accepted). Update or clear it
+with <code>llm.set_default_steering(spec)</code> or <code>llm.set_default_steering(None)</code>;
+<code>llm.get_default_steering()</code> reports the current default. HTTP clients use
+<code>POST /v1/steering {"spec": ...}</code> or <code>{"spec": null}</code> and <code>GET /v1/steering</code>.
+See <a href="../openai-server/">OpenAI-compatible server</a>.</p>
+<p>Updates affect new requests. Requests already admitted retain their configuration
+and weight snapshot. Changing a default does not reset the prefix cache or reserve
+a permanent execution slot. Algorithms, graph mode and capacity remain engine
+settings, so every default and override must satisfy that declaration.</p>
+<h2 id="applyspec-the-where-clause"><code>ApplySpec</code>: the where-clause<a class="headerlink" href="#applyspec-the-where-clause" title="Permanent link">&para;</a></h2>
+<p><code>ApplySpec</code> shares its selection language with hidden-state capture (both subclass
+<code>SelectSpec</code>), so a clause means the same thing in both systems.</p>
+<p>Each phase is selected independently and only by what you name: there is no
+separate phase gate. <code>prompt="all"</code> selects every prompt token and
+<code>generation="all"</code> every decode step — the widest include selector of each
+phase — and six narrower include selectors, three per phase, each named for
+it and carrying a symmetric exclude twin, refine the selection. A phase with
+neither <code>"all"</code> nor a selector is untouched:</p>
+<table>
+<thead>
+<tr>
+<th>Include</th>
+<th>Exclude twin</th>
+<th>Matches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prompt_tokens</code></td>
+<td><code>exclude_prompt_tokens</code></td>
+<td>Token-id allowlist (real ids, <code>&gt;= 0</code>) over prompt occurrences.</td>
+</tr>
+<tr>
+<td><code>prompt_positions</code></td>
+<td><code>exclude_prompt_positions</code></td>
+<td>Prompt positions; negative values are Python-style from the end of the prompt (<code>-1</code> = last prompt token), stable across prefill chunks. Positive values past the prompt end clamp to the last prompt token (warned at admission).</td>
+</tr>
+<tr>
+<td><code>prompt_window</code></td>
+<td><code>exclude_prompt_window</code></td>
+<td>Half-open <code>(start, stop)</code> over prompt positions; negative bounds and <code>stop=None</code> resolve from the prompt end (<code>(-5, None)</code> = the last five prompt tokens).</td>
+</tr>
+<tr>
+<td><code>generation_tokens</code></td>
+<td><code>exclude_generation_tokens</code></td>
+<td>Token-id allowlist over generated occurrences.</td>
+</tr>
+<tr>
+<td><code>generation_positions</code></td>
+<td><code>exclude_generation_positions</code></td>
+<td>Exact 0-based decode steps (<code>[0]</code> = the first generated token).</td>
+</tr>
+<tr>
+<td><code>generation_window</code></td>
+<td><code>exclude_generation_window</code></td>
+<td>Half-open <code>(start, stop)</code> over 0-based decode steps; <code>stop=None</code> = unbounded. <code>(0, k)</code> selects exactly the first <code>k</code> decode steps.</td>
+</tr>
+</tbody>
+</table>
+<p>The include selectors (with <code>prompt="all"</code> / <code>generation="all"</code> among them)
+select the <strong>union</strong> of their matches. The exclude selectors union and
+<strong>always subtract</strong>: where an include and an exclude overlap, the exclusion
+wins; an exclude requires its phase to be covered, and a clause that selects
+nothing is rejected — as is the removed <code>phases</code> key. One clause can mix
+granularities across phases:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Last prompt token plus the whole generation (the SHARP shape):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Prompt tail plus the first decode steps:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_window</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">generation_window</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+</code></pre></div>
 <h2 id="vectorspec-one-vector"><code>VectorSpec</code>: one vector<a class="headerlink" href="#vectorspec-one-vector" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1507,17 +1566,17 @@ matches; exclusions always subtract.</p>
 <tr>
 <td><code>scale</code></td>
 <td><code>1.0</code></td>
-<td>Scale factor (negative suppresses the direction).</td>
+<td>Algorithm-specific scale factor; <code>direct</code> adds <code>scale * vector</code>.</td>
 </tr>
 <tr>
 <td><code>layers</code></td>
 <td><code>None</code></td>
-<td>Layer indices to apply to; <code>None</code> lets the file decide.</td>
+<td>Layer indices to apply to; <code>None</code> uses the layer IDs in the source or payload. Payloads without layer IDs require an explicit list.</td>
 </tr>
 <tr>
 <td><code>normalize</code></td>
 <td><code>False</code></td>
-<td>Normalize the vector before applying.</td>
+<td>Rescale the transformed hidden state to its original norm for <code>direct</code>, <code>erase</code>, <code>replace</code>, and <code>concept_replace</code>. Other algorithms reject <code>True</code>.</td>
 </tr>
 <tr>
 <td><code>apply</code></td>
@@ -1536,6 +1595,10 @@ matches; exclusions always subtract.</p>
 </tr>
 </tbody>
 </table>
+<p>For <code>moe_router</code>, explicit <code>mode</code>, <code>lambda</code> and <code>topk</code> parameters override those
+values in a source file or <code>RouterConfig</code>; omitted parameters retain the payload's
+values. <code>expert_ids</code> in <code>params</code> is only for inline configuration without <code>source</code>
+or <code>data</code>. A file or <code>RouterConfig</code> records its own expert IDs per layer.</p>
 <h2 id="steering-with-your-own-tensors">Steering with your own tensors<a class="headerlink" href="#steering-with-your-own-tensors" title="Permanent link">&para;</a></h2>
 <p>The engine loads only formats whose schema EasySteer defines. Everything else —
 pyreft checkpoints, LM-Steer <code>.pt</code> files, pickled transport maps, or tensors you
@@ -1561,38 +1624,52 @@ canonical payload structures:</p>
 <td>one affine map, applied to each <code>layers</code> entry</td>
 </tr>
 <tr>
-<td><code>LowRankProjector(p1, p2)</code></td>
+<td><code>LowRankProjector(projector1, projector2)</code></td>
 <td><code>lm_steer</code></td>
 <td>low-rank update factors, applied to each <code>layers</code> entry</td>
 </tr>
 <tr>
-<td><code>ReftIntervention(rotate, weight, bias=None, layer=None)</code></td>
+<td><code>ReftIntervention(rotate_layer, learned_source_weight, learned_source_bias=None, layer=None)</code></td>
 <td><code>loreft</code></td>
-<td>LoReFT intervention; <code>layer</code> from the checkpoint wins</td>
+<td>Uses its recorded <code>layer</code>; without one, requires <code>VectorSpec.layers</code></td>
 </tr>
 <tr>
 <td><code>ConceptPair(h1=..., h2=...)</code></td>
 <td><code>concept_replace</code></td>
-<td>named roles — steer toward <code>h1</code>, away from <code>h2</code></td>
+<td>replace the component along <code>h1</code> with the corresponding component along <code>h2</code></td>
+</tr>
+<tr>
+<td><code>RouterConfig({layer: config})</code></td>
+<td><code>moe_router</code></td>
+<td>per-layer expert IDs and routing mode</td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">DirectionVector</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Any tensor you have — numpy or torch — becomes steerable directly:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">data</span><span class="o">=</span><span class="n">DirectionVector</span><span class="p">({</span><span class="mi">10</span><span class="p">:</span> <span class="n">my_vector</span><span class="p">}),</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">,</span> <span class="s2">&quot;generation&quot;</span><span class="p">]),</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">DirectionVector</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Any tensor you have — numpy or torch — becomes steerable directly:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">data</span><span class="o">=</span><span class="n">DirectionVector</span><span class="p">({</span><span class="mi">10</span><span class="p">:</span> <span class="n">my_vector</span><span class="p">}),</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)])</span>
 </code></pre></div>
 <p>Payloads are validated at construction (shapes, finiteness, role names) and
 identified engine-side by a content hash, so identical payloads share one
-resident copy regardless of how many requests carry them. <code>easysteer.vectors</code>
-ships adapters for the common third-party layouts (<code>from_pyreft</code>,
+resident copy regardless of how many requests carry them. Native files and
+in-memory data use the same payload validation, layer selection, identity and
+materialization path. The file is read before execution; workers consume that
+snapshot rather than reopen the source.</p>
+<p><code>easysteer.vectors.load(path, format=...)</code> selects an explicit format adapter.
+Supported formats are <code>gguf</code>, <code>concept_pair</code>, <code>moe_router</code>, <code>pt_direction</code>,
+<code>pyreft</code>, <code>lm_steer</code>, and <code>linear_transport</code>. The existing convenience adapters
+remain available (<code>from_pyreft</code>,
 <code>from_lm_steer</code>, <code>from_linear_transport</code>, <code>from_pt_direction</code>, <code>from_gguf</code>),
 and <code>easysteer.vectors.from_control_vector(cv)</code> steers an extraction result
 with no GGUF round-trip.</p>
+<p>When a payload records layer IDs, <code>VectorSpec.layers</code> restricts those IDs; it does
+not move an intervention to a different layer. For a checkpoint with a recorded
+LoReFT layer, omit <code>layers</code> or include that layer in the list.</p>
 <h2 id="steeringspec-vectors-conflict-policy"><code>SteeringSpec</code>: vectors + conflict policy<a class="headerlink" href="#steeringspec-vectors-conflict-policy" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1613,50 +1690,67 @@ with no GGUF round-trip.</p>
 <td><code>"priority"</code></td>
 <td>When several vectors target one position: <code>"priority"</code> (first wins), <code>"sequential"</code> (stack in order), <code>"error"</code>.</td>
 </tr>
-<tr>
-<td><code>debug</code></td>
-<td><code>False</code></td>
-<td>Verbose logging during the forward pass.</td>
-</tr>
 </tbody>
 </table>
 <p><code>moe_router</code> is not yet supported in multi-vector specs.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Single vector on every prompt + generated token</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">sentiment</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">&quot;vectors/happy.gguf&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>               <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">,</span> <span class="s2">&quot;generation&quot;</span><span class="p">])),</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">])</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Several directions stacked at the second-to-last prompt token</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">multi</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">conflict</span><span class="o">=</span><span class="s2">&quot;sequential&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">&quot;dir1.gguf&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">20</span><span class="p">],</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>                   <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">],</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">])),</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">&quot;dir2.gguf&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=-</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">20</span><span class="p">],</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>                   <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">],</span> <span class="n">positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">])),</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="p">],</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="p">)</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="c1"># Steer only the first 8 generated tokens</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="n">early</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">&quot;vectors/happy.gguf&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>               <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;generation&quot;</span><span class="p">],</span> <span class="n">generation_window</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span><span class="p">))),</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Single vector on every prompt + generated token</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">sentiment</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>               <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)),</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">])</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Several directions stacked at the second-to-last prompt token.</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># The engine must have steer_multi_vector=True; supply your own dir1/dir2 files.</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">multi</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">conflict</span><span class="o">=</span><span class="s2">"sequential"</span><span class="p">,</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"dir1.gguf"</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">20</span><span class="p">],</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                   <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">])),</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"dir2.gguf"</span><span class="p">,</span> <span class="n">scale</span><span class="o">=-</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">20</span><span class="p">],</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                   <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">])),</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="p">],</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="p">)</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="c1"># Steer only the first 8 generated tokens</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">early</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="n">VectorSpec</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>               <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">generation_window</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">8</span><span class="p">))),</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="p">])</span>
 </code></pre></div>
 <h2 id="interaction-with-engine-features">Interaction with engine features<a class="headerlink" href="#interaction-with-engine-features" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Prefix caching</strong> is supported: block hashes are keyed by the steering config
-  fingerprint; engine-default mode salts every hash, and spec updates reset the cache.</li>
+<li><strong>Prefix caching</strong> is supported: block hashes include the effective request's
+  steering fingerprint. Default and explicit requests with identical configs can
+  reuse blocks; different configs remain separate. Updating or clearing the default
+  preserves reusable blocks for previous configurations.</li>
 <li><strong>Chunked prefill</strong> is supported; negative positions resolve stably across chunks.</li>
-<li><strong>CUDA graphs</strong>: full-graph mode currently requires a single-vector, <code>direct</code>,
-  non-normalized spec; other specs are rejected at admission with an explicit error.
-  <code>--steer-graph-mode</code> is an engine optimization setting and never changes how a spec is
-  written.</li>
+<li><strong>Beam search</strong> requires steering to be disabled. Use <code>steering=False</code> (HTTP:
+  <code>"steering": false</code>) when a default is configured; effective steering with beam
+  search is rejected because its prompt/generation selection semantics differ.</li>
+<li><strong>CUDA graphs</strong>: <code>split</code> supports all algorithms and multi-vector specs, with
+  steering between compiled graph segments. <code>in_graph</code> requires a single-vector
+  spec whose algorithm has a graph kernel: <code>direct</code>, <code>erase</code>, <code>replace</code>, and
+  <code>concept_replace</code> support it; <code>loreft</code> and <code>lm_steer</code> also require payload rank
+  at most <code>steer_graph_max_rank</code> (default 32). <code>moe_router</code> supports inline and
+  file-backed <code>activate</code>, <code>deactivate</code>, <code>soft</code>, and <code>soft_topk</code> configurations;
+  <code>soft_random</code> and <code>linear</code> use <code>split</code>.
+  Normalization for the four direction algorithms above is supported in both
+  tiers. The default
+  <code>steer_graph_mode="auto"</code> evaluates an engine-default spec's actual payloads;
+  with a names-only declaration, conditional algorithms select <code>split</code>.
+  Resolution and admission share the same capability rules, and the engine logs
+  its selection reason. Eager execution uses
+  the same specs without graph capture. See the
+  <a href="https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/features/steer_vectors.md#graph-tiers">engine guide</a>
+  for explicit graph settings.</li>
 </ul>
+<p>The algorithm selects its model component: <code>moe_router</code> edits <code>router_logits</code>
+at an accessible MoE gate; the other algorithms edit decoder <code>hidden_states</code>.
+Steering and capture share layer discovery and hook availability, including
+checks for fused routers whose gate modules are bypassed.</p>
 <h2 id="migrating-from-v1">Migrating from v1<a class="headerlink" href="#migrating-from-v1" title="Permanent link">&para;</a></h2>
 <p>The v1 surface (trigger fields, <code>steer_vector_request</code>, <code>--steer-vector-path</code> flags, the
 <code>-1</code> token sentinel, <code>"path|algo"</code> sources) has been <strong>deleted</strong>. Key semantic changes:</p>
@@ -1664,11 +1758,18 @@ with no GGUF round-trip.</p>
 <li>Exclusions always subtract; nothing bypasses them.</li>
 <li><code>generation_window=(0, k)</code> steers exactly <code>k</code> decode steps (the v1 <code>first_k</code>
   off-by-one is gone).</li>
-<li>Phase selection (<code>phases</code>) replaces the <code>-1</code> sentinel.</li>
-<li><code>normalize</code> defaults to <code>False</code> everywhere, including server-level steering.</li>
+<li><code>prompt="all"</code> / <code>generation="all"</code> replace the <code>-1</code> token sentinel. There is
+  no <code>phases</code> field; narrower selectors imply their own phase.</li>
+<li><code>normalize</code> defaults to <code>False</code> everywhere, including default configurations.</li>
+<li><code>generation_window</code> is an include selector like any other: it <strong>unions</strong> with
+  the token/position selectors instead of constraining decode tokens, and a
+  cross-phase clause with only a <code>generation_window</code> no longer covers the
+  prompt — select prompt tokens explicitly (e.g. <code>prompt_window=(0, None)</code>).</li>
+<li>Every selector is phase-scoped and named for it: token-id filters split into
+  <code>prompt_tokens</code> / <code>generation_tokens</code>, and <code>prompt_positions</code> (formerly
+  <code>positions</code>) selects prompt tokens only — decode steps are always addressed
+  through <code>generation_positions</code> / <code>generation_window</code>.</li>
 </ul>
-<!-- TODO: per-algorithm pages (file formats, payload shapes) — currently only the
-README's "Adding a New Algorithm" snippet covers this. -->
 
 
 

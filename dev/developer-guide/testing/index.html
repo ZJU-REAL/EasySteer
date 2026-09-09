@@ -987,17 +987,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#running" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1009,10 +998,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#determinism-notes" class="md-nav__link">
+  <a href="#recording-and-comparing-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Determinism notes
+        Recording and comparing results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparing-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coverage-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage limits
       
     </span>
   </a>
@@ -1254,17 +1265,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#running" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1276,10 +1276,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#determinism-notes" class="md-nav__link">
+  <a href="#recording-and-comparing-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Determinism notes
+        Recording and comparing results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparing-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coverage-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage limits
       
     </span>
   </a>
@@ -1313,70 +1335,94 @@
 
 <h1 id="test-suite">Test suite<a class="headerlink" href="#test-suite" title="Permanent link">&para;</a></h1>
 <p>Validation tests live in <a href="https://github.com/ZJU-REAL/EasySteer/tree/main/tests"><code>tests/</code></a>
-and exercise the vLLM fork through the v2 steering API. See <code>tests/README.md</code> for the
-authoritative version of this page.</p>
-<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Path</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>tests/conftest.py</code></td>
-<td>GPU/trace environment setup; a GPU module declares <code>ENGINE_KWARGS</code> at module level and every test in it shares that one engine (<code>llm</code> / <code>trace</code> fixtures).</td>
-</tr>
-<tr>
-<td><code>tests/helpers.py</code></td>
-<td>Model/vector path constants (env-overridable), the <code>steering_spec()</code> builder, and the <code>TraceOracle</code> (exact steered positions from the steering trace).</td>
-</tr>
-<tr>
-<td><code>tests/cpu/</code></td>
-<td>No GPU: spec validation/translation/fingerprints and the position collector (<code>test_api_spec.py</code>), algorithm loaders (<code>test_loaders.py</code>), vector-store versioning (<code>test_store.py</code>).</td>
-</tr>
-<tr>
-<td><code>tests/e2e/</code></td>
-<td>Dense-model engine suites, one engine config per module: apply-clause semantics under chunked prefill, slot routing + scale sweep, prefix caching, engine-default steering, golden sentiment, require-preload, piecewise and full-graph compilation, capture.</td>
-</tr>
-<tr>
-<td><code>tests/moe/</code></td>
-<td>OLMoE/Qwen3-MoE suites: router-logit steering modes and slot routing, compiled MoE, SteerMoE replication, second-architecture smoke.</td>
-</tr>
-<tr>
-<td><code>tests/run_suites.sh</code></td>
-<td>Runs each GPU module in its own pytest process (vLLM engines do not reliably release GPU state in-process).</td>
-</tr>
-<tr>
-<td><code>tests/verify_steering_correctness.py</code></td>
-<td>Model/hardware sanity harness (argparse tool, not pytest).</td>
-</tr>
-<tr>
-<td><code>tests/bench_eager_vs_cudagraphs.py</code></td>
-<td>Decode throughput benchmark.</td>
-</tr>
-</tbody>
-</table>
+and exercise the vLLM fork through <code>SteeringSpec</code>, <code>VectorSpec</code> and <code>ApplySpec</code>.
+The <a href="https://github.com/ZJU-REAL/EasySteer/blob/main/tests/README.md">test guide</a>
+lists every group, environment variable and the exact compact baseline selection.</p>
 <h2 id="running">Running<a class="headerlink" href="#running" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>cpu<span class="w">     </span><span class="c1"># no-GPU suites</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>dense<span class="w">   </span><span class="c1"># dense e2e suites</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>moe<span class="w">     </span><span class="c1"># MoE suites</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">2</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>all
+<p>Use an environment with this checkout's fork, EasySteer dependencies and
+<code>pytest</code> installed. The runner does not install dependencies or select model IDs.
+Run from the repository root:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">STEER_TEST_PYTHON</span><span class="o">=</span>/path/to/environment/bin/python
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>./tests/run_suites.sh<span class="w"> </span>cpu
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">STEER_TEST_MODEL</span><span class="o">=</span>/path/to/Qwen2.5-1.5B-Instruct
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">0</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>baseline
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nv">GPU_ID</span><span class="o">=</span><span class="m">0</span><span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>dense
 </code></pre></div>
-<p>Key environment variables (defaults in <code>tests/README.md</code>): <code>GPU_ID</code>,
-<code>STEER_TEST_MODEL</code>, <code>STEER_TEST_VECTOR</code>, <code>STEER_TEST_MOE_MODEL</code>, <code>STEER_TEST_QWEN3</code>,
-<code>STEER_TEST_EAGER</code>, <code>STEER_TEST_TP</code>, <code>STEERMOE_PKL</code>.</p>
-<h2 id="determinism-notes">Determinism notes<a class="headerlink" href="#determinism-notes" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Byte-exact cross-run comparisons need identical batch geometry: <code>ignore_eos=True</code> and
-  <code>async_scheduling=False</code>. Batched-vs-sequential equality is never asserted (vLLM
-  batch-shape numerics).</li>
-<li>Stored goldens are GPU-model-specific; mechanism-level checks (captured logits,
-  steering trace, <code>num_cached_tokens</code>) are hardware-robust.</li>
-<li>Compiled-vs-eager outputs differ by kernel numerics; compiled tests compare behavior
-  via the steering trace, not bytes.</li>
-</ul>
+<p><code>kernels</code> runs fixed-input GPU graph-kernel tests without a model checkpoint.
+<code>baseline</code> includes these, CPU tests and seven model-based GPU selections covering unsteered
+parity, nonzero steering and request isolation, exact token positions, prefix
+caching, split and in-graph modes, and hidden-state capture on a compiled engine.
+Different engine configurations run in separate processes. Identical named
+profiles can share one engine: the two OLMoE eager modules use this path.
+It excludes the full scale sweep, recorded text, MoE models and additional HTTP
+suites. Use <code>dense</code> for broader dense-model coverage, including serving.</p>
+<p><code>moe</code> requires <code>STEER_TEST_MOE_MODEL</code> (OLMoE-1B-7B-0125-Instruct) and
+<code>STEER_TEST_QWEN3</code> (Qwen3-30B-A3B); <code>moe-core</code> only requires the OLMoE model.
+<code>all</code> combines CPU, kernels, dense and MoE groups. The dense sweep uses four representative
+scales; <code>extended</code> runs the full 51-scale sweep separately.
+Prefer complete local model directories. Explicit Hugging Face IDs may download
+missing files. Dense tests assume Qwen2.5-1.5B's architecture and the bundled
+<code>vectors/happy_diffmean.gguf</code>; an arbitrary model cannot replace it without
+adapting the test workload and vector.</p>
+<p>The HTTP suite can reuse an existing service with <code>STEER_TEST_SERVER_URL</code>
+(the base URL without <code>/v1</code>) and optional <code>STEER_TEST_SERVED_MODEL</code>. It checks
+health and leaves the service running. The test service should declare only
+<code>direct</code> and have no default steering; see the test guide for the command.</p>
+<h2 id="recording-and-comparing-results">Recording and comparing results<a class="headerlink" href="#recording-and-comparing-results" title="Permanent link">&para;</a></h2>
+<p>Set <code>STEER_TEST_RESULTS_DIR</code> to a fresh directory for per-suite logs, JUnit XML
+and <code>summary.tsv</code>. Startup and process timing JSON files separate engine boot
+from total runtime; pytest reports setup, call and teardown durations. HTTP
+startup logs are retained alongside the results. Distinguish cold compilation
+from runs using populated caches when comparing times.</p>
+<p>The runner continues after failures and returns nonzero if any suite fails.
+Each group runs in its own process group; remaining child workers receive a
+bounded shutdown before the next group starts. <code>STEER_TEST_GPU_PAUSE</code> adds an
+optional pause after cleanup (default 0 seconds). Trace is enabled before engine
+startup only for selected trace-based tests, unless explicitly requested through
+<code>VLLM_STEER_TRACE_DIR</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">STEER_TEST_RESULTS_DIR</span><span class="o">=</span>.local/test-results/before<span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>baseline
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">STEER_TEST_RESULTS_DIR</span><span class="o">=</span>.local/test-results/after<span class="w"> </span>./tests/run_suites.sh<span class="w"> </span>baseline
+</code></pre></div>
+<p>Record source revisions/local changes, model revision, vector checksum,
+Python/PyTorch/vLLM versions, CUDA runtime, GPU/driver, engine configuration and
+sampling parameters. Keep run logs, server paths and development records in
+ignored local storage. Public documentation describes reproducible methods and
+limitations; it does not include machine-specific acceptance logs.</p>
+<h2 id="comparing-results">Comparing results<a class="headerlink" href="#comparing-results" title="Permanent link">&para;</a></h2>
+<p>Use matching batch and generation settings when comparing runs. Temperature 0
+reduces sampling variation; small wording differences are normal. See the
+<a href="https://github.com/ZJU-REAL/EasySteer/blob/main/tests/README.md">test guide</a>
+for control comparisons and result recording.</p>
+<p>The <code>golden</code> group is opt-in and excluded from <code>baseline</code>, <code>dense</code> and <code>all</code>.
+It requires <code>STEER_TEST_GOLDEN</code>, a recorded JSON completion with matching
+GPU/software/workload metadata. A metadata mismatch fails before constructing
+an engine. See the test guide for the record contract.</p>
+<p><code>tests/verify_steering_correctness.py</code> collects diagnostic observations with
+separate engine processes. It reports logprob differences along shared token
+prefixes.
+<code>tests/bench_eager_vs_cudagraphs.py</code> compares identical HTTP workloads in eager
+and in-graph modes. Default, explicit and disabled steering resolve to the same
+per-request execution path.
+Its throughput includes prefill and HTTP overhead; rerun it to obtain results
+for your environment instead of treating historical measurements as current.
+Use <code>--concurrency 1 8</code> to compare serial and concurrent requests on each engine.
+Per-request mode measures unsteered, zero-scale and nonzero workloads separately;
+engine-default mode measures its configured steering workload. Warmup uses the
+same concurrency as the measured requests, startup time is reported separately,
+and tracing is disabled for the benchmark.</p>
+<h2 id="coverage-limits">Coverage limits<a class="headerlink" href="#coverage-limits" title="Permanent link">&para;</a></h2>
+<p>The baseline does not validate steering state across KV-transfer rejection,
+speculative-decoding generation selectors or preemption recovery. The KV
+reconstruction path may omit steering state; speculative decode-step indexing
+and resumed-prefill prompt/generation boundaries need dedicated validation.
+A baseline pass also does not certify every MoE model, parallelism setting,
+conditional graph payload or a performance improvement.</p>
+<p>Capture uses <code>vllm.capture</code>. Eligible single-worker FULL batches use a separate
+capture graph; other steps needing rows dispatch eagerly, while empty selections
+keep normal execution. <code>capture_status</code> exposes actual graph replay and eager
+forward counters. Admission skips prefix-cache reads only when a hit could omit
+selected prompt rows, preserving normal cache writes. Requests already admitted
+before capture starts fail at fetch if selected rows were skipped.</p>
 
 
 

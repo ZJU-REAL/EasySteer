@@ -1336,16 +1336,16 @@ and CUDA-graph support.</p>
 <a class="md-button" href="https://arxiv.org/abs/2509.25175">Paper (arXiv:2509.25175)</a></p>
 <h2 id="why-easysteer">Why EasySteer<a class="headerlink" href="#why-easysteer" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>High performance</strong> — 10.8–22.3× faster than existing steering frameworks through
-  vLLM integration.</li>
+<li><strong>High performance</strong> — the paper reports 10.8–22.3× speedups over the compared
+  steering frameworks. Rerun benchmarks for the current engine and hardware.</li>
 <li><strong>One spec, every backend</strong> — the same <code>SteeringSpec</code> runs under eager, split, and
   in-graph CUDA-graph execution; declare your algorithms at launch and the engine
   picks the fastest tier that serves them, rejecting anything undeclared explicitly.</li>
 <li><strong>Fine-grained control</strong> — token-level, position-specific, phase-aware
   (prompt vs. generation), and multi-vector steering.</li>
 <li><strong>Modular algorithms</strong> — direct addition, linear maps, LoReFT, LM-Steer,
-  projection-based erase/replace, MoE router steering; new algorithms plug in with two
-  methods.</li>
+  projection-based erase, replacement, and MoE router steering; new algorithms
+  extend <code>BaseSteerVectorAlgorithm</code>.</li>
 <li><strong>Full research loop</strong> — capture hidden states, extract vectors (DiffMean, PCA, LAT,
   linear probe, SAE), train interventions (ReFT), and serve them, all in one repo.</li>
 </ul>
@@ -1390,19 +1390,20 @@ and CUDA-graph support.</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Declare the steering algorithms this engine will serve; the engine</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># derives the right CUDA-graph integration from the declaration.</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;Qwen/Qwen2.5-1.5B-Instruct&quot;</span><span class="p">,</span> <span class="n">enable_steer_vector</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>          <span class="n">steer_algorithms</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">])</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span> <span class="n">enable_steer_vector</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>          <span class="n">steer_algorithms</span><span class="o">=</span><span class="p">[</span><span class="s2">"direct"</span><span class="p">])</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;vectors/happy_diffmean.gguf&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">layers</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">26</span><span class="p">)),</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">phases</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;prompt&quot;</span><span class="p">,</span> <span class="s2">&quot;generation&quot;</span><span class="p">]),</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)])</span>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">out</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="s2">&quot;Comfort Alice about her dog.&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                   <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                   <span class="n">sampling_params</span><span class="o">=</span><span class="n">SamplingParams</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">))</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">prompt</span> <span class="o">=</span> <span class="s2">"&lt;|im_start|&gt;user</span><span class="se">\n</span><span class="s2">Alice's dog has passed away. Please comfort her.&lt;|im_end|&gt;</span><span class="se">\n</span><span class="s2">&lt;|im_start|&gt;assistant</span><span class="se">\n</span><span class="s2">"</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">out</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                   <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                   <span class="n">sampling_params</span><span class="o">=</span><span class="n">SamplingParams</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">))</span>
 </code></pre></div>
 <p>See the <a href="getting-started/quickstart/">Quickstart</a> for the full example, and the
 <a href="user-guide/steering/">Steering guide</a> for the complete spec language.</p>
