@@ -1,10 +1,6 @@
 name: star-history
 
-# GitHub's stargazers API now requires an authorized token, which broke
-# third-party chart embeds (star-history.com). We render the classic chart
-# ourselves with the vendored star-history renderer (.github/actions/star-history,
-# see its PROVENANCE) and serve it from the gh-pages site; the README embeds
-# https://zju-real.github.io/EasySteer/star-history-{light,dark}.svg.
+# Render charts with the repository token and publish stable README images.
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -18,20 +14,22 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: star-history
+  cancel-in-progress: false
+
 jobs:
   chart:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: gh-pages
 
-      # Renders into the gh-pages checkout so the .star-history.sig change
-      # marker persists between runs. The vendored action never commits or
-      # touches the README; publishing stays in our own step below.
+      # Keep the data signature alongside the charts to detect unchanged runs.
       - name: Render star history charts
         uses: ./.github/actions/star-history
         with:
@@ -42,8 +40,8 @@ jobs:
       - name: Publish to gh-pages
         run: |
           cd gh-pages
-          rm -f star-history.svg  # legacy pre-vendored chart
-          git add -A -- star-history.svg star-history-light.svg \
+          git rm --ignore-unmatch -- star-history.svg
+          git add -- star-history-light.svg \
             star-history-dark.svg star-history.png .star-history.sig
           if git diff --cached --quiet; then
             echo "chart unchanged; nothing to publish"
@@ -52,4 +50,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Update star history chart"
-          git push origin gh-pages
+          # Documentation deployments also publish to this branch.
+          git pull --rebase origin gh-pages
+          git push origin HEAD:gh-pages
