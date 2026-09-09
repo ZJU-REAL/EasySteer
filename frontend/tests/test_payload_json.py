@@ -15,7 +15,7 @@ def test_json_payload_round_trip(payload_modules, kind):
         "direction": lambda: payloads.DirectionVector({8: [1.0, -2.0]}),
         "linear": lambda: payloads.LinearMap([[1, 0], [0, 1]], [0.5, -0.5]),
         "lowrank": lambda: payloads.LowRankProjector([[1], [2]], [[3], [4]]),
-        "reft": lambda: payloads.ReftIntervention([[1, 0]], [[0, 1]], [0.5], layer=22),
+        "reft": lambda: payloads.ReftIntervention([[1], [0]], [[0, 1]], [0.5], layer=22),
         "concept_pair": lambda: payloads.ConceptPair({8: [1, 2]}, {8: [3, 4]}),
         "router": lambda: payloads.RouterConfig({8: {"mode": "soft", "expert_ids": [1], "lambda": 0.7}}),
     }[kind]()

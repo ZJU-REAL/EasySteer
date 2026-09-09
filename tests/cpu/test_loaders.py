@@ -14,10 +14,6 @@ import pytest
 from vllm.model_hooks.steering.payloads import validate_router_mode
 import torch
 
-from vllm.model_hooks.steering.algorithms import (
-    DirectAlgorithm,
-)
-
 from vllm.model_hooks.steering.loading import resolve_vector_payload
 from vllm.model_hooks.steering.payloads import materialize
 
@@ -432,11 +428,6 @@ class TestMoeRouterJson:
     def test_invalid_configs_rejected(self, tmp_path, name, layer_configs):
         with pytest.raises(ValueError):
             load_source(self.write_moe(tmp_path, name, layer_configs), "moe_router")
-
-
-def test_algorithm_exposes_clause():
-    algo = DirectAlgorithm()
-    assert hasattr(algo, "clause") and not hasattr(algo, "params")
 
 
 @pytest.mark.parametrize("params", [[], "mode=activate", 0])

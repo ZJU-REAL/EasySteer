@@ -62,7 +62,7 @@ environment. The default model is `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`;
 set `EASYSTEER_MODEL` to an existing local copy of that model if desired.
 `EASYSTEER_VECTOR` overrides the SEAL GGUF path, and `EASYSTEER_BENCH_DATA`
 overrides the JSON list of MATH prompts. The tables above are historical
-v0.26.0 measurements; rerun the commands to obtain results for v0.28.0.
+v0.26.0 measurements; rerun the commands to obtain results for v0.29.0.
 
 Current throughput commands use greedy decoding and fixed generation lengths
 (`ignore_eos` in vLLM, matching `min_new_tokens`/`max_new_tokens` in Transformers),

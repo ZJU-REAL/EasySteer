@@ -54,7 +54,7 @@ def main():
 
     def generate(scale=None):
         steering = (
-            None
+            False
             if scale is None
             else SteeringSpec(
                 vectors=[

@@ -66,7 +66,7 @@ before sending a request.
 CPU checks (run from the repository root):
 
 ```bash
-python -m pip install -r hf-space/requirements.txt pytest
+python -m pip install -r hf-space/requirements.txt pytest pybase64
 python -m pytest hf-space/tests -q
 ```
 

@@ -13,39 +13,26 @@ for proxy_name in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_prox
     fi
 done
 
-# Use a separate Dockerfile so a failed/interrupted build cannot modify
-# the submodule checkout. The source uses native artifacts from vLLM v0.28.0.
-build_dockerfile=$(mktemp "${TMPDIR:-/tmp}/easysteer-dockerfile.XXXXXX")
-trap 'rm -f "$build_dockerfile"' EXIT
-awk '
-    /^ENV SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0\+csrc.build"$/ {
-        print "ENV SETUPTOOLS_SCM_PRETEND_VERSION=\"0.28.0+easysteer\""
-        version_count++
-        next
-    }
-    { print }
-    /^FROM base AS build$/ {
-        print "ENV SETUPTOOLS_SCM_PRETEND_VERSION=\"0.28.0+easysteer\""
-        build_count++
-    }
-    END { if (version_count != 1 || build_count != 1) exit 1 }
-' vllm-steer/docker/Dockerfile > "$build_dockerfile"
+# The default official image uses CUDA 13.0. Select CUDA 12.9 with
+# VLLM_BASE_IMAGE=vllm/vllm-openai:v0.29.0-cu129 bash docker/build.sh.
+base_args=()
+if [[ -n "${VLLM_BASE_IMAGE:-}" ]]; then
+    base_args+=(--build-arg "VLLM_BASE_IMAGE=$VLLM_BASE_IMAGE")
+fi
+vllm_image=${VLLM_STEER_IMAGE:-vllm-steer:base}
+easysteer_image=${EASYSTEER_IMAGE:-easysteer:latest}
 
-echo "Step 1/2: Building vllm-steer base image (v0.28.0 native artifacts)..."
+echo "Step 1/2: Installing vllm-steer with v0.29.0 native artifacts..."
 docker build \
     "${proxy_args[@]}" \
-    --build-arg PYTHON_VERSION=3.12 \
-    --build-arg VLLM_USE_PRECOMPILED=1 \
-    --build-arg VLLM_MERGE_BASE_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a \
-    --build-arg GIT_REPO_CHECK=0 \
-    --target vllm-openai \
-    -t vllm-steer:base \
-    -f "$build_dockerfile" \
-    vllm-steer
+    "${base_args[@]}" \
+    --target vllm-steer \
+    -t "$vllm_image" \
+    -f docker/Dockerfile .
 
 echo "Step 2/2: Building EasySteer image..."
-docker build "${proxy_args[@]}" -t easysteer:latest -f docker/Dockerfile .
+docker build "${proxy_args[@]}" "${base_args[@]}" \
+    --target easysteer -t "$easysteer_image" -f docker/Dockerfile .
 
-echo "Built vllm-steer:base and easysteer:latest."
-echo "Run: docker compose -f docker/docker-compose.yml up -d"
-echo "Or:  docker run --gpus all -it easysteer:latest"
+echo "Built $vllm_image and $easysteer_image."
+echo "Run: docker run --gpus all -it $easysteer_image"

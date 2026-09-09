@@ -22,6 +22,7 @@
 <a id="news"></a>
 ## 新闻 🔥
 
+- [2026/09/09] 升级至 vLLM v0.29.0，适配默认 V2 模型运行器，并更新干预、捕获和 Docker 集成。
 - [2026/08/22] [EasySteer 论文](https://arxiv.org/abs/2509.25175)被 EMNLP 2026 System Demonstrations 接收 🎉
 - [2026/08/03] 迁移至 vLLM v0.26.0（V2 模型运行器）：v2 干预 API、重新设计的隐状态捕获（选择子句、行标签、按请求捕获），并上线了[文档站](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
@@ -42,7 +43,7 @@
 
 ## 关于 EasySteer
 
-EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。当前版本基于 vLLM v0.28.0（V2 模型运行器），提供连续批处理、兼容前缀缓存的干预、CUDA 图支持、声明式 v2 干预 API（`SteeringSpec`/`ApplySpec`），以及重新设计的隐状态捕获管线（源侧选择、行标签、按请求捕获）。
+EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。当前版本基于 vLLM v0.29.0（V2 模型运行器），提供连续批处理、兼容前缀缓存的干预、CUDA 图支持、声明式 v2 干预 API（`SteeringSpec`/`ApplySpec`），以及重新设计的隐状态捕获管线（源侧选择、行标签、按请求捕获）。
 
 - **高性能**: 论文实验中，通过对接 vLLM，相比所比较的干预框架实现 10.8-22.3× 的速度提升
 - **模块化设计**: 插拔式接口，便于在不改动核心代码的情况下扩展自定义算法
@@ -76,7 +77,7 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer
 
 # 官方 vLLM wheel，然后覆盖固定版本分支的 Python 文件
-pip install vllm==0.28.0
+pip install vllm==0.29.0
 VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
 rsync -a vllm-steer/vllm/ "$VLLM_DIR"/
 
@@ -101,8 +102,8 @@ git submodule update --init --recursive
 cd vllm-steer
 
 # 使用预编译版本安装（推荐）
-# EasySteer 适配的是 vLLM v0.28.0 发布时的 commit，请指定该 commit 以匹配预编译内核。
-export VLLM_PRECOMPILED_WHEEL_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a
+# EasySteer 适配的是 vLLM v0.29.0 发布时的 commit，请指定该 commit 以匹配预编译内核。
+export VLLM_PRECOMPILED_WHEEL_COMMIT=98dff2a81d747d1dba01a47f939f48c3526d4206
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # 安装 EasySteer

@@ -6,10 +6,10 @@ without enabling steering.
 
 ## Engine requirements
 
-Capture requires the V2 model runner; V1 is not supported. In vLLM 0.28,
-ordinary dense models use V2 by default, including the Qwen model below.
-For architectures that do not select V2 by default, set
-`VLLM_USE_V2_MODEL_RUNNER=1` before importing vLLM.
+Capture requires the V2 GPU model runner, which vLLM 0.29 selects by default.
+Models or features that fall back to V1, and standalone multimodal encoder
+runners, cannot use capture. Steering and capture currently require token-ID
+prompts; prompt embeddings are not supported.
 
 ```python
 from vllm import LLM

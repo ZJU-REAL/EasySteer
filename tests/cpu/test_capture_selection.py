@@ -361,6 +361,36 @@ def test_late_capture_ignores_completed_requests_awaiting_worker_cleanup():
     assert not session._streams["hidden_states"].elided_reqs
 
 
+def test_late_capture_rejects_only_scheduled_prompt_embedding_requests():
+    session = CaptureSession()
+    session._attached = True
+    session._hooked_layers["hidden_states"] = {0}
+    session.add_request("embed-01234567", {}, capture_supported=False)
+    assert not session.any_enabled()
+    session.enable_stream("hidden_states", budget_rows=20)
+    # Starting capture cannot infer active requests from worker history.
+    assert session.fetch_stream("hidden_states", clear=False) == {}
+    session.prepare_batch(make_geometry())
+    assert session.fetch_stream("hidden_states", clear=False) == {}
+
+    geometry = make_geometry(
+        offsets=(0, 1), computed=(3,), prompt=(4,), output=(0,),
+        req_ids=("embed-01234567",), token_ids=(0,),
+    )
+    assert not session.needs_capture_for_batch(
+        geometry.req_ids, [3], [1], [4], [True]
+    )
+    # Even an ordinary graph dispatch must record the capture failure.
+    session.prepare_batch(geometry)
+    with pytest.raises(RuntimeError, match="prompt embeddings"):
+        session.fetch_stream("hidden_states", req_ids=["embed"])
+    assert session.fetch_stream("hidden_states", req_ids=["a"]) == {}
+    session.finish_requests({"embed-01234567"})
+    assert not session._unsupported_requests
+    session.enable_stream("hidden_states", budget_rows=20)
+    assert session.fetch_stream("hidden_states") == {}
+
+
 @pytest.mark.parametrize(
     "select, before_tokenization, after_tokenization",
     [
@@ -779,6 +809,18 @@ def test_worker_capture_rpc_rejects_v1_before_calling_runner(method):
     with pytest.raises(RuntimeError, match="Capture requires the V2 model runner"):
         getattr(worker, method)("hidden_states")
     assert not worker.model_runner.mock_calls
+
+
+def test_worker_capture_rpc_rejects_separate_multimodal_encoder_runner():
+    from vllm.v1.worker.gpu_worker import Worker
+    from vllm.v1.worker.mm_encoder_model_runner import MMEncoderModelRunner
+
+    worker = Worker.__new__(Worker)
+    worker.use_v2_model_runner = True
+    worker.vllm_config = SimpleNamespace(is_mm_encoder_only=True)
+    worker.model_runner = MMEncoderModelRunner.__new__(MMEncoderModelRunner)
+    with pytest.raises(RuntimeError, match="multimodal encoder-only"):
+        worker.start_capture("hidden_states")
 
 
 def test_full_budget_remembers_processed_requests_until_completion(context):

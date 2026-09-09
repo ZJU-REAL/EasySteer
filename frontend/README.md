@@ -40,9 +40,9 @@ may require a reverse proxy or server CORS configuration. Extraction and
 training model paths are resolved by the job backend; inference vector paths
 are resolved by vllm-steer. Use matching model weights and compatible vectors.
 
-Extraction requires the V2 model runner: the Qwen2.5 presets use it by default;
-for models that default to V1, set `VLLM_USE_V2_MODEL_RUNNER=1` before starting
-the job backend. See the [capture guide](../docs/user-guide/hidden-state-capture.md).
+Extraction requires the V2 model runner, which vLLM 0.29.0 uses by default.
+V1 fallback paths and standalone multimodal encoder workers do not support
+capture. See the [capture guide](../docs/user-guide/hidden-state-capture.md).
 
 ## Development
 

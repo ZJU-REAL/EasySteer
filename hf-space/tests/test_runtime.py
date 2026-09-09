@@ -4,8 +4,8 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
+import httpx
 import pytest
 
 SPACE = Path(__file__).resolve().parents[1]
@@ -25,7 +25,12 @@ exporter = load_module("space_exporter", SPACE / "export_payload.py")
 def test_default_api_mode_requires_configuration():
     with pytest.raises(ValueError, match="VLLM_API_URL, VLLM_MODEL_NAME"):
         runtime.demo_mode({})
-    assert runtime.demo_mode({"VLLM_API_URL": "http://server/v1", "VLLM_MODEL_NAME": "model"}) == "api"
+    assert (
+        runtime.demo_mode(
+            {"VLLM_API_URL": "http://server/v1", "VLLM_MODEL_NAME": "model"}
+        )
+        == "api"
+    )
     assert runtime.demo_mode({"DEMO_MODE": "gpu"}) == "gpu"
     for invalid in ("typo", "auto"):
         with pytest.raises(ValueError, match="DEMO_MODE"):
@@ -34,7 +39,9 @@ def test_default_api_mode_requires_configuration():
 
 def test_export_reports_lfs_pointer_before_importing_engine(tmp_path):
     checkpoint = tmp_path / "checkpoint.bin"
-    checkpoint.write_text("version https://git-lfs.github.com/spec/v1\noid sha256:abc\n")
+    checkpoint.write_text(
+        "version https://git-lfs.github.com/spec/v1\noid sha256:abc\n"
+    )
     with pytest.raises(ValueError, match="Git LFS pointer"):
         exporter.export_payload(checkpoint, "loreft", tmp_path / "payload.json")
 
@@ -56,9 +63,13 @@ def test_api_ui_and_bundled_payload(monkeypatch):
     before = set(sys.modules)
     app = load_module("space_api_app", SPACE / "app.py")
     assert not {"torch", "vllm", "easysteer"} & (set(sys.modules) - before)
-    direct = app.build_single_spec_wire(app.SINGLE_CONFIGS["emotion_direct"], app._vector_source)
+    direct = app.build_single_spec_wire(
+        app.SINGLE_CONFIGS["emotion_direct"], app._vector_source
+    )
     assert direct["vectors"][0]["source"].startswith("/remote/hf-space/")
-    reft = app.build_single_spec_wire(app.SINGLE_CONFIGS["emoji_loreft"], app._vector_source)
+    reft = app.build_single_spec_wire(
+        app.SINGLE_CONFIGS["emoji_loreft"], app._vector_source
+    )
     vector = reft["vectors"][0]
     assert vector["data"]["kind"] == "reft"
     assert vector["data"]["extra"]["layer"] == 22
@@ -66,12 +77,58 @@ def test_api_ui_and_bundled_payload(monkeypatch):
     assert vector["apply"] == {"prompt_positions": [-1]}
     requests = []
 
-    def create(**kwargs):
-        requests.append(kwargs)
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="mock reply"))])
+    def respond(request):
+        assert request.url.path == "/v1/chat/completions"
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "id": "test-completion",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "qwen-demo",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {"role": "assistant", "content": "mock reply"},
+                    }
+                ],
+            },
+        )
 
-    monkeypatch.setattr(app._api_client.chat.completions, "create", create)
-    assert app.generate_single("emoji_loreft", "Who are you?", 1.0, progress=lambda *args, **kwargs: None) == ("mock reply", "mock reply")
-    assert len(requests) == 2
-    assert requests[0]["extra_body"]["steering"] is False
-    assert requests[1]["extra_body"]["steering"] == reft
+    with app.OpenAI(
+        base_url="http://127.0.0.1:1/v1",
+        api_key="test",
+        http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+    ) as client:
+        monkeypatch.setattr(app, "_api_client", client)
+        assert app.generate_single(
+            "emoji_loreft", "Who are you?", 1.0, progress=lambda *args, **kwargs: None
+        ) == ("mock reply", "mock reply")
+        assert len(requests) == 2
+        assert requests[0]["steering"] is False
+        assert requests[1]["steering"] == reft
+
+        requests.clear()
+        multi = app.build_multi_spec_wire(
+            app.MULTI_CONFIGS["refusal_direction"], app._vector_source
+        )
+        assert app.generate_multi(
+            "refusal_direction", "Who are you?", progress=lambda *args, **kwargs: None
+        ) == ("mock reply", "mock reply")
+        assert len(requests) == 2
+        assert requests[0]["steering"] is False
+        assert requests[1]["steering"] == multi
+        assert multi["conflict"] == "sequential"
+        assert len(multi["vectors"]) == 4
+        assert [vector["apply"]["prompt_positions"] for vector in multi["vectors"]] == [
+            [-1],
+            [-2],
+            [-3],
+            [-4],
+        ]
+        assert all(
+            vector["source"].startswith("/remote/hf-space/")
+            for vector in multi["vectors"]
+        )

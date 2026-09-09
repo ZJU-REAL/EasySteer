@@ -11,16 +11,17 @@ EasySteer ships as two packages installed from one repository: the vLLM fork
 
 ## Validated inference environment
 
-The vLLM 0.28.0 steering and capture regression suites have been exercised with
+The vLLM 0.29.0 steering and capture regression suites have been exercised with
 this combination on Linux x86_64:
 
 | Component | Version / hardware |
 |---|---|
 | Python | 3.12.13 |
-| vLLM | 0.28.0, with this repository's steering fork |
+| vLLM | 0.29.0, with this repository's steering fork |
 | PyTorch | 2.13.0+cu130 |
 | Transformers | 5.16.1 |
 | CUDA runtime | 13.0.96 |
+| NVIDIA driver | 580.173.02 |
 | GPU | NVIDIA RTX PRO 6000 Blackwell Server Edition |
 
 This records an exercised inference combination, not a complete compatibility
@@ -29,7 +30,7 @@ when installing; other hardware and package combinations need their own checks.
 
 ## Route 1: quick install (prebuilt wheel + fork overlay)
 
-The fork's changes against upstream vLLM v0.28.0 are pure Python, so you can
+The fork's changes against upstream vLLM v0.29.0 are pure Python, so you can
 install the official wheel and overlay the fork's files onto it — no build,
 no editable checkouts:
 
@@ -42,7 +43,7 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer
 
 # Official vLLM wheel (kernels prebuilt)
-pip install vllm==0.28.0
+pip install vllm==0.29.0
 
 # Overlay the pinned fork's Python files onto the installed package
 VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
@@ -70,9 +71,9 @@ cd EasySteer
 git submodule update --init --recursive
 cd vllm-steer
 
-# EasySteer tracks the vLLM v0.28.0 release commit; pin it so the
+# EasySteer tracks the vLLM v0.29.0 release commit; pin it so the
 # precompiled kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a
+export VLLM_PRECOMPILED_WHEEL_COMMIT=98dff2a81d747d1dba01a47f939f48c3526d4206
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 cd ..
@@ -98,7 +99,7 @@ export VLLM_TARGET_DEVICE="cuda"
 export MAX_JOBS=$(nproc)
 export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
 
-pip install -r requirements/build.txt
+pip install -r requirements/build/cuda.txt
 pip install -e . --no-build-isolation -v
 
 cd ..
@@ -120,8 +121,21 @@ docker run --gpus all -it \
 ```
 
 Here `latest` is the image built locally by the script. The historical published
-`v0.17.1` image uses an older engine and v1-era APIs; it is not the v0.28.0 build
+`v0.17.1` image uses an older engine and v1-era APIs; it is not the v0.29.0 build
 described on this page.
+
+The default base image uses CUDA 13.0. For a CUDA 12.9 build, select the
+corresponding official image:
+
+```bash
+VLLM_BASE_IMAGE=vllm/vllm-openai:v0.29.0-cu129 bash docker/build.sh
+```
+
+Check the NVIDIA driver on the machine that will run the container. The
+container supplies its CUDA runtime; it still uses the host's GPU driver.
+CUDA 13.x requires driver R580 or newer. CUDA 12.x builds can support older
+drivers, but JIT/PTX compatibility must also be checked on the target GPU;
+see NVIDIA's [compatibility requirements](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html).
 
 ## CUDA library discovery
 

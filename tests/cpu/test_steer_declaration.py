@@ -208,7 +208,7 @@ def _direct_request():
 
 
 class TestAdmissionErrorTypes:
-    """0.28 AsyncLLM propagates VLLMClientError as a request error (4xx)."""
+    """0.29 AsyncLLM propagates VLLMClientError as a request error (4xx)."""
 
     @pytest.mark.parametrize("problem", ["width", "layer", "partial_vector", "topk"])
     def test_model_errors_rejected_without_worker_admission(self, problem):

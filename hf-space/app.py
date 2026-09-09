@@ -6,11 +6,14 @@ DEMO_MODE=gpu to load the model locally with vLLM.
 """
 
 import json
+import logging
 import os
 from typing import Any, Dict, Tuple
 
 from runtime import ALGORITHM_CAPABILITIES, demo_mode, load_payload
 from steering_config import build_multi_spec_wire, build_single_spec_wire
+
+logger = logging.getLogger(__name__)
 
 # Validate configuration before importing UI or local GPU dependencies.
 _demo_mode = demo_mode()
@@ -176,29 +179,21 @@ def _api_generate(prompt: str, config, spec_wire) -> str:
     return response.choices[0].message.content
 
 
-def generate_single(
-    config_name: str, prompt: str, scale: float, progress=gr.Progress()
+def _generate_comparison(
+    config_name: str, prompt: str, progress, *, scale=None, multi_vector=False
 ) -> Tuple[str, str]:
-    """Generate text using single steering vector."""
+    """Compare baseline and steered output with one preset and sampling config."""
     try:
-        config = SINGLE_CONFIGS[config_name]
-        if config_name in _SCALE_LOCKED_SINGLE:
+        config = (MULTI_CONFIGS if multi_vector else SINGLE_CONFIGS)[config_name]
+        if not multi_vector and config_name in _SCALE_LOCKED_SINGLE:
             scale = float(config["steer_vector"].get("scale", 1.0))
 
         if USE_API:
             progress(0.2, desc="Calling API (baseline)...")
             baseline_text = _api_generate(prompt, config, False)
-
-            progress(0.6, desc="Calling API (steered)...")
-            steered_text = _api_generate(
-                prompt,
-                config,
-                build_single_spec_wire(config, _vector_source, scale_override=scale),
-            )
         else:
             progress(0, desc="Loading model...")
             llm = load_model()
-
             formatted_prompt = format_prompt(prompt)
             sampling_params = SamplingParams(
                 temperature=float(config["sampling"].get("temperature", 0.0)),
@@ -207,81 +202,59 @@ def generate_single(
                     config["sampling"].get("repetition_penalty", 1.1)
                 ),
             )
-
             progress(0.3, desc="Generating baseline...")
             baseline_out = llm.generate(
                 formatted_prompt, steering=False, sampling_params=sampling_params
             )
             baseline_text = baseline_out[0].outputs[0].text
 
-            progress(0.6, desc="Generating steered output...")
+        spec_wire = (
+            build_multi_spec_wire(config, _vector_source)
+            if multi_vector
+            else build_single_spec_wire(config, _vector_source, scale_override=scale)
+        )
+        if USE_API:
+            progress(
+                0.6,
+                desc="Calling API (multi-vector steered)..."
+                if multi_vector
+                else "Calling API (steered)...",
+            )
+            steered_text = _api_generate(prompt, config, spec_wire)
+        else:
+            progress(
+                0.6,
+                desc="Generating multi-vector steered output..."
+                if multi_vector
+                else "Generating steered output...",
+            )
             steered_out = llm.generate(
                 formatted_prompt,
-                steering=_local_spec(
-                    build_single_spec_wire(config, _vector_source, scale_override=scale)
-                ),
+                steering=_local_spec(spec_wire),
                 sampling_params=sampling_params,
             )
             steered_text = steered_out[0].outputs[0].text
 
         progress(1.0, desc="Complete!")
         return baseline_text, steered_text
-    except Exception as e:
-        import traceback
-
-        err = f"❌ Error: {e}\n\n{traceback.format_exc()}"
+    except Exception:
+        logger.exception("Text generation failed")
+        err = "❌ Generation failed. Please try again later."
         return err, err
+
+
+def generate_single(
+    config_name: str, prompt: str, scale: float, progress=gr.Progress()
+) -> Tuple[str, str]:
+    """Generate text using a single steering vector."""
+    return _generate_comparison(config_name, prompt, progress, scale=scale)
 
 
 def generate_multi(
     config_name: str, prompt: str, progress=gr.Progress()
 ) -> Tuple[str, str]:
     """Generate text using multiple steering vectors."""
-    try:
-        config = MULTI_CONFIGS[config_name]
-
-        if USE_API:
-            progress(0.2, desc="Calling API (baseline)...")
-            baseline_text = _api_generate(prompt, config, False)
-
-            progress(0.6, desc="Calling API (multi-vector steered)...")
-            steered_text = _api_generate(
-                prompt, config, build_multi_spec_wire(config, _vector_source)
-            )
-        else:
-            progress(0, desc="Loading model...")
-            llm = load_model()
-
-            formatted_prompt = format_prompt(prompt)
-            sampling_params = SamplingParams(
-                temperature=float(config["sampling"].get("temperature", 0.0)),
-                max_tokens=int(config["sampling"].get("max_tokens", 128)),
-                repetition_penalty=float(
-                    config["sampling"].get("repetition_penalty", 1.1)
-                ),
-            )
-
-            progress(0.3, desc="Generating baseline...")
-            baseline_out = llm.generate(
-                formatted_prompt, steering=False, sampling_params=sampling_params
-            )
-            baseline_text = baseline_out[0].outputs[0].text
-
-            progress(0.6, desc="Generating multi-vector steered output...")
-            steered_out = llm.generate(
-                formatted_prompt,
-                steering=_local_spec(build_multi_spec_wire(config, _vector_source)),
-                sampling_params=sampling_params,
-            )
-            steered_text = steered_out[0].outputs[0].text
-
-        progress(1.0, desc="Complete!")
-        return baseline_text, steered_text
-    except Exception as e:
-        import traceback
-
-        err = f"❌ Error: {e}\n\n{traceback.format_exc()}"
-        return err, err
+    return _generate_comparison(config_name, prompt, progress, multi_vector=True)
 
 
 def update_sv_ui(config_name):

@@ -38,6 +38,8 @@ site/
 **/site/
 .ruff_cache/
 **/.ruff_cache/
+.mypy_cache/
+**/.mypy_cache/
 
 # IDE
 .vscode/

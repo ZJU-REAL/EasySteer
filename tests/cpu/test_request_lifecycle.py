@@ -227,4 +227,3 @@ def test_runner_reattachment_detaches_previous_model_hooks(mode):
         runner._close_steering()
     assert not new._forward_hooks
     assert key not in ops._CONTROLLERS
-

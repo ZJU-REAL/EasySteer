@@ -22,6 +22,7 @@
 <a id="news"></a>
 ## News 🔥
 
+- [2026/09/09] Updated to vLLM v0.29.0 with its default V2 model runner; refreshed steering, capture, and Docker integration.
 - [2026/08/22] [EasySteer](https://arxiv.org/abs/2509.25175) has been accepted to EMNLP 2026 System Demonstrations 🎉
 - [2026/08/03] Migrated to vLLM v0.26.0 (V2 model runner): v2 steering API, redesigned hidden-state capture (select clauses, labeled rows, per-request capture), and our new [documentation site](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
@@ -42,7 +43,7 @@
 
 ## About
 
-Built on vLLM, EasySteer is a unified framework for high-performance LLM steering: it applies steering vectors — directions in a model's hidden-state space — during inference to shift model behavior without changing model weights, at serving speed. The current release tracks vLLM v0.28.0 on the V2 model runner, with continuous batching, prefix-cache-compatible steering, CUDA-graph support, the declarative v2 steering API (`SteeringSpec`/`ApplySpec`), and a redesigned hidden-state capture pipeline (source-side selection, labeled rows, per-request capture).
+Built on vLLM, EasySteer is a unified framework for high-performance LLM steering: it applies steering vectors — directions in a model's hidden-state space — during inference to shift model behavior without changing model weights, at serving speed. The current release tracks vLLM v0.29.0 on the V2 model runner, with continuous batching, prefix-cache-compatible steering, CUDA-graph support, the declarative v2 steering API (`SteeringSpec`/`ApplySpec`), and a redesigned hidden-state capture pipeline (source-side selection, labeled rows, per-request capture).
 
 - **High Performance**: the paper reports 10.8-22.3× speedups over the compared steering frameworks through vLLM integration
 - **Modular Design**: Pluggable interfaces for custom steering algorithms without modifying core code
@@ -76,7 +77,7 @@ git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
 cd EasySteer
 
 # Official vLLM wheel, then overlay the pinned fork's Python files
-pip install vllm==0.28.0
+pip install vllm==0.29.0
 VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
 rsync -a vllm-steer/vllm/ "$VLLM_DIR"/
 
@@ -101,8 +102,8 @@ git submodule update --init --recursive
 cd vllm-steer
 
 # Install with pre-compiled version (recommended)
-# EasySteer tracks the vLLM v0.28.0 release commit; pin it so the kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a
+# EasySteer tracks the vLLM v0.29.0 release commit; pin it so the kernels match.
+export VLLM_PRECOMPILED_WHEEL_COMMIT=98dff2a81d747d1dba01a47f939f48c3526d4206
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # Install EasySteer

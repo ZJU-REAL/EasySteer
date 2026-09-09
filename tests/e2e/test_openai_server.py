@@ -38,8 +38,7 @@ def _free_port():
 
 def _serve_cmd(port, *extra):
     return [
-        sys.executable, "-m", "vllm.entrypoints.openai.api_server",
-        "--model", DENSE_MODEL,
+        sys.executable, "-m", "vllm.entrypoints.cli.main", "serve", DENSE_MODEL,
         "--served-model-name", SERVED_MODEL,
         "--host", "127.0.0.1", "--port", str(port),
         "--enforce-eager",

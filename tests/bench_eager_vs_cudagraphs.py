@@ -55,8 +55,8 @@ def server_command(args: argparse.Namespace, *, eager: bool) -> list[str]:
     command = [
         sys.executable,
         "-m",
-        "vllm.entrypoints.openai.api_server",
-        "--model",
+        "vllm.entrypoints.cli.main",
+        "serve",
         args.model,
         "--host",
         "127.0.0.1",
