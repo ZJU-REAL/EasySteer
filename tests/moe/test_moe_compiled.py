@@ -3,8 +3,8 @@
 
 The vllm::steer_moe_gate op is registered as a piecewise splitting op;
 under compiled execution the gate steering runs eagerly between
-CUDA-graph segments. Capture streams are eager-only, so the mechanism
-is verified through the steering trace instead.
+CUDA-graph segments. This suite verifies the mechanism through the
+steering trace.
 
 Coverage:
   - the engine boots compiled (no enforce_eager) with a moe_router
@@ -76,12 +76,12 @@ def deact_spec(tmp_path_factory):
     )
 
 
-def test_unsteered_run_leaves_no_applies(trace, prompt_ids):
-    """Without steering the gate routing is off: zero apply records."""
-    out, by_layer = trace.run(prompt_ids, SP, layers=ALL_LAYERS)
-    assert out.outputs[0].text, "compiled engine produced no output"
-    applied = sorted(lid for lid, pos in by_layer.items() if pos)
-    assert not applied, f"applies without steering at layers {applied}"
+def test_only_router_steering_splits_compiled_graph(llm):
+    config = llm.llm_engine.vllm_config
+    assert config.steer_vector_config.graph_mode == "split"
+    ops = config.compilation_config.splitting_ops or []
+    assert "vllm::steer_moe_gate" in ops
+    assert "vllm::steer_apply" not in ops
 
 
 def test_steered_output_and_trace_cover_all_layers(
@@ -89,7 +89,9 @@ def test_steered_output_and_trace_cover_all_layers(
 ):
     """Steering changes the output and applies at every MoE layer with
     full prompt coverage on the prefill step."""
-    baseline, _ = trace.run(prompt_ids, SP, layers=ALL_LAYERS)
+    baseline, baseline_layers = trace.run(prompt_ids, SP, layers=ALL_LAYERS)
+    applied = sorted(lid for lid, pos in baseline_layers.items() if pos)
+    assert not applied, f"applies without steering at layers {applied}"
     steered, by_layer = trace.run(
         prompt_ids, SP, layers=ALL_LAYERS, steering=deact_spec
     )

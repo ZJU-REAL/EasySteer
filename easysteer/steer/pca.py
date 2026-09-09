@@ -1,6 +1,4 @@
-"""
-Principal Component Analysis Extractor
-"""
+"""Principal-component control-vector extraction."""
 
 import logging
 
@@ -42,7 +40,7 @@ def _fit_first_component(activations):
 
 
 class PCAExtractor(BaseExtractor):
-    """Principal Component Analysis method for control vector extraction"""
+    """Extract directions with principal component analysis."""
 
     method = "pca"
     progress_desc = "Computing PCA directions"
@@ -66,11 +64,8 @@ class PCAExtractor(BaseExtractor):
                 variance under the `"explained_variance"` key.
         """
         if method == "standard":
-            # Plain PCA over positive samples only
             activations = (
-                pos_rows
-                if isinstance(pos_rows, np.ndarray)
-                else np.vstack(pos_rows)
+                pos_rows if isinstance(pos_rows, np.ndarray) else np.vstack(pos_rows)
             )
         elif method == "center":
             # Centered PCA: truncate to equal numbers of positives and
@@ -83,21 +78,15 @@ class PCAExtractor(BaseExtractor):
         else:  # "diff" — extract() validated the variant name.
             # Difference of each positive/negative pair.
             min_samples = min(len(pos_rows), len(neg_rows))
-            differences = [
-                pos_rows[i] - neg_rows[i] for i in range(min_samples)
-            ]
+            differences = [pos_rows[i] - neg_rows[i] for i in range(min_samples)]
             # Extra positives are paired with the negative mean.
             if len(pos_rows) > min_samples:
                 neg_mean = np.mean(neg_rows, axis=0)
-                differences.extend(
-                    row - neg_mean for row in pos_rows[min_samples:]
-                )
+                differences.extend(row - neg_mean for row in pos_rows[min_samples:])
             # Extra negatives are paired with the positive mean.
             if len(neg_rows) > min_samples:
                 pos_mean = np.mean(pos_rows, axis=0)
-                differences.extend(
-                    pos_mean - row for row in neg_rows[min_samples:]
-                )
+                differences.extend(pos_mean - row for row in neg_rows[min_samples:])
             activations = np.vstack(differences)
 
         component, variance = _fit_first_component(activations)
@@ -121,7 +110,7 @@ class PCAExtractor(BaseExtractor):
         correct_direction: bool = True,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs
+        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the PCA method.
 
@@ -145,8 +134,6 @@ class PCAExtractor(BaseExtractor):
                 f"Unknown PCA method: {method!r}. Supported methods: "
                 f"{list(supported_methods)}"
             )
-        # Only the first principal component is ever computed; reject
-        # anything else instead of silently recording an unused value.
         if n_components != 1:
             raise ValueError(
                 f"n_components={n_components} is not supported; "

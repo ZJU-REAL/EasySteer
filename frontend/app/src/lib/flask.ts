@@ -1,24 +1,17 @@
 /**
- * Client for the retained Flask job backend (vector extraction and
- * training). Endpoints and payload shapes match `frontend/extraction_api.py`
- * and `frontend/training_api.py` as-is.
+ * Client for the Flask extraction and training job API.
  */
 
 import {
-  interventionFromName,
-  normalizeTrainingConfig,
   type ExtractionConfig,
-  type RawTrainingConfig,
   type TrainingConfig,
 } from "./jobConfig";
 import { settings } from "./settings";
 
 export type {
   ExtractionConfig,
-  RawTrainingConfig,
   TrainingConfig,
 } from "./jobConfig";
-export { interventionFromName, normalizeTrainingConfig } from "./jobConfig";
 
 export interface ExtractionStatus {
   is_extracting: boolean;
@@ -114,11 +107,8 @@ export function listTrainingConfigs(): Promise<{ configs: { name: string; displa
   return getJson("/api/train-configs");
 }
 
-export async function getTrainingConfig(name: string): Promise<TrainingConfig> {
-  const raw = await getJson<RawTrainingConfig & Partial<TrainingConfig>>(
-    `/api/train-config/${encodeURIComponent(name)}`,
-  );
-  return normalizeTrainingConfig(raw, interventionFromName(name));
+export function getTrainingConfig(name: string): Promise<TrainingConfig> {
+  return getJson(`/api/train-config/${encodeURIComponent(name)}`);
 }
 
 // ---- SAE feature exploration (Neuronpedia proxied by the Flask backend) ----

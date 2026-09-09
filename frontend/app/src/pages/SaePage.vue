@@ -160,7 +160,6 @@ function similarity(result: flask.SaeSearchResult): string {
     </div>
     <p class="page-intro">{{ t("sae_intro") }}</p>
 
-    <!-- Search: mode tabs on top of one compact form, as in the old UI -->
     <div class="panel search-panel">
       <div class="panel-header">
         <h2>{{ t("sae_search_title") }}</h2>

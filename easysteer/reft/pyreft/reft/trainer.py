@@ -1,58 +1,24 @@
 from ..core import IntervenableModel
-import torch.nn as nn
 from torch.utils.data.sampler import Sampler
 from torch.utils.data import DataLoader, DistributedSampler
-from transformers import (
-    Trainer,
-    TrainingArguments,
-    DataCollator,
-    DataCollatorForSeq2Seq,
-    AutoTokenizer
-)
+from transformers import Trainer, DataCollatorForSeq2Seq
 from transformers.trainer_utils import (
     EvalPrediction,
     has_length,
     denumpify_detensorize
 )
 from datasets import Dataset
-from dataclasses import dataclass
-from typing import Dict, Optional, Sequence, Union, Iterable
+from typing import Union, Iterable
 
 from tqdm import tqdm
 import os
 import torch
-import re
 
-import numpy as np
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.utils import logging
 import torch.distributed as dist
 
 logger = logging.get_logger(__name__)
-
-@dataclass
-class ReftDataCollator(object):
-    """Collate examples for ReFT."""
-
-    data_collator: DataCollator
-
-    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
-        batch_inputs = self.data_collator(instances)
-        max_seq_length = batch_inputs["input_ids"].shape[-1]
-        batch_inputs["intervention_locations"] = batch_inputs["intervention_locations"][..., :max_seq_length]
-        return batch_inputs
-
-
-def make_data_collator(tokenizer, model) -> ReftDataCollator:
-    data_collator_fn = DataCollatorForSeq2Seq(
-        tokenizer=tokenizer,
-        model=model,
-        label_pad_token_id=-100,
-        padding="longest",
-        max_length=2048,
-    )
-    return ReftDataCollator(data_collator=data_collator_fn)
-
 
 def make_dataloader(
     dataset: Dataset,
@@ -67,11 +33,7 @@ def make_dataloader(
 class ReftTrainer(Trainer):
     def save_model(self, output_dir, _internal_call=False, **kwargs):
         # Handle CPU training and non-distributed cases
-        try:
-            is_main_process = not dist.is_initialized() or dist.get_rank() == 0
-        except (RuntimeError, AttributeError) as e:  # Catches case when torch.distributed is not available or other dist errors
-            logger.error(f"Error checking distributed training status: {str(e)}")
-            is_main_process = True
+        is_main_process = not dist.is_initialized() or dist.get_rank() == 0
         
         if is_main_process:
             target_dir = f"{output_dir}/intervenable_model"
@@ -143,7 +105,7 @@ class ReftTrainer(Trainer):
         if cf_outputs is None:
             output = base_outputs # in case of lora only training
 
-        return (output, output) if return_outputs else output.loss
+        return (output.loss, output) if return_outputs else output.loss
 
 class ReftTrainerForCausalLM(ReftTrainer):
     def get_train_dataloader(self) -> DataLoader:
@@ -168,7 +130,8 @@ class ReftTrainerForSequenceClassification(ReftTrainer):
         self,
         intervenable: IntervenableModel,
         inputs,
-        return_outputs=False
+        return_outputs=False,
+        **kwargs,
     ):
         # run intervened forward pass
         unit_locations = None
@@ -234,7 +197,7 @@ class ReftTrainerForSequenceClassification(ReftTrainer):
         dataloader = make_dataloader(
             eval_dataset, batch_size, data_collator, shuffle=False)
 
-        logger.info(f"***** Running In-Training Evaluation *****")
+        logger.info("***** Running In-Training Evaluation *****")
         if has_length(dataloader):
             logger.info(f"  Num examples = {self.num_examples(dataloader)}")
         else:

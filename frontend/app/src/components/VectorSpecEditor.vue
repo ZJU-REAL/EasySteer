@@ -21,7 +21,7 @@ const sourceModel = computed({
   },
 });
 
-// Params edited as JSON text (only moe_router takes params today).
+// Keep parameter JSON text separate from the parsed spec while editing.
 const showParams = computed(
   () => props.vector.algorithm === "moe_router" || Object.keys(props.vector.params).length > 0,
 );

@@ -38,14 +38,14 @@ MODES = ("eager", "split", "in_graph")
 def build_engine(mode, max_steer):
     from vllm import LLM
 
-    kwargs = dict(
-        model=MODEL,
-        enable_steer_vector=True,
-        steer_algorithms=["direct"],
-        max_steer_vectors=max_steer,
-        enable_prefix_caching=False,
-        enable_chunked_prefill=False,
-    )
+    kwargs = {
+        "model": MODEL,
+        "enable_steer_vector": True,
+        "steer_algorithms": ["direct"],
+        "max_steer_vectors": max_steer,
+        "enable_prefix_caching": False,
+        "enable_chunked_prefill": False,
+    }
     if mode == "eager":
         kwargs["enforce_eager"] = True
     else:
@@ -57,9 +57,7 @@ def run_mode(args):
     from vllm import SamplingParams
 
     llm = build_engine(args.mode, args.max_steer)
-    params = SamplingParams(
-        temperature=0, max_tokens=args.max_tokens, ignore_eos=True
-    )
+    params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
     layers = list(range(args.layers))
     ks = sorted(set(args.configs))
@@ -73,9 +71,7 @@ def run_mode(args):
     )
 
     for k in ks:
-        steering = (
-            None if k == 0 else [specs[i % k] for i in range(args.batch)]
-        )
+        steering = None if k == 0 else [specs[i % k] for i in range(args.batch)]
         start = time.perf_counter()
         outs = llm.generate(prompts, params, steering=steering, use_tqdm=False)
         elapsed = time.perf_counter() - start
@@ -91,22 +87,33 @@ def run_mode(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--batch", type=int, default=64)
-    parser.add_argument("--configs", type=int, nargs="+",
-                        default=[0, 1, 8, 32],
-                        help="K values: distinct configs per batch "
-                             "(0 = unsteered baseline)")
-    parser.add_argument("--max-steer", type=int, default=32,
-                        help="max_steer_vectors, identical for every "
-                             "tier (K <= this)")
+    parser.add_argument(
+        "--configs",
+        type=int,
+        nargs="+",
+        default=[0, 1, 8, 32],
+        help="K values: distinct configs per batch (0 = unsteered baseline)",
+    )
+    parser.add_argument(
+        "--max-steer",
+        type=int,
+        default=32,
+        help="max_steer_vectors, identical for every tier (K <= this)",
+    )
     parser.add_argument("--max-tokens", type=int, default=128)
-    parser.add_argument("--layers", type=int, default=28,
-                        help="steered layer count per config")
-    parser.add_argument("--modes", nargs="+", default=["eager", "in_graph"],
-                        choices=MODES,
-                        help="tiers to compare (add 'split' for the "
-                             "piecewise middle tier)")
-    parser.add_argument("--mode", choices=MODES,
-                        help=argparse.SUPPRESS)  # internal: child runs one tier
+    parser.add_argument(
+        "--layers", type=int, default=28, help="steered layer count per config"
+    )
+    parser.add_argument(
+        "--modes",
+        nargs="+",
+        default=["eager", "in_graph"],
+        choices=MODES,
+        help="tiers to compare (add 'split' for the piecewise middle tier)",
+    )
+    parser.add_argument(
+        "--mode", choices=MODES, help=argparse.SUPPRESS
+    )  # internal: child runs one tier
     args = parser.parse_args()
 
     ks = sorted(set(args.configs))
@@ -119,18 +126,22 @@ def main():
         return
 
     passthrough = [
-        "--batch", str(args.batch),
-        "--configs", *[str(k) for k in ks],
-        "--max-steer", str(args.max_steer),
-        "--max-tokens", str(args.max_tokens),
-        "--layers", str(args.layers),
+        "--batch",
+        str(args.batch),
+        "--configs",
+        *[str(k) for k in ks],
+        "--max-steer",
+        str(args.max_steer),
+        "--max-tokens",
+        str(args.max_tokens),
+        "--layers",
+        str(args.layers),
     ]
     env = {**os.environ, "VLLM_LOGGING_LEVEL": "WARNING"}
     for mode in args.modes:
         print(f"===== tier: {mode} =====", flush=True)
         subprocess.run(
-            [sys.executable, os.path.abspath(__file__), "--mode", mode,
-             *passthrough],
+            [sys.executable, os.path.abspath(__file__), "--mode", mode, *passthrough],
             check=True,
             env=env,
         )

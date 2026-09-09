@@ -65,10 +65,18 @@ class Intervention(torch.nn.Module):
                 
     def set_source_representation(self, source_representation):
         self.is_source_constant = True
+        if (
+            hasattr(self, "source_representation")
+            and "source_representation" not in self._buffers
+        ):
+            del self.source_representation
         self.register_buffer('source_representation', source_representation)
                 
     def set_interchange_dim(self, interchange_dim):
-        if not isinstance(interchange_dim, torch.Tensor):
+        if interchange_dim is None:
+            # An open-ended slice intervenes on the complete last dimension.
+            self.interchange_dim = None
+        elif not isinstance(interchange_dim, torch.Tensor):
             # Convert integer or list into torch.Tensor.
             self.interchange_dim = torch.tensor(interchange_dim)
         else:
@@ -639,4 +647,3 @@ class JumpReLUAutoencoderIntervention(TrainableIntervention):
 
     def __str__(self):
         return f"JumpReLUAutoencoderIntervention()"
-

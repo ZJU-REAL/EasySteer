@@ -11,7 +11,7 @@ Available extractors: DiffMean, PCA, LAT, linear probe, and SAE feature vectors.
 from easysteer.steer import extract_diffmean_control_vector, StatisticalControlVector
 
 control_vector = extract_diffmean_control_vector(
-    all_hidden_states=all_hidden_states,  # nested [samples][layer][token]
+    all_hidden_states=capture_result,  # CaptureResult from hs.capture(...)
     positive_indices=[0, 1, 2, 3],
     negative_indices=[4, 5, 6, 7],
     token_pos=-1,       # which token's activation to use
@@ -24,6 +24,14 @@ control_vector = StatisticalControlVector.import_gguf("vectors/diffmean.gguf")
 ```
 
 The exported GGUF file is what `VectorSpec(source=...)` consumes at inference time.
+Pass `CaptureResult` directly to preserve true layer IDs. Legacy nested
+`[sample][layer][token]` inputs are also accepted, but their layer keys are inferred
+from list positions starting at zero. The selected rows must include every sample
+needed by `positive_indices` and `negative_indices`.
+
+Extractor `normalize=True` normalizes the extracted direction. This differs from
+inference-time `VectorSpec.normalize=True`, which rescales the transformed hidden
+state to its original norm.
 
 Sibling functions follow the same shape: `extract_pca_control_vector`,
 `extract_lat_control_vector`, `extract_linear_probe_control_vector`, and the generic
@@ -38,22 +46,13 @@ Reimplements pyreft: trains a parameterized intervention (e.g. `BiasIntervention
 LoReFT) on a frozen HuggingFace model with a standard `transformers` trainer, then saves
 the learned representation for inference.
 
-```python
-import easysteer.reft as reft
-
-reft_config = reft.ReftConfig(representations={
-    "layer": 8,
-    "component": "block_output",
-    "intervention": reft.BiasIntervention(embed_dim=model.config.hidden_size),
-})
-reft_model = reft.get_reft_model(model, reft_config)
-# ... build a data module, run reft.ReftTrainer, then reft_model.save(...)
-```
+Use `easysteer.reft.train.train_reft` for the shared training pipeline. Bias
+checkpoints are loaded through `easysteer.vectors.from_pyreft` and applied with
+`algorithm="direct"`; LoReFT checkpoints use the same adapter with
+`algorithm="loreft"`. These checkpoints are passed through `VectorSpec(data=...)`,
+rather than as a third-party checkpoint path in `source`.
 
 The complete training walkthrough (data module, trainer, saving) is in
 [ReFT training](reft-training.md); see the
 [LoReFT replication](../replications/index.md) for a complete train-then-steer
 notebook.
-
-<!-- TODO: dedicated pages for each extractor (assumptions, when to prefer which),
-GGUF file format description, and the reft training API surface. -->

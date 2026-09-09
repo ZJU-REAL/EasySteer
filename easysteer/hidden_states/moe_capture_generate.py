@@ -1,13 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MoE router-logits capture through the generate task.
+"""MoE router-logits capture with per-sample or concatenated results."""
 
-Compatibility wrapper: keeps the ``get_moe_router_logits_generate()``
-signature while delegating to :func:`easysteer.hidden_states.capture`
-on the ``router_logits`` stream, with exact label-driven per-sample
-splitting.
-"""
-
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import torch
 
@@ -16,14 +10,11 @@ from .capture_result import capture
 
 def get_moe_router_logits_generate(
     llm: Any,
-    prompts: Union[List[str], List[Dict[str, Any]]],
+    prompts: list[str] | list[dict[str, Any]],
     max_tokens: int = 1,
     split_by_samples: bool = False,
     **generate_kwargs,
-) -> Union[
-    Tuple[Dict[int, torch.Tensor], Any],
-    Tuple[List[Dict[int, torch.Tensor]], Any],
-]:
+) -> tuple[dict[int, torch.Tensor], Any] | tuple[list[dict[int, torch.Tensor]], Any]:
     """Capture MoE router logits while running generate.
 
     Works for any generate-capable MoE model, including multimodal
@@ -32,7 +23,7 @@ def get_moe_router_logits_generate(
     the captured logits are the post-steering ones.
 
     Args:
-        llm: vLLM LLM instance (any engine config: compiled or eager,
+        llm: Single-worker vLLM LLM instance (compiled or eager,
             prefix caching on or off).
         prompts: text prompts, or multimodal dicts with ``prompt`` and
             ``multi_modal_data`` keys.

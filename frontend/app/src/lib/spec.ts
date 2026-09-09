@@ -1,9 +1,11 @@
 /**
  * Client-side mirror of the steering spec schema defined in
- * `vllm-steer/vllm/steer_vectors/api.py` (SteeringSpec / VectorSpec /
+ * `vllm-steer/vllm/model_hooks/steering/api.py` (SteeringSpec / VectorSpec /
  * ApplySpec). Field names, defaults and validation rules must match the
- * server exactly; when the Python schema changes, change this file too.
+ * server exactly. Algorithm rules are generated from the engine catalog.
  */
+
+import { ALGORITHM_CAPABILITIES } from "./algorithmCapabilities";
 
 export type Phase = "prompt" | "generation";
 
@@ -16,29 +18,23 @@ export type ConflictPolicy = "priority" | "sequential" | "error";
 
 export const CONFLICT_POLICIES: ConflictPolicy[] = ["priority", "sequential", "error"];
 
-export const ALGORITHMS = [
-  "direct",
-  "linear",
-  "loreft",
-  "lm_steer",
-  "erase",
-  "replace",
-  "concept_replace",
-  "moe_router",
-] as const;
-
-export type Algorithm = (typeof ALGORITHMS)[number];
+export type Algorithm = keyof typeof ALGORITHM_CAPABILITIES;
+export const ALGORITHMS = Object.keys(ALGORITHM_CAPABILITIES) as Algorithm[];
 
 /** Allowed `params` keys per algorithm; unlisted algorithms accept none. */
-const ALGORITHM_PARAMS: Record<string, string[]> = {
-  moe_router: ["expert_ids", "mode", "lambda", "topk"],
-};
+const ALGORITHM_PARAMS: Record<string, readonly string[]> = Object.fromEntries(
+  ALGORITHMS.map((name) => [name, ALGORITHM_CAPABILITIES[name].params]),
+);
 
 /** Algorithms that never load `source` files (in-memory payloads only). */
-const DATA_ONLY_ALGORITHMS = ["linear", "lm_steer", "loreft"];
+const DATA_ONLY_ALGORITHMS: readonly string[] = ALGORITHMS.filter(
+  (name) => ALGORITHM_CAPABILITIES[name].source === "none",
+);
 
 /** Algorithms whose `source` must be an EasySteer GGUF export. */
-const GGUF_ONLY_ALGORITHMS = ["direct", "erase", "replace"];
+const GGUF_ONLY_ALGORITHMS: readonly string[] = ALGORITHMS.filter(
+  (name) => ALGORITHM_CAPABILITIES[name].source === "gguf",
+);
 
 /** Half-open (start, stop) window; stop=null is open-ended. */
 export type SpecWindow = [number, number | null];
@@ -119,7 +115,7 @@ export function defaultSteeringSpec(): SteeringSpec {
 }
 
 export interface SpecIssue {
-  /** JSON-path-ish location, e.g. "vectors[0].apply.phases". */
+  /** JSON-path-ish location, e.g. "vectors[0].apply.prompt_positions". */
   path: string;
   message: string;
 }
@@ -326,6 +322,12 @@ export function validateVectorSpec(vector: VectorSpec, path = "vector"): SpecIss
     issues.push({ path: `${path}.scale`, message: "scale must be a finite number" });
   }
   const algo = vector.algorithm;
+  if (vector.normalize && !ALGORITHM_CAPABILITIES[algo as Algorithm]?.normalize) {
+    issues.push({
+      path: `${path}.normalize`,
+      message: `algorithm '${algo}' does not support normalize=True`,
+    });
+  }
   if (!ALGORITHMS.includes(algo as Algorithm)) {
     issues.push({
       path: `${path}.algorithm`,
@@ -353,7 +355,13 @@ export function validateVectorSpec(vector: VectorSpec, path = "vector"): SpecIss
   if (hasSource && hasData) {
     issues.push({ path, message: "source and data are mutually exclusive" });
   }
-  if (algo === "moe_router" && !hasSource) {
+  if (algo === "moe_router" && (hasSource || hasData) && "expert_ids" in (vector.params ?? {})) {
+    issues.push({
+      path: `${path}.params`,
+      message: "moe_router params['expert_ids'] requires inline configuration without source or data",
+    });
+  }
+  if (algo === "moe_router" && !hasSource && !hasData) {
     if (!vector.params || !vector.params["expert_ids"]) {
       issues.push({
         path: `${path}.params`,
@@ -477,8 +485,7 @@ export function specFromJson(json: unknown): SteeringSpec {
     throw new Error("steering spec must be a JSON object");
   }
   const obj = json as Record<string, unknown>;
-  // "debug" existed until the engine dropped it as dead; old JSON
-  // still parses, the flag is simply discarded.
+  // Accept and discard the optional debug field.
   const knownKeys = ["vectors", "conflict", "debug"];
   const unknown = Object.keys(obj).filter((k) => !knownKeys.includes(k));
   if (unknown.length > 0) {

@@ -4,7 +4,6 @@ import os
 import sys
 from contextlib import contextmanager
 
-# Repository root (the directory containing easysteer/ and frontend/).
 PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
@@ -14,13 +13,11 @@ PROJECT_ROOT = os.path.dirname(
 def project_root_on_path():
     """Temporarily put the repository root on sys.path.
 
-    Use as::
+    Restore the original path after the import so repository directories do not
+    shadow installed packages in later imports.
 
-        with project_root_on_path():
-            from easysteer.steer.lat import LATExtractor
-
-    sys.path is restored afterwards so pip-installed packages are not
-    shadowed by repo-local directories.
+    Yields:
+        The repository root directory.
     """
     original_path = sys.path.copy()
     try:

@@ -1,10 +1,8 @@
-# Base classes for intervention framework
-# Extracted from pyvene for better organization
+"""Base pyvene model and configuration classes exposed by ReFT."""
 
-# Import all the core functionality from the modeling directory
 from .modeling.intervenable_base import (
-    IntervenableModel, 
-    IntervenableNdifModel, 
+    IntervenableModel,
+    IntervenableNdifModel,
     build_intervenable_model
 )
 from .modeling.configuration_intervenable_model import (
@@ -12,11 +10,10 @@ from .modeling.configuration_intervenable_model import (
     RepresentationConfig
 )
 
-# Re-export for convenience
 __all__ = [
     'IntervenableModel',
-    'IntervenableNdifModel', 
+    'IntervenableNdifModel',
     'build_intervenable_model',
     'IntervenableConfig',
     'RepresentationConfig'
-] 
+]

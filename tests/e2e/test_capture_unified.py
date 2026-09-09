@@ -3,20 +3,20 @@
 
 One engine serves steering and capture. While capture is idle the
 engine keeps compiled execution with full CUDA graphs (steering in
-full-graph mode); capture-active batches dispatch to the raw eager
-forward where the capture hooks run natively. Prefix caching stays
-enabled: capture requests carry a unique cache_salt (full recompute,
-no cache hits), and unsalted requests that do hit the cache while
-capture is enabled fail explicitly at fetch.
+full-graph mode); eligible capture batches use a separate FULL graph,
+with raw eager execution for other batches needing rows. Admission skips
+prefix reads only when a hit could omit selected prompt rows; cache
+writes retain their ordinary keys for reuse after capture.
 """
 
 import os
 
-import pytest
 import torch
 from vllm import SamplingParams
 
 from helpers import DENSE_MODEL, steering_spec
+
+ENGINE_PROFILE = "dense_graph_capture"
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
@@ -71,16 +71,38 @@ def test_capture_on_compiled_engine(llm):
         assert positions == list(range(plen + 3))
 
 
-def test_capture_is_deterministic_across_calls(llm):
+def test_repeated_capture_has_complete_labels_and_clears_stream(llm):
+    """Each helper call owns one complete result and stops its capture stream."""
     import easysteer.hidden_states as hs
+    from vllm.capture import match_capture_request_id
 
-    r1 = hs.capture(llm, [PROMPT], layers=[10])
-    r2 = hs.capture(llm, [PROMPT], layers=[10])
-    assert torch.equal(r1.rows(10), r2.rows(10))
+    hidden_size = llm.llm_engine.vllm_config.model_config.hf_config.hidden_size
+    previous_ids = set()
+    for _ in range(2):
+        result = hs.capture(
+            llm, [PROMPT], layers=[10], max_tokens=1, ignore_eos=True,
+        )
+        assert result.labelled and len(result) == 1
+        assert result.layer_ids == [10]
+        output = result.outputs[0]
+        prompt_ids = list(output.prompt_token_ids)
+        assert len(output.outputs[0].token_ids) == 1
+        assert result.sample_positions(0) == list(range(len(prompt_ids)))
+        assert result.sample_token_ids(0) == prompt_ids
+        rows = result.rows(10)
+        assert tuple(rows.shape) == (len(prompt_ids), hidden_size)
+        assert torch.isfinite(rows).all().item()
+        request_ids = set(result.meta(10).req_ids)
+        assert request_ids and request_ids.isdisjoint(previous_ids)
+        assert all(match_capture_request_id(rid, output.request_id)
+                   for rid in request_ids)
+        previous_ids.update(request_ids)
+        assert not rpc(llm, "capture_status", "hidden_states")[0]["enabled"]
+        assert rpc(llm, "fetch_captured", "hidden_states", clear=False)[0] == {}
 
 
 def test_warm_cache_capture_is_complete(llm):
-    """A salted capture request never hits the cache it just warmed."""
+    """Capture recomputes selected prompt rows even with a warm cache."""
     import easysteer.hidden_states as hs
 
     llm.generate(
@@ -89,23 +111,30 @@ def test_warm_cache_capture_is_complete(llm):
     result = hs.capture(llm, [LONG_PROMPT], max_tokens=1, layers=[10])
     plen = len(result.outputs[0].prompt_token_ids)
     assert result.sample_positions(0) == list(range(plen))
+    assert result.outputs[0].num_cached_tokens == 0
 
 
-def test_unsalted_cache_hit_fails_explicitly(llm):
+def test_rpc_capture_recomputes_and_preserves_cache_reuse(llm):
+    from vllm.capture import deserialize_captured
+
     prompt = LONG_PROMPT + "Water is made of hydrogen and oxygen atoms. "
-    llm.generate(prompt, SamplingParams(max_tokens=1), use_tqdm=False)
     rpc(llm, "start_capture", "hidden_states", layers=[10])
     try:
-        llm.generate(prompt, SamplingParams(max_tokens=1), use_tqdm=False)
-        with pytest.raises(Exception, match="cache_salt"):
-            rpc(llm, "fetch_captured", "hidden_states", clear=True)
+        out = llm.generate(prompt, SamplingParams(max_tokens=1), use_tqdm=False)[0]
+        assert out.num_cached_tokens == 0
+        raw = rpc(llm, "fetch_captured", "hidden_states", clear=True)[0]
     finally:
         rpc(llm, "stop_capture", "hidden_states")
+    tensors, meta = deserialize_captured(raw)
+    assert tensors[10].shape[0] == len(out.prompt_token_ids)
+    assert meta[10].positions.tolist() == list(range(len(out.prompt_token_ids)))
+    warm = llm.generate(prompt, SamplingParams(max_tokens=1), use_tqdm=False)[0]
+    assert warm.num_cached_tokens > 0, "capture must populate reusable cache blocks"
 
 
 def test_generation_only_capture_tolerates_cache_hits(llm):
     """Selections that cannot touch prompt rows are unaffected by hits."""
-    from vllm.steer_vectors.api import SelectSpec
+    from vllm.model_hooks.steering.api import SelectSpec
 
     prompt = LONG_PROMPT + "The tallest mountain on Earth is Everest. "
     llm.generate(prompt, SamplingParams(max_tokens=1), use_tqdm=False)
@@ -117,7 +146,10 @@ def test_generation_only_capture_tolerates_cache_hits(llm):
         select=SelectSpec(generation="all").to_wire(),
     )
     try:
-        llm.generate(prompt, SamplingParams(max_tokens=4), use_tqdm=False)
+        out = llm.generate(
+            prompt, SamplingParams(max_tokens=4, ignore_eos=True), use_tqdm=False
+        )[0]
+        assert out.num_cached_tokens > 0
         raw = rpc(llm, "fetch_captured", "hidden_states", clear=True)[0]
     finally:
         rpc(llm, "stop_capture", "hidden_states")
@@ -125,6 +157,45 @@ def test_generation_only_capture_tolerates_cache_hits(llm):
 
     tensors, meta = deserialize_captured(raw)
     assert tensors[10].shape[0] == 3, "the three decode forwards"
+
+
+def test_helper_per_prompt_selection_controls_cache_reads(llm):
+    import easysteer.hidden_states as hs
+    from vllm.steer_vectors import SelectSpec
+
+    prompts = [LONG_PROMPT + suffix for suffix in ("First.", "Second.", "Third.")]
+    llm.generate(prompts, SamplingParams(max_tokens=1), use_tqdm=False)
+    result = hs.capture(
+        llm, prompts, layers=[10], max_tokens=3, ignore_eos=True,
+        select=SelectSpec(generation="all"),
+        per_prompt_selects=[
+            SelectSpec(prompt="all"), SelectSpec(prompt_positions=[-1]), None
+        ],
+    )
+    lengths = [len(out.prompt_token_ids) for out in result.outputs]
+    assert result.outputs[0].num_cached_tokens == 0
+    assert all(out.num_cached_tokens > 0 for out in result.outputs[1:])
+    assert result.sample_positions(0) == list(range(lengths[0]))
+    assert result.sample_positions(1) == [lengths[1] - 1]
+    assert result.sample_positions(2) == [lengths[2], lengths[2] + 1]
+
+
+def test_capture_replays_graph_after_helper_stop_and_restart(llm):
+    import easysteer.hidden_states as hs
+    from vllm.steer_vectors import SelectSpec
+
+    before = rpc(llm, "capture_status", "hidden_states")[0]
+    for _ in range(2):
+        result = hs.capture(
+            llm, [LONG_PROMPT], layers=[10], max_tokens=4, ignore_eos=True,
+            select=SelectSpec(generation="all"),
+        )
+        plen = len(result.outputs[0].prompt_token_ids)
+        assert result.sample_positions(0) == list(range(plen, plen + 3))
+    after = rpc(llm, "capture_status", "hidden_states")[0]
+    assert not after["enabled"] and after["graph_ready"]
+    assert after["graph_replays"] >= before["graph_replays"] + 6
+    assert after["graph_buffer_bytes"] > 0
 
 
 def test_capture_and_steering_coexist(llm):
@@ -137,7 +208,7 @@ def test_capture_and_steering_coexist(llm):
     rpc(llm, "start_capture", "hidden_states", layers=[12])
     try:
         steered = llm.generate(
-            {"prompt": PROMPT, "cache_salt": "unified-coexist"},
+            PROMPT,
             sp,
             steering=spec,
             use_tqdm=False,
@@ -148,3 +219,41 @@ def test_capture_and_steering_coexist(llm):
     assert steered != plain, "steering must apply on the capture path"
     tensors, meta = deserialize_captured(raw)
     assert 12 in tensors and tensors[12].shape[0] > 0
+
+
+def test_capture_budget_keeps_ordinary_graphs_until_request_drain(llm):
+    """Budget drops count selected rows per layer, including ordinary replays."""
+    from vllm.capture import deserialize_captured
+
+    rpc(
+        llm, "start_capture", "hidden_states", layers=[10],
+        select={"generation": "all"}, budget_rows=2,
+    )
+    try:
+        first = llm.generate(
+            PROMPT, SamplingParams(max_tokens=4, ignore_eos=True), use_tqdm=False
+        )[0]
+        full = rpc(llm, "capture_status", "hidden_states")[0]
+        assert full["tokens_stored"] == 2 and full["tokens_dropped"] == 1
+        assert full["graph_ready"]
+        llm.generate(
+            PROMPT, SamplingParams(max_tokens=3, ignore_eos=True), use_tqdm=False
+        )
+        idle = rpc(llm, "capture_status", "hidden_states")[0]
+        assert idle["tokens_stored"] == 2 and idle["tokens_dropped"] == 3
+        assert idle["graph_replays"] == full["graph_replays"]
+        assert idle["eager_capture_forwards"] == full["eager_capture_forwards"]
+        rpc(llm, "fetch_captured", "hidden_states", req_ids=[first.request_id])
+        resumed = llm.generate(
+            PROMPT, SamplingParams(max_tokens=3, ignore_eos=True), use_tqdm=False
+        )[0]
+        active = rpc(llm, "capture_status", "hidden_states")[0]
+        assert active["graph_replays"] == idle["graph_replays"] + 2
+        assert active["tokens_stored"] == 2 and active["tokens_dropped"] == 3
+        raw = rpc(llm, "fetch_captured", "hidden_states")[0]
+        tensors, meta = deserialize_captured(raw)
+        assert tensors[10].shape[0] == 2
+        plen = len(resumed.prompt_token_ids)
+        assert meta[10].positions.tolist() == [plen, plen + 1]
+    finally:
+        rpc(llm, "stop_capture", "hidden_states")

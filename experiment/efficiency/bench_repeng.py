@@ -11,28 +11,26 @@ import argparse
 import time
 
 import numpy as np
+from common import MODEL, N_SEQUENTIAL, SEAL_VECTOR, load_examples, report
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # repeng still uses the numpy<2 np.float_ alias; restore it before
 # import (removed in NumPy 2.0).
 np.float_ = np.float64
 
-import torch
-from repeng import ControlModel, ControlVector
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-from common import MODEL, N_SEQUENTIAL, SEAL_VECTOR, load_examples, report
+from repeng import ControlModel, ControlVector  # noqa: E402
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", type=int, default=0,
-                        help="batch size; 0 = sequential (paper: 64)")
-    parser.add_argument("--max-tokens", type=int, default=2048,
-                        choices=[128, 2048])
+    parser.add_argument(
+        "--batch", type=int, default=0, help="batch size; 0 = sequential (paper: 64)"
+    )
+    parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
     args = parser.parse_args()
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL)
-    tokenizer.pad_token_id = 0
+    tokenizer = AutoTokenizer.from_pretrained(MODEL, padding_side="left")
+    tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(MODEL).to("cuda")
     model = ControlModel(model, list(range(1, 28)))
     model.set_control(ControlVector.import_gguf(SEAL_VECTOR), 0)
@@ -40,23 +38,25 @@ def main():
         "pad_token_id": tokenizer.eos_token_id,
         "do_sample": False,
         "max_new_tokens": args.max_tokens,
-        "early_stopping": True,
+        "min_new_tokens": args.max_tokens,
     }
 
     if args.batch:
-        inputs = tokenizer(load_examples(args.batch), return_tensors="pt",
-                           padding=True).to(model.device)
+        inputs = tokenizer(
+            load_examples(args.batch), return_tensors="pt", padding=True
+        ).to(model.device)
         start = time.time()
         outputs = model.generate(**inputs, **settings)
         elapsed = time.time() - start
-        with torch.no_grad():
-            input_lens = inputs["attention_mask"].sum(dim=1)
-            non_pad = (outputs != settings["pad_token_id"]).long().sum(dim=1)
-            tokens = int((non_pad - input_lens).clamp(min=0).sum().item())
+        # min_new_tokens == max_new_tokens keeps every generated suffix full;
+        # subtract the padded prompt width, not the number of non-EOS input IDs.
+        tokens = outputs.shape[0] * (outputs.shape[1] - inputs["input_ids"].shape[1])
         report(tokens, elapsed, args.batch)
     else:
-        prepared = [tokenizer(e, return_tensors="pt").to(model.device)
-                    for e in load_examples(N_SEQUENTIAL)]
+        prepared = [
+            tokenizer(e, return_tensors="pt").to(model.device)
+            for e in load_examples(N_SEQUENTIAL)
+        ]
         tokens = 0
         start = time.time()
         for inputs in prepared:

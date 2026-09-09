@@ -135,7 +135,10 @@ llm = LLM(
 sampling = SamplingParams(temperature=${temperature}, max_tokens=${maxTokens})
 
 messages = [{"role": "user", "content": ${pyStr(prompt)}}]
-outputs = llm.chat(messages, sampling, steering=spec)
+prompt = llm.get_tokenizer().apply_chat_template(
+    messages, tokenize=False, add_generation_prompt=True,
+)
+outputs = llm.generate([prompt], sampling, steering=spec)
 print(outputs[0].outputs[0].text)
 `;
 }

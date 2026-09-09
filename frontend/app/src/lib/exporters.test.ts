@@ -38,6 +38,9 @@ describe("toPython", () => {
     expect(code).toContain("enable_steer_vector=True");
     expect(code).toContain('steer_algorithms=["direct"]');
     expect(code).toContain("steering=spec");
+    expect(code).toContain("llm.get_tokenizer().apply_chat_template(");
+    expect(code).toContain("llm.generate([prompt], sampling, steering=spec)");
+    expect(code).not.toContain("llm.chat(");
     expect(code).not.toContain("normalize");
     expect(code).not.toContain("conflict");
     expect(code).not.toContain("steer_multi_vector");

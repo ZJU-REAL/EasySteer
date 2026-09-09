@@ -1,16 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Hidden-state capture through the generate task.
+"""Hidden-state capture with nested or concatenated tensor results."""
 
-Compatibility wrapper: keeps the long-standing
-``get_all_hidden_states_generate()`` signature (used by the replication
-notebooks and the frontend) while delegating capture, transport and
-exact per-sample splitting to :func:`easysteer.hidden_states.capture`.
-Splitting is always label-driven — the engine tags every captured row
-with its owning request, which is the only correct attribution under
-continuous batching.
-"""
-
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import torch
 
@@ -18,11 +9,11 @@ from .capture_result import capture
 
 
 def _sugar_select(
-    token_ids: Optional[List[int]],
-    positions: Optional[List[int]],
-    select: Optional[Any],
-) -> Optional[Any]:
-    """Translate the token_ids/positions sugar into a SelectSpec.
+    token_ids: list[int] | None,
+    positions: list[int] | None,
+    select: Any | None,
+) -> Any | None:
+    """Translate token_ids/positions shortcuts into a SelectSpec.
 
     ``token_ids`` matches over prompt and generated tokens alike;
     ``positions`` selects prompt positions (negative = from the prompt
@@ -42,7 +33,7 @@ def _sugar_select(
             "positions must be None or non-empty ('all rows' is the "
             "default when no filter is given)"
         )
-    from vllm.steer_vectors.api import SelectSpec
+    from vllm.capture import SelectSpec
 
     return SelectSpec(
         prompt_tokens=list(token_ids) if token_ids is not None else None,
@@ -53,18 +44,16 @@ def _sugar_select(
 
 def get_all_hidden_states_generate(
     llm: Any,
-    prompts: Union[List[str], List[Dict[str, Any]]],
+    prompts: list[str] | list[dict[str, Any]],
     max_tokens: int = 1,
     split_by_samples: bool = True,
-    token_ids: Optional[List[int]] = None,
-    positions: Optional[List[int]] = None,
-    layers: Optional[List[int]] = None,
-    dtype: Optional[str] = None,
-    select: Optional[Union[dict, Any]] = None,
+    token_ids: list[int] | None = None,
+    positions: list[int] | None = None,
+    layers: list[int] | None = None,
+    dtype: str | None = None,
+    select: dict | Any | None = None,
     **generate_kwargs,
-) -> Union[
-    Tuple[List[List[torch.Tensor]], Any], Tuple[List[torch.Tensor], Any]
-]:
+) -> tuple[list[list[torch.Tensor]], Any] | tuple[list[torch.Tensor], Any]:
     """Capture every layer's hidden states while running generate.
 
     Works for any generate-capable model, including multimodal models
@@ -73,7 +62,7 @@ def get_all_hidden_states_generate(
     matching what an embed task would produce.
 
     Args:
-        llm: vLLM LLM instance (any engine config: compiled or eager,
+        llm: Single-worker vLLM LLM instance (compiled or eager,
             prefix caching on or off).
         prompts: text prompts, or multimodal dicts with ``prompt`` and
             ``multi_modal_data`` keys.
@@ -82,7 +71,7 @@ def get_all_hidden_states_generate(
             if False return per-layer tensors concatenated over samples.
         token_ids: only capture rows whose input token id is in this
             list (source-side filter; unions with ``positions``).
-        positions: only capture these absolute positions (negatives
+        positions: only capture these prompt positions (negatives
             resolve from the prompt end; unions with ``token_ids``).
         layers: layer-id subset (None = all hooked layers).
         dtype: engine-side storage dtype (e.g. ``'float16'``).

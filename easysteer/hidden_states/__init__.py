@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Hidden-state and router-logit capture clients for vllm-steer.
 
-The primary entry point is :func:`capture`, which returns a
-:class:`CaptureResult` with exact, label-driven per-sample views.
+The primary entry point is ``capture``, which returns a
+``CaptureResult`` with labelled per-sample views.
 ``get_all_hidden_states_generate`` and ``get_moe_router_logits_generate``
-are thin compatibility wrappers over it, keeping the signatures the
-replication notebooks use.
+return nested or concatenated tensors through the same capture client.
 
 Example:
     >>> import easysteer.hidden_states as hs
@@ -16,8 +15,8 @@ Example:
     >>> result.sample(0)[10].shape  # sample 0, layer 10
 """
 
-from .capture_result import CaptureResult, capture
 from .capture_generate import get_all_hidden_states_generate
+from .capture_result import CaptureResult, capture
 from .moe_capture_generate import get_moe_router_logits_generate
 
 __all__ = [

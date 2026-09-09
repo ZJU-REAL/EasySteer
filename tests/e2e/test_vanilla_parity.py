@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Steering-enabled engines must not perturb unsteered traffic.
 
-Steering is row-local on the hidden stream (no residual collapse), so an
-engine with enable_steer_vector=True and no steering config must produce
-byte-identical outputs to a vanilla engine. Boots both engines in one
+Compare generated token IDs from an engine with enable_steer_vector=True
+and no steering config against a vanilla engine. Boots both engines in one
 process at low memory utilization (they fit together even if the first
 does not release; the engine-per-module convention guards GPU state
 release, which this comparison does not depend on).

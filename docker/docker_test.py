@@ -1,26 +1,88 @@
-from vllm import LLM, SamplingParams
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+"""Smoke test for the current EasySteer source or a freshly built image.
+
+Set STEER_TEST_MODEL to Qwen2.5-1.5B-Instruct's local path or model ID.
+STEER_TEST_VECTOR overrides the bundled happy direction; GPU_ID optionally
+selects a GPU, otherwise CUDA_VISIBLE_DEVICES is preserved.
+"""
+
 import os
+from pathlib import Path
 
-# Set your GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
-# Initialize the LLM model
-# enable_steer_vector=True: Enables vector steering (without this, behaves like regular vLLM)
-llm = LLM(model="/app/models/Qwen/Qwen2.5-1.5B-Instruct/", enable_steer_vector=True, steer_algorithms=["direct"], enforce_eager=True, tensor_parallel_size=1)
+def main():
+    model = os.environ.get("STEER_TEST_MODEL")
+    if not model:
+        raise SystemExit(
+            "Set STEER_TEST_MODEL to a Qwen2.5-1.5B-Instruct path or model ID."
+        )
+    model = os.path.expanduser(model)
+    vector = Path(
+        os.environ.get(
+            "STEER_TEST_VECTOR",
+            str(Path(__file__).resolve().parents[1] / "vectors/happy_diffmean.gguf"),
+        )
+    ).expanduser()
+    if not vector.is_file():
+        raise SystemExit(f"Steering vector not found: {vector}")
 
-sampling_params = SamplingParams(
-    temperature=0.0,
-    max_tokens=128,
-)
-text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
-target_layers = list(range(10,26))
+    # Set visibility before importing vLLM / torch.
+    if "GPU_ID" in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["GPU_ID"]
 
-baseline_steering = SteeringSpec(vectors=[VectorSpec(source="/app/easysteer/vectors/happy_diffmean.gguf", scale=0.0, layers=target_layers, apply=ApplySpec(phases=["prompt", "generation"]))])
-baseline_output = llm.generate(text, steering=baseline_steering, sampling_params=sampling_params)
+    from vllm import LLM, SamplingParams
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-happy_steering = SteeringSpec(vectors=[VectorSpec(source="/app/easysteer/vectors/happy_diffmean.gguf", scale=2.0, layers=target_layers, apply=ApplySpec(phases=["prompt", "generation"]))])
-happy_output = llm.generate(text, steering=happy_steering, sampling_params=sampling_params)
+    llm = LLM(
+        model=model,
+        enable_steer_vector=True,
+        steer_algorithms=["direct"],
+        enforce_eager=True,
+        enable_prefix_caching=False,
+        async_scheduling=False,
+        tensor_parallel_size=1,
+        max_model_len=2048,
+    )
+    sampling_params = SamplingParams(
+        temperature=0.0,
+        max_tokens=128,
+        ignore_eos=True,
+    )
+    text = (
+        "<|im_start|>user\nAlice's dog has passed away. Please comfort her."
+        "<|im_end|>\n<|im_start|>assistant\n"
+    )
 
-print(baseline_output[0].outputs[0].text)
-print(happy_output[0].outputs[0].text)
+    def generate(scale=None):
+        steering = (
+            None
+            if scale is None
+            else SteeringSpec(
+                vectors=[
+                    VectorSpec(
+                        source=str(vector.resolve()),
+                        scale=scale,
+                        layers=list(range(10, 26)),
+                        apply=ApplySpec(prompt="all", generation="all"),
+                    )
+                ]
+            )
+        )
+        return llm.generate(
+            text,
+            steering=steering,
+            sampling_params=sampling_params,
+            use_tqdm=False,
+        )[0].outputs[0]
+
+    plain = generate()
+    zero = generate(0.0)
+    happy = generate(2.0)
+    assert zero.token_ids == plain.token_ids, "Zero-scale steering changed output"
+    assert happy.token_ids != plain.token_ids, "Nonzero steering had no effect"
+    print("Baseline:", plain.text)
+    print("Steered:", happy.text)
+    print("PASS: zero-scale parity and nonzero steering")
+
+
+if __name__ == "__main__":
+    main()

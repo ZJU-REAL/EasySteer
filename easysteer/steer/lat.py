@@ -1,6 +1,4 @@
-"""
-Linear Algebraic Technique (LAT) Extractor
-"""
+"""Linear Algebraic Technique (LAT) control-vector extraction."""
 
 import logging
 
@@ -18,14 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class LATExtractor(BaseExtractor):
-    """Linear Algebraic Technique (LAT) method for control vector extraction"""
+    """Extract directions with the Linear Algebraic Technique (LAT)."""
 
     method = "lat"
     progress_desc = "Computing LAT directions"
 
     @staticmethod
-    def _direction(pos_rows, neg_rows, *, layer, n_components,
-                   correct_direction):
+    def _direction(pos_rows, neg_rows, *, layer, n_components, correct_direction):
         """PCA over normalized differences of randomly paired rows.
 
         Args:
@@ -45,34 +42,19 @@ class LATExtractor(BaseExtractor):
             tuple[np.ndarray, dict]: The component and its explained
                 variance under the `"explained_variance"` key.
         """
-        activations = (
-            pos_rows if neg_rows is None else np.vstack([pos_rows, neg_rows])
-        )
+        activations = pos_rows if neg_rows is None else np.vstack([pos_rows, neg_rows])
 
-        # LAT: pair activations at random and take differences
-        logger.info(
-            f"Layer {layer}: Shuffling {activations.shape[0]} activations"
-        )
+        logger.info(f"Layer {layer}: Shuffling {activations.shape[0]} activations")
         # Permute a copy: never mutate the caller-visible array.
         activations = np.random.permutation(activations)
         length = activations.shape[0] // 2
         differences = activations[:length] - activations[length : length * 2]
 
-        logger.info(
-            f"Layer {layer}: Shuffled and diff'd: {differences.shape[0]} pairs"
-        )
-        logger.info(
-            f"Layer {layer}: Potential NaNs: {np.isnan(differences).sum()}"
-        )
-        logger.info(
-            f"Layer {layer}: Potential Infs: {np.isinf(differences).sum()}"
-        )
-        logger.info(
-            f"Layer {layer}: Range: {differences.min()} to "
-            f"{differences.max()}"
-        )
+        logger.info(f"Layer {layer}: Shuffled and diff'd: {differences.shape[0]} pairs")
+        logger.info(f"Layer {layer}: Potential NaNs: {np.isnan(differences).sum()}")
+        logger.info(f"Layer {layer}: Potential Infs: {np.isinf(differences).sum()}")
+        logger.info(f"Layer {layer}: Range: {differences.min()} to {differences.max()}")
 
-        # Normalize the differences, guarding against zero norms
         norms = np.linalg.norm(differences, axis=1, keepdims=True)
         differences = np.where(norms == 0, 0, differences / norms)
 
@@ -85,9 +67,7 @@ class LATExtractor(BaseExtractor):
 
         component = pca.components_[0]
         variance = float(pca.explained_variance_ratio_[0])
-        logger.info(
-            f"Layer {layer}: LAT explains {variance:.5%} of the variance"
-        )
+        logger.info(f"Layer {layer}: LAT explains {variance:.5%} of the variance")
 
         if correct_direction and neg_rows is not None:
             component = correct_sign(component, pos_rows, neg_rows)
@@ -104,7 +84,7 @@ class LATExtractor(BaseExtractor):
         correct_direction: bool = True,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs
+        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the LAT method.
 

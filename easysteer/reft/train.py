@@ -1,9 +1,4 @@
-"""Shared ReFT training and inference pipeline.
-
-Consolidates the model-loading / ReftConfig / data-module / Trainer / save
-sequence that used to be copy-pasted across basic_demo.py, ssv.py,
-test_demo.py and frontend/training_api.py.
-"""
+"""Shared model loading, training and inference for ReFT interventions."""
 
 import os
 
@@ -13,10 +8,9 @@ import transformers
 from easysteer.reft import pyreft
 from easysteer.reft.pyreft.reft.algorithms import BiasIntervention
 
-# Chat template used to wrap the instruction of each training example.
+# Default Qwen chat format; callers can supply another prompt template.
 PROMPT_TEMPLATE = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
 
-# Default TrainingArguments used unless overridden via **training_args.
 DEFAULT_TRAINING_ARGS = {
     "num_train_epochs": 100.0,
     "output_dir": "./tmp",
@@ -27,7 +21,6 @@ DEFAULT_TRAINING_ARGS = {
     "save_strategy": "no",
 }
 
-# The emoji-response demonstrations shared by the demos.
 EMOJI_EXAMPLES = [
     ["Who are you?", "🤖💬🌐🧠"],
     ["Who am I?", "👤❓🔍🌟"],
@@ -52,7 +45,7 @@ def resolve_model_path(model_path=None):
     """Return the model path, falling back to $REFT_MODEL_PATH.
 
     Raises:
-        ValueError: if neither the argument nor the environment variable
+        ValueError: If neither the argument nor the environment variable
             is set.
     """
     path = model_path or os.environ.get("REFT_MODEL_PATH")
@@ -120,8 +113,7 @@ def train_reft(
             (see DEFAULT_TRAINING_ARGS for the defaults).
 
     Returns:
-        (reft_model, tokenizer): the trained ReFT model (on `device`) and
-        its tokenizer.
+        The trained ReFT model on ``device`` and its tokenizer.
     """
     model, tokenizer = load_model_and_tokenizer(model_path, device)
 
@@ -150,8 +142,8 @@ def train_reft(
     args.update(training_args)
     trainer = pyreft.ReftTrainerForCausalLM(
         model=reft_model,
-        tokenizer=tokenizer,
         args=transformers.TrainingArguments(**args),
+        processing_class=tokenizer,
         **data_module,
     )
     for callback in callbacks or []:
@@ -159,7 +151,7 @@ def train_reft(
     trainer.train()
 
     if save_dir is not None:
-        reft_model.set_device("cpu")  # move to CPU before saving
+        reft_model.set_device("cpu")
         reft_model.save(save_directory=save_dir, save_to_hf_hub=False)
         reft_model.set_device(device)
     return reft_model, tokenizer
@@ -169,7 +161,7 @@ def load_reft(model_path, save_dir, device="cuda"):
     """Load a saved ReFT intervention on top of a freshly loaded base model.
 
     Returns:
-        (reft_model, tokenizer)
+        The loaded ReFT model and its tokenizer.
     """
     model, tokenizer = load_model_and_tokenizer(model_path, device)
     reft_model = pyreft.ReftModel.load(save_dir, model)

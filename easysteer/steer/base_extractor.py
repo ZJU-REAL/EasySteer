@@ -1,12 +1,4 @@
-"""Shared scaffolding for the statistical control-vector extractors.
-
-Every extractor follows the same recipe: resolve the sample split, pull
-one token row per sample and layer, compute a per-layer direction,
-normalize it, and package everything into a StatisticalControlVector.
-`BaseExtractor` owns that recipe; each concrete extractor implements
-only the per-layer `_direction()` hook, and its public `extract()`
-wrapper validates method-specific options before delegating.
-"""
+"""Shared per-layer extraction and control-vector assembly."""
 
 import abc
 from typing import ClassVar
@@ -26,8 +18,8 @@ class BaseExtractor(abc.ABC):
     """Template for per-layer statistical control-vector extraction.
 
     Subclasses set `method` and `progress_desc` and implement
-    `_direction()`; their public `extract()` wrappers keep their exact
-    historical signatures and call `_extract_template()`.
+    `_direction()`. Their public `extract()` methods validate options
+    before calling `_extract_template()`.
     """
 
     method: ClassVar[str]
@@ -71,24 +63,10 @@ class BaseExtractor(abc.ABC):
         extra_metadata=None,
         method=None,
     ) -> StatisticalControlVector:
-        """Run the shared extraction recipe.
+        """Select token rows, compute directions, and assemble a control vector.
 
-        The corpus is tokenized into per-layer row matrices exactly
-        once; `_direction()` is then invoked per layer, its result
-        optionally L2-normalized, cast to float32, and packaged with
-        canonical metadata.
-
-        Args:
-            all_hidden_states (list | CaptureResult): Nested
-                `[sample][layer][token]` hidden states, or a
-                CaptureResult from easysteer.hidden_states.
-            positive_indices (list[int]): Indices of positive samples.
-            negative_indices (list[int] | None): Resolved negative
-                indices; used for the metadata count and, by default,
-                for extraction.
-
-        Returns:
-            StatisticalControlVector: The extracted control vector.
+        extraction_negatives overrides the negative rows used for computation;
+        negative_indices still determines the sample count in metadata.
         """
         opts = opts or {}
         if extraction_negatives is None:

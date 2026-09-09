@@ -29,7 +29,7 @@ import time
 from common import MODEL, load_examples
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bench_multi_config import distinct_spec  # noqa: E402
+from bench_multi_config import distinct_spec
 
 
 def run_capacity(args):
@@ -44,17 +44,17 @@ def run_capacity(args):
         enable_prefix_caching=False,
         enable_chunked_prefill=False,
     )
-    params = SamplingParams(temperature=0, max_tokens=args.max_tokens,
-                            ignore_eos=True)
+    params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
     layers = list(range(args.layers))
     steering = [distinct_spec(i, layers) for i in range(args.batch)]
 
     # Untimed warmup outside the steered workload.
-    llm.generate(prompts[:8],
-                 SamplingParams(temperature=0, max_tokens=8,
-                                ignore_eos=True),
-                 use_tqdm=False)
+    llm.generate(
+        prompts[:8],
+        SamplingParams(temperature=0, max_tokens=8, ignore_eos=True),
+        use_tqdm=False,
+    )
     start = time.perf_counter()
     outs = llm.generate(prompts, params, steering=steering, use_tqdm=False)
     elapsed = time.perf_counter() - start
@@ -68,16 +68,18 @@ def run_capacity(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", type=int, default=256,
-                        help="requests, each with a distinct config")
-    parser.add_argument("--capacities", type=int, nargs="+",
-                        default=[2, 8, 32, 128, 256])
+    parser.add_argument(
+        "--batch", type=int, default=256, help="requests, each with a distinct config"
+    )
+    parser.add_argument(
+        "--capacities", type=int, nargs="+", default=[2, 8, 32, 128, 256]
+    )
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--layers", type=int, default=28)
-    parser.add_argument("--tier", choices=["in_graph", "eager"],
-                        default="in_graph")
-    parser.add_argument("--capacity", type=int,
-                        help=argparse.SUPPRESS)  # internal: child runs one
+    parser.add_argument("--tier", choices=["in_graph", "eager"], default="in_graph")
+    parser.add_argument(
+        "--capacity", type=int, help=argparse.SUPPRESS
+    )  # internal: child runs one
     args = parser.parse_args()
 
     if args.capacity:
@@ -88,12 +90,20 @@ def main():
     for capacity in args.capacities:
         assert capacity <= args.batch, "capacity beyond batch is a no-op"
         subprocess.run(
-            [sys.executable, os.path.abspath(__file__),
-             "--capacity", str(capacity),
-             "--batch", str(args.batch),
-             "--max-tokens", str(args.max_tokens),
-             "--layers", str(args.layers),
-             "--tier", args.tier],
+            [
+                sys.executable,
+                os.path.abspath(__file__),
+                "--capacity",
+                str(capacity),
+                "--batch",
+                str(args.batch),
+                "--max-tokens",
+                str(args.max_tokens),
+                "--layers",
+                str(args.layers),
+                "--tier",
+                args.tier,
+            ],
             check=True,
             env=env,
         )

@@ -26,7 +26,7 @@ from helpers import DENSE_MODEL
 
 def sel(**filters):
     """SelectSpec wire dict: the given filters, or whole both phases."""
-    from vllm.steer_vectors.api import SelectSpec
+    from vllm.model_hooks.steering.api import SelectSpec
 
     if not filters:
         return SelectSpec(prompt="all", generation="all").to_wire()
@@ -104,21 +104,14 @@ def test_layer_subset_captures_only_those_layers(llm):
     assert sorted(captured) == [5, 10], f"got layers {sorted(captured)}"
 
 
-def test_reduce_last_one_row_per_step(llm):
-    with capturing(llm, "hidden_states", layers=[10], reduce="last"):
-        generate(llm)
-        hs = fetch(llm)
-    assert hs[10].shape[0] == SP.max_tokens, (
-        f"'last' stored {hs[10].shape[0]} rows, want one per step "
-        f"({SP.max_tokens})"
-    )
-
-
-def test_reduce_mean_same_rows_different_values(llm):
-    """'mean' has the same per-step row count as 'last' but other values."""
+def test_reduce_last_and_mean_preserve_rows_and_differ_on_prefill(llm):
     with capturing(llm, "hidden_states", layers=[10], reduce="last"):
         generate(llm)
         last = fetch(llm)
+    assert last[10].shape[0] == SP.max_tokens, (
+        f"'last' stored {last[10].shape[0]} rows, want one per step "
+        f"({SP.max_tokens})"
+    )
     with capturing(llm, "hidden_states", layers=[10], reduce="mean"):
         generate(llm)
         mean = fetch(llm)
@@ -422,7 +415,7 @@ class TestPerRequestSelect:
 
     def test_per_prompt_selects_engine_side(self, llm):
         from vllm.capture import deserialize_captured
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         first_only = SelectSpec(prompt_positions=[0]).to_wire()
         gen_only = SelectSpec(generation="all").to_wire()
@@ -474,7 +467,7 @@ class TestPerRequestSelect:
 
     def test_client_capture_api(self, llm):
         import easysteer.hidden_states as hs
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         result = hs.capture(
             llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],

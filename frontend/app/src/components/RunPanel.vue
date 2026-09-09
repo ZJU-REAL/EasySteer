@@ -52,7 +52,7 @@ async function run(compare: boolean): Promise<void> {
     runs.push(
       streamChatCompletion({
         ...common,
-        steering: null,
+        steering: false,
         onToken: (tok) => (outputA.value += tok),
       }),
     );

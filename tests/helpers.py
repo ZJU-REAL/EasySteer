@@ -10,19 +10,17 @@ wraps generate() and returns the steered absolute positions.
 import glob
 import json
 import os
+from pathlib import Path
 
-DENSE_MODEL = os.environ.get(
-    "STEER_TEST_MODEL", "/data/zju-130/shenyl/hf/model/Qwen/Qwen2.5-1.5B-Instruct/"
-)
-DENSE_VECTOR = os.path.expanduser(
-    os.environ.get("STEER_TEST_VECTOR", "~/EasySteer/vectors/happy_diffmean.gguf")
-)
-MOE_MODEL = os.path.expanduser(
-    os.environ.get("STEER_TEST_MOE_MODEL", "~/models/OLMoE-1B-7B-0125-Instruct")
-)
-QWEN3_MODEL = os.environ.get(
-    "STEER_TEST_QWEN3", "/data/zju-130/shenyl/hf/model/Qwen/Qwen3-30B-A3B"
-)
+# run_suites.sh checks only the models needed by the selected group.
+# Direct pytest callers must set the corresponding model variable too.
+DENSE_MODEL = os.path.expanduser(os.environ.get("STEER_TEST_MODEL", ""))
+MOE_MODEL = os.path.expanduser(os.environ.get("STEER_TEST_MOE_MODEL", ""))
+QWEN3_MODEL = os.path.expanduser(os.environ.get("STEER_TEST_QWEN3", ""))
+DENSE_VECTOR = str(Path(os.environ.get(
+    "STEER_TEST_VECTOR",
+    Path(__file__).resolve().parents[1] / "vectors" / "happy_diffmean.gguf",
+)).expanduser().resolve())
 
 
 _INCLUDE_KWARGS = (

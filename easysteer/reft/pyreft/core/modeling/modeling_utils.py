@@ -1,7 +1,7 @@
 import random, torch, types
 import numpy as np
 from torch import nn
-from .intervenable_modelcard import *
+from .intervenable_modelcard import get_model_profile, model_family
 from .interventions import *
 from .constants import *
 
@@ -36,21 +36,13 @@ def is_stateless(model):
 
 
 def is_gru(model):
-    """Determine if this is a transformer model."""
-    if (
-        type(model) == GRUModel
-        or type(model) == GRULMHeadModel
-        or type(model) == GRUForClassification
-    ):
-        return True
-    return False
+    """Return whether the exact model type belongs to the registered GRU family."""
+    return model_family(type(model)) == "gru"
 
 
 def is_mlp(model):
-    """Determine if this is a mlp model."""
-    if type(model) == MLPModel or type(model) == MLPForClassification:
-        return True
-    return False
+    """Return whether the exact model type belongs to the registered MLP family."""
+    return model_family(type(model)) == "mlp"
 
 
 def is_transformer(model):
@@ -112,12 +104,15 @@ def getattr_for_torch_module(model, parameter_name):
 def get_dimension_by_component(model_type, model_config, component) -> int:
     """Based on the representation, get the aligning dimension size."""
 
-    if component not in type_to_dimension_mapping[model_type]:
+    profile = get_model_profile(model_type)
+    if profile is None or component not in profile.dimensions:
         return None
 
-    dimension_proposals = type_to_dimension_mapping[model_type][component]
+    dimension_proposals = profile.dimensions[component]
     for proposal in dimension_proposals:
-        if proposal.isnumeric():
+        if callable(proposal):
+            dimension = proposal(model_config)
+        elif proposal.isnumeric():
             dimension = int(proposal)
         elif "*" in proposal:
             # often constant multiplier with MLP
@@ -146,14 +141,9 @@ def get_dimension_by_component(model_type, model_config, component) -> int:
 
 def get_module_hook(model, representation, backend="native") -> nn.Module:
     """Render the intervening module with a hook."""
-    if (
-        get_internal_model_type(model) in type_to_module_mapping and
-        representation.component
-        in type_to_module_mapping[get_internal_model_type(model)]
-    ):
-        type_info = type_to_module_mapping[get_internal_model_type(model)][
-            representation.component
-        ]
+    profile = get_model_profile(type(model))
+    if profile is not None and representation.component in profile.modules:
+        type_info = profile.modules[representation.component]
         parameter_name = type_info[0]
         hook_type = type_info[1]
         if "%s" in parameter_name and representation.moe_key is None:
@@ -170,6 +160,12 @@ def get_module_hook(model, representation, backend="native") -> nn.Module:
             hook_type = CONST_INPUT_HOOK
         elif representation.component.split(".")[-1] == "output":
             hook_type = CONST_OUTPUT_HOOK
+        else:
+            raise ValueError(
+                f"Unknown component {representation.component!r} for "
+                f"{type(model).__name__}; use an explicit module path ending "
+                "in '.input' or '.output'"
+            )
 
     module = getattr_for_torch_module(model, parameter_name)
     if backend == "native":
@@ -247,9 +243,9 @@ def output_to_subcomponent(output, component, model_type, model_config):
     :param model_config: Hugging Face Model Config
     """
     subcomponent = output
-    if model_type in type_to_module_mapping and \
-        component in type_to_module_mapping[model_type]:
-        split_last_dim_by = type_to_module_mapping[model_type][component][2:]
+    profile = get_model_profile(model_type)
+    if profile is not None and component in profile.modules:
+        split_last_dim_by = profile.modules[component][2:]
         if len(split_last_dim_by) != 0 and len(split_last_dim_by) > 2:
             raise ValueError(f"Unsupported {split_last_dim_by}.")
         for i, (split_fn, param) in enumerate(split_last_dim_by):
@@ -408,12 +404,10 @@ def scatter_neurons(
             last_dim,
         )  # b_s, s, -1, num_h, d
         # get whether split by QKV
-        if (
-            component in type_to_module_mapping[model_type]
-            and len(type_to_module_mapping[model_type][component]) > 2
-            and type_to_module_mapping[model_type][component][2][0] == split_three
-        ):
-            _slice_idx = type_to_module_mapping[model_type][component][2][1]
+        profile = get_model_profile(model_type)
+        component_info = profile.modules.get(component, ()) if profile else ()
+        if len(component_info) > 2 and component_info[2][0] == split_three:
+            _slice_idx = component_info[2][1]
         else:
             _slice_idx = 0
         tensor_permute = tensor_input.view(new_shape)  # b_s, s, -1, num_h, d

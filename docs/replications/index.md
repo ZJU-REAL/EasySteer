@@ -1,8 +1,9 @@
 # Paper replications
 
 The [`replications/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications)
-directory reproduces published steering papers with EasySteer notebooks. Each folder
-contains a README, the notebook(s), and the extracted vectors.
+directory reproduces published steering papers with EasySteer notebooks. The folders
+contain paper notes, notebooks, and available vector or intervention artifacts.
+Consult each experiment for its required model, data and checkpoint files.
 
 | Folder | One-liner | Category |
 |---|---|---|

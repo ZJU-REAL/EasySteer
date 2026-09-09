@@ -7,7 +7,7 @@ under in-graph steering (compiled execution, per-token row tables) and
 under prefix caching, where a warm request's steered rows fall inside
 the KV-cache hit and are never recomputed — correctness there rests on
 the config-fingerprinted block keying, which is verified here end to
-end as byte parity between cold (reset cache) and warm runs of the
+end by comparing cold (reset cache) and warm runs of the
 same request. Differential checks guard against vacuous parity: every
 spec must actually change the output, and steering different positions
 must produce different outputs.
@@ -33,6 +33,9 @@ ENGINE_KWARGS = dict(
     enable_chunked_prefill=False,
     gpu_memory_utilization=0.18,
     max_model_len=512,
+    # Keep profiling proportional to this short-input positional test.
+    max_num_batched_tokens=512,
+    max_num_seqs=32,
 )
 
 PROMPT = list(range(200, 248))  # 48 tokens: 3 full blocks of 16
@@ -80,10 +83,9 @@ def test_declaration_resolves_in_graph(llm):
 
 
 class TestWarmColdParity:
-    """Cold (reset cache) and warm (cache hit) runs of an identical
-    position-sensitive request must be byte-identical: warm requests
-    reuse KV computed under the same steering fingerprint, so steered
-    rows inside the cached region need no recomputation."""
+    """Compare cold and warm runs of the same position-sensitive
+    request. Warm requests reuse KV under the same steering fingerprint,
+    so steered rows inside the cached region need no recomputation."""
 
     @pytest.mark.parametrize("name", sorted(POSITION_SPECS))
     def test_parity_and_effect(self, llm, name):
@@ -106,9 +108,8 @@ class TestWarmColdParity:
 
 class TestPartialPrefixHit:
     def test_head_positions_survive_partial_hit(self, llm):
-        """A longer prompt sharing a steered head reuses only the head
-        blocks; the recomputed tail plus cached steered head must equal
-        the fully-cold run of the same request."""
+        """Compare partial head-block reuse with a fully cold run of
+        the same longer prompt."""
         s = spec(prompt_positions=[0, 1, 2, 3])
         longer = PROMPT + list(range(300, 316))
         llm.reset_prefix_cache()
@@ -127,8 +128,7 @@ class TestPartialPrefixHit:
 
 
 class TestPositionsAreLoadBearing:
-    """Different trigger positions must produce different outputs —
-    detects steering that fires but at the wrong rows."""
+    """Compare outputs across trigger positions in this workload."""
 
     def test_head_vs_tail_differ(self, llm):
         llm.reset_prefix_cache()
@@ -137,8 +137,8 @@ class TestPositionsAreLoadBearing:
         assert head.outputs[0].text != tail.outputs[0].text
 
     def test_out_of_range_position_clamps_to_last_prompt_token(self, llm):
-        """A positive position past the prompt end clamps to the last
-        prompt token: byte-identical to prompt_positions=[-1]."""
+        """Compare a position beyond the prompt end with [-1]; both
+        selectors clamp to the last prompt token."""
         llm.reset_prefix_cache()
         tail = run(llm, PROMPT, spec(prompt_positions=[-1]))
         llm.reset_prefix_cache()
@@ -174,9 +174,8 @@ class TestCoBatchedPerRequestPositions:
     engine, where the trace oracle is unavailable. Two batches with
     identical prompts, params, and scheduling geometry are compared:
     one mixed (per-request specs and unsteered twins) and one fully
-    unsteered. Same geometry means byte-comparable outputs, so each
-    request is judged against its own unsteered counterpart — different
-    lengths, different specs, one batch."""
+    unsteered. Each request is compared with its unsteered counterpart
+    at matching batch geometry."""
 
     def test_each_request_applies_only_its_own_spec(self, llm):
         prompts = [

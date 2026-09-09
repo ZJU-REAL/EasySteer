@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""CPU units for the v2 steering API (STEERING_API_V2.md).
+"""CPU units for vllm.model_hooks.steering.api (see docs/user-guide/steering.md).
 
 Spec validation (explicit-failure paths), translation to the internal
 engine struct, fingerprint/prefix-cache participation, and the position
@@ -10,24 +10,24 @@ generation windows, negative positions resolved from the prompt end.
 import pytest
 import torch
 from pydantic import ValidationError
-
-from vllm.steer_vectors.api import (
+from vllm.model_hooks.selection.batch import BatchView
+from vllm.model_hooks.selection.runtime import collect_positions_apply_spec
+from vllm.model_hooks.steering.api import (
     ApplySpec,
     SteeringSpec,
     VectorSpec,
     to_engine_request,
 )
-from vllm.steer_vectors.algorithms.clause import (
-    ApplyClause,
-    collect_positions_apply_spec,
-)
-from vllm.steer_vectors.request import (
-    SteerVectorRequest,
+from vllm.model_hooks.steering.payloads import ConceptPair, DirectionVector
+from vllm.model_hooks.steering.request import (
+    ResolvedVector,
+    SteeringRequest,
+    config_fingerprint,
     is_prompt_length_sensitive,
 )
-from vllm.steer_vectors.worker_manager import config_fingerprint
 
 VEC = "/tmp/does-not-need-to-exist.gguf"
+PAYLOAD = DirectionVector({10: [1.0, 2.0], 12: [3.0, 4.0]})
 APPLY_ALL = ApplySpec(prompt="all", generation="all")
 
 
@@ -35,7 +35,7 @@ def make_spec(**apply_kwargs):
     return SteeringSpec(
         vectors=[
             VectorSpec(
-                source=VEC,
+                data=PAYLOAD,
                 scale=0.5,
                 layers=[10],
                 apply=ApplySpec(**apply_kwargs),
@@ -102,6 +102,24 @@ class TestApplySpecValidation:
 
 
 class TestVectorAndSteeringSpecValidation:
+    @pytest.mark.parametrize("algorithm", ["linear", "lm_steer", "loreft", "moe_router"])
+    def test_unsupported_normalize_rejected_at_authoring_and_engine(self, algorithm):
+        with pytest.raises(ValueError, match="does not support normalize"):
+            VectorSpec(algorithm=algorithm, normalize=True, source=VEC, apply=APPLY_ALL)
+        with pytest.raises(ValueError, match="does not support normalize"):
+            ResolvedVector(
+                payload=PAYLOAD.to_wire(), algorithm=algorithm, normalize=True,
+                apply_spec=APPLY_ALL.to_wire(),
+            )
+
+    @pytest.mark.parametrize("algorithm", ["direct", "erase", "replace", "concept_replace"])
+    def test_direction_algorithms_accept_normalize(self, algorithm):
+        payload = ConceptPair(PAYLOAD, PAYLOAD) if algorithm == "concept_replace" else PAYLOAD
+        spec = VectorSpec(
+            algorithm=algorithm, normalize=True, data=payload, apply=APPLY_ALL,
+        )
+        assert to_engine_request(SteeringSpec(vectors=[spec])).vectors[0].normalize
+
     def test_path_algo_hack_rejected(self):
         with pytest.raises(ValidationError, match="plain path"):
             VectorSpec(source="v.gguf|linear", apply=APPLY_ALL)
@@ -109,6 +127,10 @@ class TestVectorAndSteeringSpecValidation:
     def test_unknown_params_rejected(self):
         with pytest.raises(ValidationError, match="unknown params"):
             VectorSpec(source=VEC, params={"beta": 1}, apply=APPLY_ALL)
+
+    def test_unknown_algorithm_rejected_before_source_loading(self):
+        with pytest.raises(ValidationError, match="Unknown steering algorithm"):
+            VectorSpec(source=VEC, algorithm="missing", apply=APPLY_ALL)
 
     def test_source_required_for_non_moe(self):
         with pytest.raises(ValidationError, match="source file or an in-memory"):
@@ -143,94 +165,25 @@ class TestVectorAndSteeringSpecValidation:
             )
 
 
-class TestTranslation:
-    def test_single_vector_fields(self):
-        spec = make_spec(exclude_prompt_positions=[0], prompt_tokens=[5])
-        req = to_engine_request(spec)
-        assert req.steer_vector_local_path == VEC
-        assert req.scale == 0.5 and req.target_layers == [10]
-        assert req.apply_spec == {
-            "prompt": None,
-            "generation": None,
-            "prompt_tokens": [5],
-            "prompt_positions": None,
-            "prompt_window": None,
-            "generation_tokens": None,
-            "generation_positions": None,
-            "generation_window": None,
-            "exclude_prompt_tokens": None,
-            "exclude_prompt_positions": [0],
-            "exclude_prompt_window": None,
-            "exclude_generation_tokens": None,
-            "exclude_generation_positions": None,
-            "exclude_generation_window": None,
-        }
-
-    def test_moe_params_folded(self):
-        req = to_engine_request(
-            SteeringSpec(
-                vectors=[
-                    VectorSpec(
-                        algorithm="moe_router",
-                        layers=[3],
-                        params={
-                            "expert_ids": [1, 2],
-                            "mode": "soft",
-                            "lambda": 0.7,
-                        },
-                        apply=APPLY_ALL,
-                    )
-                ]
-            )
-        )
-        assert req.moe_expert_ids == [1, 2]
-        assert req.moe_mode == "soft"
-        assert req.moe_lambda == 0.7
-        assert req.moe_topk == 8
-
-    def test_multi_vector_translation(self):
-        req = to_engine_request(
-            SteeringSpec(
-                vectors=[
-                    VectorSpec(source=VEC, layers=[10], apply=APPLY_ALL),
-                    VectorSpec(
-                        source=VEC,
-                        layers=[12],
-                        apply=ApplySpec(generation="all"),
-                    ),
-                ],
-                conflict="sequential",
-            )
-        )
-        assert req.is_multi_vector and len(req.vector_configs) == 2
-        assert req.conflict_resolution == "sequential"
-        assert req.vector_configs[1].apply_spec["generation"] == "all"
-
-
 class TestEngineStructValidation:
     def test_missing_apply_spec_rejected(self):
         with pytest.raises(ValueError, match="apply_spec"):
-            SteerVectorRequest(
-                steer_vector_name="x",
-                steer_vector_int_id=7,
-                steer_vector_local_path=VEC,
-            )
+            ResolvedVector(payload=PAYLOAD.to_wire())
 
     def test_malformed_apply_spec_rejected(self):
         with pytest.raises(ValueError, match="unknown selection fields"):
-            SteerVectorRequest(
-                steer_vector_name="x",
-                steer_vector_int_id=7,
-                steer_vector_local_path=VEC,
+            ResolvedVector(
+                payload=PAYLOAD.to_wire(),
                 apply_spec={"prompt": "all", "bogus": 1},
             )
 
     def test_apply_spec_satisfies_trigger_requirement(self):
-        assert SteerVectorRequest(
+        assert SteeringRequest(
             steer_vector_name="x",
             steer_vector_int_id=7,
-            steer_vector_local_path=VEC,
-            apply_spec={"prompt": "all"},
+            vectors=[ResolvedVector(
+                source=VEC, payload=PAYLOAD.to_wire(), apply_spec={"prompt": "all"}
+            )],
         )
 
 
@@ -243,7 +196,6 @@ class TestFingerprintAndLengthSensitivity:
         "apply_kwargs",
         [
             {"prompt_positions": [-1]},
-            {"prompt_positions": [5]},
             {"generation_window": (0, 2)},
             {"generation_positions": [0]},
             {"prompt_window": (-4, None)},
@@ -286,18 +238,17 @@ class TestFingerprintAndLengthSensitivity:
         assert fp_a1 != fp_b
 
 
-def run_collector(spec_kwargs, token_ids, num_computed, is_decode, num_output,
+def run_collector(spec_kwargs, token_ids, num_computed, num_output,
                   num_prompt):
     wire = ApplySpec(**spec_kwargs).to_wire()
     tokens = torch.tensor(token_ids)
-    info = {
-        "query_start_loc": torch.tensor([0, len(token_ids)]),
-        "num_computed": torch.tensor([num_computed]),
-        "is_decode_mask": torch.tensor([is_decode]),
-        "num_output_tokens": torch.tensor([num_output]),
-        "num_prompt_tokens": torch.tensor([num_prompt]),
-    }
-    out = collect_positions_apply_spec(tokens, info, wire)
+    batch = BatchView(
+        query_start_loc=torch.tensor([0, len(token_ids)]),
+        num_computed=torch.tensor([num_computed]),
+        num_output=torch.tensor([num_output]),
+        num_prompt=torch.tensor([num_prompt]),
+    )
+    out = collect_positions_apply_spec(tokens, batch, wire)
     return [] if out is None else out.tolist()
 
 
@@ -310,7 +261,7 @@ class TestCollectorSemantics:
 
     def test_prompt_phase_covers_all_prompt_tokens(self):
         assert run_collector(
-            {"prompt": "all"}, [11, 12, 13, 14], 0, False, 0, 4
+            {"prompt": "all"}, [11, 12, 13, 14], 0, 0, 4
         ) == [0, 1, 2, 3]
 
     def test_exclusions_compose_with_phase_wide_prompt(self):
@@ -322,21 +273,20 @@ class TestCollectorSemantics:
             },
             [11, 12, 13, 14],
             0,
-            False,
             0,
             4,
         ) == [1, 3]
 
     def test_generation_phase_skips_prefill_step(self):
         assert run_collector(
-            {"generation": "all"}, [11, 12, 13, 14], 0, False, 0, 4
+            {"generation": "all"}, [11, 12, 13, 14], 0, 0, 4
         ) == []
 
     def test_window_exact_first_two_decode_steps(self):
         results = [
             run_collector(
                 {"generation_window": (0, 2)},
-                [99], 4 + j, True, j + 1, 4,
+                [99], 4 + j, j + 1, 4,
             )
             for j in range(4)
         ]
@@ -346,7 +296,7 @@ class TestCollectorSemantics:
         results = [
             run_collector(
                 {"generation_window": (1, None)},
-                [99], 4 + j, True, j + 1, 4,
+                [99], 4 + j, j + 1, 4,
             )
             for j in range(3)
         ]
@@ -354,13 +304,13 @@ class TestCollectorSemantics:
 
     def test_negative_position_resolves_against_prompt_length(self):
         assert run_collector(
-            {"prompt_positions": [-1]}, [11, 12], 2, False, 0, 4
+            {"prompt_positions": [-1]}, [11, 12], 2, 0, 4
         ) == [1]
 
     def test_position_past_prompt_end_clamps_to_last_prompt_token(self):
         assert run_collector(
             {"prompt_positions": [10]},
-            [11, 12, 13, 14], 0, False, 0, 4,
+            [11, 12, 13, 14], 0, 0, 4,
         ) == [3]
 
     def test_prompt_positions_never_match_decode_tokens(self):
@@ -368,7 +318,7 @@ class TestCollectorSemantics:
         # prompt position (clamped or not) must not select it.
         assert run_collector(
             {"prompt_positions": [10]},
-            [99], 4, True, 1, 4,
+            [99], 4, 1, 4,
         ) == []
 
     def test_prompt_and_generation_token_filters_are_phase_scoped(self):
@@ -376,19 +326,19 @@ class TestCollectorSemantics:
         # matches its own phase.
         assert run_collector(
             {"prompt_tokens": [42]},
-            [42, 11, 42], 0, False, 0, 3,
+            [42, 11, 42], 0, 0, 3,
         ) == [0, 2]
         assert run_collector(
             {"prompt_tokens": [42]},
-            [42], 3, True, 1, 3,
+            [42], 3, 1, 3,
         ) == []
         assert run_collector(
             {"generation_tokens": [42]},
-            [42], 3, True, 1, 3,
+            [42], 3, 1, 3,
         ) == [0]
         assert run_collector(
             {"generation_tokens": [42]},
-            [42, 11, 42], 0, False, 0, 3,
+            [42, 11, 42], 0, 0, 3,
         ) == []
 
     def test_token_and_position_triggers_union(self):
@@ -396,7 +346,6 @@ class TestCollectorSemantics:
             {"prompt_tokens": [11], "prompt_positions": [3]},
             [11, 12, 13, 14],
             0,
-            False,
             0,
             4,
         ) == [0, 3]
@@ -406,7 +355,6 @@ class TestCollectorSemantics:
             {"prompt_window": (-2, None)},
             [11, 12, 13, 14],
             0,
-            False,
             0,
             4,
         ) == [2, 3]
@@ -416,7 +364,6 @@ class TestCollectorSemantics:
             {"prompt_window": (1, 3)},
             [11, 12, 13, 14],
             0,
-            False,
             0,
             4,
         ) == [1, 2]
@@ -424,14 +371,14 @@ class TestCollectorSemantics:
     def test_prompt_window_ignores_decode_tokens(self):
         assert run_collector(
             {"prompt_window": (0, None)},
-            [99], 4, True, 1, 4,
+            [99], 4, 1, 4,
         ) == []
 
     def test_generation_positions_select_exact_steps(self):
         results = [
             run_collector(
                 {"generation_positions": [0, 2]},
-                [99], 4 + j, True, j + 1, 4,
+                [99], 4 + j, j + 1, 4,
             )
             for j in range(4)
         ]
@@ -447,7 +394,7 @@ class TestCollectorSemantics:
                     "generation_tokens": [42],
                     "generation_window": (0, 1),
                 },
-                [99], 4 + j, True, j + 1, 4,
+                [99], 4 + j, j + 1, 4,
             )
             for j in range(3)
         ]
@@ -458,7 +405,7 @@ class TestCollectorSemantics:
                 "generation_tokens": [42],
                 "generation_window": (0, 1),
             },
-            [42], 4 + 2, True, 3, 4,
+            [42], 4 + 2, 3, 4,
         )
         assert results_tok == [0]
 
@@ -469,9 +416,9 @@ class TestCollectorSemantics:
             "prompt_window": (-1, None),
             "generation_window": (0, 1),
         }
-        assert run_collector(spec, [11, 12, 13, 14], 0, False, 0, 4) == [3]
-        assert run_collector(spec, [99], 4, True, 1, 4) == [0]
-        assert run_collector(spec, [99], 5, True, 2, 4) == []
+        assert run_collector(spec, [11, 12, 13, 14], 0, 0, 4) == [3]
+        assert run_collector(spec, [99], 4, 1, 4) == [0]
+        assert run_collector(spec, [99], 5, 2, 4) == []
 
     def test_exclude_twins_veto_includes(self):
         # Overlap resolution: the exclusion always wins.
@@ -483,7 +430,6 @@ class TestCollectorSemantics:
             },
             [11, 12, 13, 14],
             0,
-            False,
             0,
             4,
         ) == [0, 2]
@@ -496,26 +442,11 @@ class TestCollectorSemantics:
                     "exclude_generation_positions": [1],
                     "exclude_generation_window": (3, None),
                 },
-                [99], 4 + j, True, j + 1, 4,
+                [99], 4 + j, j + 1, 4,
             )
             for j in range(5)
         ]
         assert results == [[0], [], [0], [], []]
-
-
-class TestApplyClauseIntegration:
-    def test_global_fast_path(self):
-        ctrl = ApplyClause()
-        ctrl.configure_from_dict({"apply_spec": APPLY_ALL.to_wire()})
-        assert ctrl.selects_all_tokens()
-
-    def test_filtered_spec_not_global(self):
-        ctrl = ApplyClause()
-        ctrl.configure_from_dict(
-            {"apply_spec": ApplySpec(prompt="all", exclude_prompt_tokens=[3]).to_wire()}
-        )
-        assert not ctrl.selects_all_tokens()
-        assert ctrl.has_clause()
 
 
 class TestSelectSpec:
@@ -523,12 +454,12 @@ class TestSelectSpec:
     steering-facing name and capture consumes the same wire form."""
 
     def test_apply_spec_is_a_select_spec(self):
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         assert issubclass(ApplySpec, SelectSpec)
 
     def test_wire_roundtrip(self):
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         spec = SelectSpec(
             prompt="all",
@@ -540,21 +471,21 @@ class TestSelectSpec:
         assert rebuilt.to_wire() == spec.to_wire()
 
     def test_from_wire_rejects_unknown_fields(self):
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         with pytest.raises(ValueError, match="unknown selection fields"):
             SelectSpec.from_wire({"prompt": "all", "tokns": [1]})
 
     def test_from_wire_validates_clause(self):
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
         with pytest.raises(ValidationError):
             SelectSpec.from_wire({"prompt_tokens": []})
 
     def test_from_wire_rejects_removed_phases_key(self):
-        from vllm.steer_vectors.api import SelectSpec
+        from vllm.model_hooks.steering.api import SelectSpec
 
-        with pytest.raises(ValueError, match="'phases' was removed"):
+        with pytest.raises(ValueError, match="unknown selection fields"):
             SelectSpec.from_wire({"phases": ["prompt"]})
 
 
@@ -562,7 +493,7 @@ class TestCaptureStreamConfigSelection:
     """StreamConfig validates select=, reduce= and dtype= at enable time."""
 
     def test_select_clause_normalized(self):
-        from vllm.capture.store import StreamConfig
+        from vllm.model_hooks.capture.store import StreamConfig
 
         config = StreamConfig(
             select={"generation": "all", "prompt_tokens": [42]}
@@ -573,25 +504,25 @@ class TestCaptureStreamConfigSelection:
         assert config.select["prompt_tokens"] == [42]
 
     def test_select_clause_validated(self):
-        from vllm.capture.store import StreamConfig
+        from vllm.model_hooks.capture.store import StreamConfig
 
         with pytest.raises(ValueError, match="unknown selection fields"):
             StreamConfig(select={"phase": ["prompt"]})
 
     def test_unknown_reduce_rejected(self):
-        from vllm.capture.store import StreamConfig
+        from vllm.model_hooks.capture.store import StreamConfig
 
         with pytest.raises(ValueError, match="reduce"):
             StreamConfig(reduce="first")
 
     def test_unknown_dtype_rejected(self):
-        from vllm.capture.store import StreamConfig
+        from vllm.model_hooks.capture.store import StreamConfig
 
         with pytest.raises(ValueError, match="dtype"):
             StreamConfig(dtype="nn")
 
     def test_select_conflicts_with_reductions(self):
-        from vllm.capture.store import StreamConfig
+        from vllm.model_hooks.capture.store import StreamConfig
 
         with pytest.raises(ValueError, match="reduc"):
             StreamConfig(select={"prompt": "all"}, reduce="last")

@@ -4,8 +4,8 @@
  * - `streamChatCompletion` posts to `{base}/chat/completions` with the
  *   steering spec inlined as the request-level `steering` field (what the
  *   OpenAI SDK's `extra_body` flattens into).
- * - `setServerSteering` sets the server-level default spec via
- *   `POST {base}/v1/steering {"spec": {...}}`.
+ * - `setServerSteering` sets the default spec for new requests via
+ *   `POST {base}/steering {"spec": {...}}`.
  */
 
 import type { SteeringSpec } from "./spec";
@@ -20,7 +20,7 @@ export interface StreamOptions {
   baseUrl: string;
   model: string;
   messages: ChatMessage[];
-  steering: SteeringSpec | null;
+  steering: SteeringSpec | false | null;
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
@@ -39,7 +39,8 @@ export async function streamChatCompletion(opts: StreamOptions): Promise<void> {
   };
   if (opts.temperature !== undefined) body.temperature = opts.temperature;
   if (opts.maxTokens !== undefined) body.max_tokens = opts.maxTokens;
-  if (opts.steering) body.steering = specToJson(opts.steering);
+  if (opts.steering === false) body.steering = false;
+  else if (opts.steering !== null) body.steering = specToJson(opts.steering);
 
   const resp = await fetch(joinUrl(opts.baseUrl, "/chat/completions"), {
     method: "POST",
@@ -79,7 +80,7 @@ export async function streamChatCompletion(opts: StreamOptions): Promise<void> {
   }
 }
 
-/** Replace the server-level default steering spec (null clears it). */
+/** Replace the default steering spec for new requests (null clears it). */
 export async function setServerSteering(
   baseUrl: string,
   spec: SteeringSpec | null,

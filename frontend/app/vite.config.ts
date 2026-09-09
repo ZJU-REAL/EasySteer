@@ -87,7 +87,7 @@ export default defineConfig({
     proxy: {
       // Flask job backend (extraction / training) during development.
       "/api": {
-        target: "http://localhost:5000",
+        target: `http://127.0.0.1:${process.env.EASYSTEER_BACKEND_PORT || "5000"}`,
         changeOrigin: true,
       },
     },

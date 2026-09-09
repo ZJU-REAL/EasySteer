@@ -1,328 +1,213 @@
 #!/usr/bin/env python3
-"""Verify steering correctness for your model/hardware before running experiments.
+"""Collect optional steering diagnostics, with one engine per child process.
 
-Runs four comparisons and reports pass/fail for each:
+Reports token equality and logprob differences for the same fixed-length batch
+under five configurations. These observations are not pass/fail or a substitute
+for the mechanism-level pytest suites: kernel and scheduler numerics can change
+text even at temperature=0, including between eager and compiled runs.
 
-  1. plain vLLM (chunked prefill ON)  vs  plain vLLM (chunked prefill OFF)
-     → Confirms disabling chunked prefill is safe for your model.
-
-  2. plain vLLM (chunked prefill OFF) vs  steered at scale=0 (chunked prefill OFF)
-     → Confirms the steering infrastructure is transparent when inactive.
-
-  3. steered eager (scale=4)  vs  steered CUDA graphs (scale=4)
-     → Confirms CUDA graphs don't skip or corrupt the steering intervention.
-
-  4. steered scale=4  vs  steered scale=0
-     → Confirms steering actually changes the output (sanity check).
-
-Run this script on your target model and hardware BEFORE running any
-experiments that depend on steering correctness.
-
-Usage:
-    CUDA_VISIBLE_DEVICES=0 python scripts/verify_steering_correctness.py \
+Usage from the repository root:
+    CUDA_VISIBLE_DEVICES=0 python tests/verify_steering_correctness.py \
         --model Qwen/Qwen2.5-1.5B-Instruct \
-        --vector vectors/happy_diffmean.gguf \
-        --target-layers 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 \
-        --scale 4.0
-
-All arguments have sensible defaults for the Qwen2.5-1.5B + happy vector setup.
+        --vector vectors/happy_diffmean.gguf --target-layers 10 11 12 \
+        --output /tmp/steering-diagnostic.json
 """
+
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
-import torch
-
-from vllm import LLM, SamplingParams
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
-
-LOGPROB_ATOL = 1e-4
-
-PROMPTS_RAW = [
+CASES = ("plain_chunked", "plain", "zero_eager", "steered_eager", "steered_graph")
+PROMPTS = [
+    "Alice's dog has passed away. Please comfort her.",
     "Describe a rainy Monday morning.",
     "What happens when you find a lost cat?",
     "Tell me about riding a bicycle through the park.",
-    "What's the best way to make coffee?",
     "Describe the view from a mountaintop at sunrise.",
 ]
 
 
-def build_prompts(model: str) -> list[str]:
+def run_case(args: argparse.Namespace) -> dict:
+    import torch
+    import vllm
     from transformers import AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(model)
-    return [
-        tok.apply_chat_template(
-            [{"role": "user", "content": p}],
+    from vllm import LLM, SamplingParams
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    prompts = [
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt}],
             tokenize=False,
             add_generation_prompt=True,
         )
-        for p in PROMPTS_RAW
+        for prompt in PROMPTS
     ]
-
-
-def extract_logprobs(
-    outputs,
-) -> list[tuple[list[str], list[float]]]:
-    results = []
-    for out in outputs:
-        comp = out.outputs[0]
-        tokens: list[str] = []
-        lps: list[float] = []
-        for i, lp_dict in enumerate(comp.logprobs):
-            tid = comp.token_ids[i]
-            entry = lp_dict[tid]
-            tokens.append(entry.decoded_token or f"<id:{tid}>")
-            lps.append(entry.logprob)
-        results.append((tokens, lps))
-    return results
-
-
-def generate(
-    llm: LLM,
-    prompts: list[str],
-    max_tokens: int,
-    steering: SteeringSpec | None = None,
-) -> list[tuple[list[str], list[float]]]:
-    sampling = SamplingParams(temperature=0.0, max_tokens=max_tokens, logprobs=0)
-    kwargs = {}
-    if steering is not None:
-        kwargs["steering"] = steering
-    outputs = llm.generate(prompts, sampling_params=sampling, **kwargs)
-    return extract_logprobs(outputs)
-
-
-def compare(
-    name_a: str,
-    results_a: list[tuple[list[str], list[float]]],
-    name_b: str,
-    results_b: list[tuple[list[str], list[float]]],
-    expect_same: bool,
-) -> tuple[bool, float]:
-    """Compare two sets of results.
-
-    If expect_same=True, checks tokens match and logprobs are within LOGPROB_ATOL.
-    If expect_same=False, checks that at least one prompt differs (sanity check).
-    Returns (passed, global_max_diff).
-    """
-    global_max = 0.0
-    all_match = True
-    for i in range(len(results_a)):
-        toks_a, lps_a = results_a[i]
-        toks_b, lps_b = results_b[i]
-        if toks_a != toks_b:
-            all_match = False
-        max_diff = max(
-            (abs(a - b) for a, b in zip(lps_a, lps_b)),
-            default=0.0,
-        )
-        global_max = max(global_max, max_diff)
-
-    if expect_same:  # noqa: SIM108
-        passed = all_match and global_max <= LOGPROB_ATOL
-    else:
-        passed = not all_match  # at least one prompt should differ
-    return passed, global_max
-
-
-def make_llm(
-    model: str,
-    gpu_mem: float,
-    max_model_len: int,
-    *,
-    enable_steer: bool = False,
-    enforce_eager: bool = True,
-    chunked_prefill: bool = False,
-    vector_path: str | None = None,
-    scale: float = 0.0,
-    target_layers: list[int] | None = None,
-    normalize: bool = True,
-) -> LLM:
-    kwargs: dict = dict(
-        model=model,
-        enforce_eager=enforce_eager,
-        enable_chunked_prefill=chunked_prefill,
+    kwargs = dict(
+        model=args.model,
+        enforce_eager=args._case != "steered_graph",
+        enable_chunked_prefill=args._case == "plain_chunked",
         enable_prefix_caching=False,
-        gpu_memory_utilization=gpu_mem,
-        max_model_len=max_model_len,
+        async_scheduling=False,
+        gpu_memory_utilization=args.gpu_memory_utilization,
+        max_model_len=args.max_model_len,
+        max_num_seqs=len(PROMPTS),
+        max_num_batched_tokens=args.max_model_len,
     )
-    if vector_path is not None:
-        # Engine-default steering (implies enable_steer_vector)
-        kwargs["steering_config"] = SteeringSpec(vectors=[VectorSpec(
-            source=vector_path,
-            scale=scale,
-            layers=target_layers,
-            normalize=normalize,
-            apply=ApplySpec(prompt="all", generation="all"),
-        )]).model_dump_json()
-    elif enable_steer:
-        kwargs["enable_steer_vector"] = True
-    return LLM(**kwargs)
-
-
-def run_check(
-    name: str,
-    name_a: str,
-    results_a: list[tuple[list[str], list[float]]],
-    name_b: str,
-    results_b: list[tuple[list[str], list[float]]],
-    expect_same: bool,
-) -> bool:
-    passed, max_diff = compare(name_a, results_a, name_b, results_b, expect_same)
-    if expect_same:
-        status = "PASS" if passed else "FAIL"
-        detail = f"max_diff={max_diff:.6f} (tol={LOGPROB_ATOL})"
-    else:
-        status = "PASS" if passed else "FAIL"
-        detail = (
-            "outputs differ"
-            if passed
-            else "outputs are IDENTICAL (steering had no effect!)"
+    if args._case.startswith(("zero_", "steered_")):
+        kwargs["steering_config"] = SteeringSpec(
+            vectors=[
+                VectorSpec(
+                    source=args.vector,
+                    algorithm="direct",
+                    scale=0.0 if args._case == "zero_eager" else args.scale,
+                    layers=args.target_layers,
+                    normalize=False,
+                    apply=ApplySpec(prompt="all", generation="all"),
+                )
+            ]
+        ).model_dump_json()
+        if args._case == "steered_graph":
+            kwargs["steer_graph_mode"] = "in_graph"
+    llm = LLM(**kwargs)
+    params = SamplingParams(
+        temperature=0,
+        max_tokens=args.max_tokens,
+        ignore_eos=True,
+        logprobs=0,
+        seed=0,
+    )
+    outputs = llm.generate(prompts, sampling_params=params, use_tqdm=False)
+    results = []
+    for output in outputs:
+        completion = output.outputs[0]
+        results.append(
+            {
+                "text": completion.text,
+                "token_ids": list(completion.token_ids),
+                "logprobs": [
+                    distribution[token].logprob
+                    for token, distribution in zip(
+                        completion.token_ids, completion.logprobs
+                    )
+                ],
+            }
         )
-    print(f"  [{status}] {name}: {detail}")
-    return passed
+    config = llm.llm_engine.vllm_config
+    return {
+        "case": args._case,
+        "gpu_name": torch.cuda.get_device_name(0),
+        "vllm_version": vllm.__version__,
+        "torch_version": torch.__version__,
+        "cudagraph_mode": str(config.compilation_config.cudagraph_mode),
+        "steer_graph_mode": getattr(config.steer_vector_config, "graph_mode", None),
+        "outputs": results,
+    }
+
+
+def compare(left: dict, right: dict) -> dict:
+    """Compare logprobs only along a shared autoregressive token prefix."""
+    equal = 0
+    shared_tokens = 0
+    maximum = 0.0
+    for a, b in zip(left["outputs"], right["outputs"], strict=True):
+        equal += a["token_ids"] == b["token_ids"]
+        for token_a, token_b, lp_a, lp_b in zip(
+            a["token_ids"],
+            b["token_ids"],
+            a["logprobs"],
+            b["logprobs"],
+            strict=True,
+        ):
+            if token_a != token_b:
+                break
+            shared_tokens += 1
+            maximum = max(maximum, abs(lp_a - lp_b))
+    return {
+        "left": left["case"],
+        "right": right["case"],
+        "identical_token_sequences": equal,
+        "total_prompts": len(left["outputs"]),
+        "shared_prefix_tokens": shared_tokens,
+        "max_shared_prefix_logprob_difference": maximum if shared_tokens else None,
+    }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Verify steering correctness for your model/hardware.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--model", default="Qwen/Qwen2.5-1.5B-Instruct",
-        help="HuggingFace model name or path",
-    )
-    parser.add_argument(
-        "--vector", required=True,
-        help="Path to steering vector (.gguf)",
-    )
-    parser.add_argument(
-        "--target-layers", type=int, nargs="+", required=True,
-        help="Layer indices to steer",
-    )
-    parser.add_argument(
-        "--scale", type=float, default=4.0,
-        help="Steering scale for comparison",
-    )
-    parser.add_argument(
-        "--max-tokens", type=int, default=40,
-        help="Tokens to generate per prompt",
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", default=os.environ.get("STEER_TEST_MODEL"))
+    parser.add_argument("--vector", required=True)
+    parser.add_argument("--target-layers", type=int, nargs="+", required=True)
+    parser.add_argument("--scale", type=float, default=2.0)
+    parser.add_argument("--max-tokens", type=int, default=40)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.4)
     parser.add_argument("--max-model-len", type=int, default=512)
-    parser.add_argument("--no-normalize", dest="normalize", action="store_false")
+    parser.add_argument("--output", type=Path, help="New JSON result path")
+    parser.add_argument("--_case", choices=CASES, help=argparse.SUPPRESS)
+    parser.add_argument("--_result", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if not args.model:
+        parser.error("provide --model or STEER_TEST_MODEL")
+    args.vector = str(Path(args.vector).expanduser().resolve())
+    if not Path(args.vector).is_file():
+        parser.error(f"vector file does not exist: {args.vector}")
+    if args.max_tokens <= 0 or args.max_tokens >= args.max_model_len:
+        parser.error("--max-tokens must be positive and below --max-model-len")
+    if args.output and args.output.exists():
+        parser.error(f"output already exists: {args.output}")
+    if args._case:
+        args._result.write_text(json.dumps(run_case(args), indent=2), encoding="utf-8")
+        return
 
-    vector_path = str(Path(args.vector).resolve())
-    if not Path(vector_path).exists():
-        print(f"ERROR: Vector file not found: {vector_path}", file=sys.stderr)
-        sys.exit(1)
+    observations = []
+    with tempfile.TemporaryDirectory(prefix="easysteer-diagnostic-") as tmp:
+        for case in CASES:
+            result_path = Path(tmp) / f"{case}.json"
+            print(f"Collecting {case} in a separate process", flush=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    *sys.argv[1:],
+                    "--_case",
+                    case,
+                    "--_result",
+                    str(result_path),
+                ],
+                check=True,
+            )
+            observations.append(json.loads(result_path.read_text(encoding="utf-8")))
 
-    print("=" * 60)
-    print("Steering Correctness Verification")
-    print("=" * 60)
-    print(f"  Model:         {args.model}")
-    print(f"  Vector:        {vector_path}")
-    print(f"  Target layers: {args.target_layers}")
-    print(f"  Scale:         {args.scale}")
-    print(f"  Max tokens:    {args.max_tokens}")
-    print(f"  Tolerance:     {LOGPROB_ATOL}")
-    print()
-
-    prompts = build_prompts(args.model)
-    common = dict(
-        model=args.model,
-        gpu_mem=args.gpu_memory_utilization,
-        max_model_len=args.max_model_len,
+    by_case = {observation["case"]: observation for observation in observations}
+    comparisons = [
+        compare(by_case[left], by_case[right])
+        for left, right in (
+            ("plain_chunked", "plain"),
+            ("plain", "zero_eager"),
+            ("steered_eager", "steered_graph"),
+            ("zero_eager", "steered_eager"),
+        )
+    ]
+    report = {
+        "workload": vars(args) | {"output": str(args.output), "_result": None},
+        "observations": observations,
+        "comparisons": comparisons,
+    }
+    if args.output:
+        with args.output.open("x", encoding="utf-8") as output:
+            json.dump(report, output, indent=2)
+    print(json.dumps(comparisons, indent=2))
+    print(
+        "Diagnostic collection completed. Use tests/run_suites.sh baseline for "
+        "mechanism-level validation; text differences alone do not identify "
+        "a steering regression."
     )
-
-    # ── 1. Plain chunked ON ──────────────────────────────────────
-    print("[1/5] Plain vLLM, chunked_prefill=True")
-    llm = make_llm(**common, chunked_prefill=True)
-    plain_chunked = generate(llm, prompts, args.max_tokens)
-    del llm
-    torch.cuda.empty_cache()
-
-    # ── 2. Plain chunked OFF ─────────────────────────────────────
-    print("[2/5] Plain vLLM, chunked_prefill=False")
-    llm = make_llm(**common, chunked_prefill=False)
-    plain_nochunk = generate(llm, prompts, args.max_tokens)
-    del llm
-    torch.cuda.empty_cache()
-
-    # ── 3. Steered scale=0, eager ────────────────────────────────
-    print("[3/5] Steered vLLM, scale=0, eager")
-    llm = make_llm(
-        **common, vector_path=vector_path, scale=0.0,
-        target_layers=args.target_layers, normalize=args.normalize,
-    )
-    steered_s0 = generate(llm, prompts, args.max_tokens)
-    del llm
-    torch.cuda.empty_cache()
-
-    # ── 4. Steered scale=N, eager ────────────────────────────────
-    print(f"[4/5] Steered vLLM, scale={args.scale}, eager")
-    llm = make_llm(
-        **common, vector_path=vector_path, scale=args.scale,
-        target_layers=args.target_layers, normalize=args.normalize,
-    )
-    steered_eager = generate(llm, prompts, args.max_tokens)
-    del llm
-    torch.cuda.empty_cache()
-
-    # ── 5. Steered scale=N, CUDA graphs ──────────────────────────
-    print(f"[5/5] Steered vLLM, scale={args.scale}, CUDA graphs")
-    llm = make_llm(
-        **common, enforce_eager=False,
-        vector_path=vector_path, scale=args.scale,
-        target_layers=args.target_layers, normalize=args.normalize,
-    )
-    steered_cg = generate(llm, prompts, args.max_tokens)
-    del llm
-    torch.cuda.empty_cache()
-
-    # ── Results ──────────────────────────────────────────────────
-    print()
-    print("=" * 60)
-    print("Results")
-    print("=" * 60)
-
-    checks = []
-    checks.append(run_check(
-        "Chunked prefill ON vs OFF (plain, no steering)",
-        "plain_chunked", plain_chunked,
-        "plain_nochunk", plain_nochunk,
-        expect_same=True,
-    ))
-    checks.append(run_check(
-        "Plain vs scale=0 steering (both chunked OFF)",
-        "plain_nochunk", plain_nochunk,
-        "steered_s0", steered_s0,
-        expect_same=True,
-    ))
-    checks.append(run_check(
-        f"Steered eager vs CUDA graphs (scale={args.scale})",
-        "steered_eager", steered_eager,
-        "steered_cg", steered_cg,
-        expect_same=True,
-    ))
-    checks.append(run_check(
-        f"Steering has effect (scale={args.scale} vs scale=0)",
-        "steered_eager", steered_eager,
-        "steered_s0", steered_s0,
-        expect_same=False,
-    ))
-
-    print()
-    n_pass = sum(checks)
-    n_total = len(checks)
-    if all(checks):
-        print(f"*** ALL {n_total} CHECKS PASSED — safe to run experiments ***")
-    else:
-        print(f"*** {n_total - n_pass}/{n_total} CHECKS FAILED ***")
-        print("Do NOT run experiments until all checks pass.")
-        sys.exit(1)
 
 
 if __name__ == "__main__":

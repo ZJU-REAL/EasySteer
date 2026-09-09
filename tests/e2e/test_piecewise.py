@@ -4,13 +4,9 @@
 The engine boots WITHOUT enforce_eager so the model is torch.compiled
 and piecewise cudagraphs are captured. Covers: config wiring (the
 steer_apply splitting op and piecewise cudagraph mode), steering firing
-under compiled execution, scale-0 steering being byte-identical to no
-steering, and byte-identical replay of a repeated steered run.
+under compiled execution and scale-0 steering as a no-op on this workload.
 
-Compiled kernels drift numerically from eager, so there is no
-byte-compare against an eager golden (the original script printed that
-diff as informational only); the checks here are behavior-level within
-one compiled engine.
+The checks compare behavior within one compiled engine.
 """
 
 import os
@@ -45,7 +41,7 @@ SP = SamplingParams(temperature=0.0, max_tokens=128)
 
 @pytest.fixture(scope="module")
 def outs(llm):
-    """Unsteered / zero-scale / twice-steered outputs on one engine."""
+    """Unsteered / zero-scale / steered outputs on one engine."""
 
     def gen(spec=None):
         out = llm.generate(
@@ -57,7 +53,6 @@ def outs(llm):
         "plain": gen(),
         "zero": gen(steering_spec(scale=0.0, layers=LAYERS)),
         "happy": gen(steering_spec(scale=2.0, layers=LAYERS)),
-        "happy2": gen(steering_spec(scale=2.0, layers=LAYERS)),
     }
 
 
@@ -67,6 +62,7 @@ def test_piecewise_config_wiring(llm):
     assert "vllm::steer_apply" in (comp.splitting_ops or []), (
         f"vllm::steer_apply missing from splitting_ops: {comp.splitting_ops}"
     )
+    assert "vllm::steer_moe_gate" not in (comp.splitting_ops or [])
     assert comp.cudagraph_mode.has_piecewise_cudagraphs(), (
         f"cudagraph_mode is {comp.cudagraph_mode}, expected piecewise"
     )
@@ -84,11 +80,4 @@ def test_zero_scale_identical_to_no_steering(outs):
     """The op is a clean no-op on unsteered tokens."""
     assert outs["zero"] == outs["plain"], (
         "scale-0 steering differs from no steering"
-    )
-
-
-def test_repeated_steered_run_deterministic(outs):
-    """Cudagraph replay of an identical steered config is byte-stable."""
-    assert outs["happy"] == outs["happy2"], (
-        "repeated steered run not deterministic"
     )

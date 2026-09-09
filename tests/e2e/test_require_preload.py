@@ -2,7 +2,7 @@
 """--steer-require-preload frontend enforcement.
 
 With require_preload set, steering specs referencing vectors that were
-not explicitly preloaded are rejected with a clear ValueError at the
+not explicitly preloaded are rejected with a clear VLLMClientError at the
 frontend — the engine stays alive — and succeed (and actually steer)
 after LLM.preload_steer_vectors.
 """
@@ -10,6 +10,7 @@ after LLM.preload_steer_vectors.
 import pytest
 
 from vllm import SamplingParams
+from vllm.exceptions import VLLMClientError
 
 from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
 
@@ -23,6 +24,8 @@ ENGINE_KWARGS = dict(
     enable_prefix_caching=False,
     gpu_memory_utilization=0.18,
     max_model_len=2048,
+    max_num_batched_tokens=2048,
+    max_num_seqs=32,
 )
 
 PROMPT = (
@@ -36,7 +39,7 @@ SP = SamplingParams(temperature=0.0, max_tokens=48)
 def test_unpreloaded_vector_rejected_then_accepted(llm):
     spec = steering_spec(scale=2.0, layers=LAYERS)
 
-    with pytest.raises(ValueError, match="not preloaded"):
+    with pytest.raises(VLLMClientError, match="not preloaded"):
         llm.generate(PROMPT, steering=spec, sampling_params=SP)
 
     plain = llm.generate(PROMPT, sampling_params=SP)[0].outputs[0].text
@@ -60,5 +63,5 @@ def test_unpreloaded_multi_vector_rejected(llm):
         layers=LAYERS,
         apply=ApplySpec(prompt="all", generation="all"),
     )])
-    with pytest.raises(ValueError, match="not preloaded"):
+    with pytest.raises(VLLMClientError, match="not preloaded"):
         llm.generate(PROMPT, steering=missing, sampling_params=SP)

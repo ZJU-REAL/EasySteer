@@ -1,6 +1,4 @@
-"""
-Difference of Means Extractor
-"""
+"""Difference-of-means control-vector extraction."""
 
 import numpy as np
 
@@ -14,7 +12,7 @@ from .utils import (
 
 
 class DiffMeanExtractor(BaseExtractor):
-    """Difference of means method for control vector extraction"""
+    """Extract directions from the difference of positive and negative means."""
 
     method = "diffmean"
     progress_desc = "Computing DiffMean directions"
@@ -42,7 +40,7 @@ class DiffMeanExtractor(BaseExtractor):
         negative_indices=None,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs
+        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the difference-of-means method.
 
@@ -103,8 +101,7 @@ class DiffMeanExtractor(BaseExtractor):
         accumulator.pos = pos_moments
         accumulator.neg = neg_moments
         directions = {
-            layer: accumulator.direction(layer, normalize=normalize)
-            for layer in layers
+            layer: accumulator.direction(layer, normalize=normalize) for layer in layers
         }
         return StatisticalControlVector(
             method="diffmean",

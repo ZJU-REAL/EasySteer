@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Adapters from third-party checkpoint formats to steering payloads.
 
-The engine only loads formats whose schema EasySteer itself defines
-(its GGUF export; the moe_router JSON). Everything else is interpreted
-here, client-side: each adapter is a small pure function that reads one
-known checkpoint layout and returns a canonical payload for
-``VectorSpec(data=...)``. If your file does not match one of these
-layouts, load it yourself and construct the payload directly — the
-payload classes are the contract, the adapters are only conveniences.
+Adapters read known checkpoint layouts and return payloads for
+``VectorSpec(data=...)``. For other layouts, construct a payload directly.
+The engine itself loads EasySteer's GGUF and moe_router JSON formats.
 
 Example:
     >>> from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
@@ -22,16 +18,18 @@ Example:
     ... )])
 """
 
+import base64
 import glob
 import json
 import os
 import pickle
 from typing import Any
 
-from vllm.steer_vectors.payloads import (
+from vllm.model_hooks.steering.payloads import (
     DirectionVector,
     LinearMap,
     LowRankProjector,
+    Payload,
     ReftIntervention,
 )
 
@@ -42,7 +40,27 @@ __all__ = [
     "from_lm_steer",
     "from_pt_direction",
     "from_pyreft",
+    "load",
+    "to_json_payload",
 ]
+
+
+def to_json_payload(payload: Payload) -> dict[str, Any]:
+    """Encode a canonical payload for JSON files or OpenAI HTTP requests.
+
+    Tensor bytes become base64 strings; shapes, metadata and the content
+    hash remain identical to ``payload.to_wire()``. This runs in the
+    producing EasySteer environment, so JSON consumers need no engine
+    or tensor dependencies.
+    """
+    wire = payload.to_wire()
+    return {
+        **wire,
+        "tensors": {
+            name: {**tensor, "data": base64.b64encode(tensor["data"]).decode("ascii")}
+            for name, tensor in wire["tensors"].items()
+        },
+    }
 
 
 def from_pt_direction(path: str, layers: list[int]) -> DirectionVector:
@@ -61,18 +79,13 @@ def from_pt_direction(path: str, layers: list[int]) -> DirectionVector:
         vector = torch.from_numpy(vector)
     if not isinstance(vector, torch.Tensor):
         raise ValueError(
-            f"{path} does not contain a tensor or numpy array: "
-            f"{type(vector).__name__}"
+            f"{path} does not contain a tensor or numpy array: {type(vector).__name__}"
         )
     return DirectionVector({layer: vector for layer in layers})
 
 
 def from_control_vector(cv: Any) -> DirectionVector:
-    """Payload from an easysteer ``StatisticalControlVector``.
-
-    The no-disk path: extract with ``easysteer.steer`` and steer with
-    the result directly, no GGUF round-trip.
-    """
+    """Convert a StatisticalControlVector directly, without a GGUF round-trip."""
     if not getattr(cv, "directions", None):
         raise ValueError("control vector has no directions")
     return DirectionVector(dict(cv.directions))
@@ -80,18 +93,42 @@ def from_control_vector(cv: Any) -> DirectionVector:
 
 def from_gguf(path: str) -> DirectionVector:
     """Payload from an EasySteer GGUF export (``direction.<layer>``)."""
-    from easysteer.steer.utils import StatisticalControlVector
+    from vllm.model_hooks.steering.loading import load_file_payload
 
-    return from_control_vector(StatisticalControlVector.import_gguf(path))
+    return load_file_payload(path, format="gguf")
+
+
+def load(path: str, *, format: str, **options) -> Payload:
+    """Load an explicitly identified checkpoint schema into a canonical payload.
+
+    Formats: ``gguf``, ``concept_pair`` (named h1/h2 GGUF directory),
+    ``moe_router`` (JSON), ``pt_direction``, ``pyreft``, ``lm_steer`` and
+    ``linear_transport``. Options go to the chosen adapter; for example
+    ``layers=[10]`` for pt_direction or ``vector_index=1`` for lm_steer.
+    A suffix such as .pt never selects or guesses a checkpoint schema.
+    """
+    if format in ("gguf", "concept_pair", "moe_router"):
+        from vllm.model_hooks.steering.loading import load_file_payload
+
+        return load_file_payload(path, format=format, **options)
+    adapters = {
+        "pt_direction": from_pt_direction,
+        "pyreft": from_pyreft,
+        "lm_steer": from_lm_steer,
+        "linear_transport": from_linear_transport,
+    }
+    if format not in adapters:
+        raise ValueError(f"Unknown checkpoint format: {format!r}")
+    return adapters[format](path, **options)
 
 
 def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
     """Payload from a pyreft checkpoint directory.
 
     Reads the single ``*.bin`` + config pair. A BiasIntervention-style
-    state dict (one vector) becomes a :class:`DirectionVector` for the
+    state dict (one vector) becomes a ``DirectionVector`` for the
     ``direct`` algorithm; a LoReFT state dict (rotation + learned
-    source) becomes a :class:`ReftIntervention` for ``loreft``. The
+    source) becomes a ``ReftIntervention`` for ``loreft``. The
     checkpoint's layer index is preserved.
     """
     import torch
@@ -131,7 +168,7 @@ def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
             layer=layer,
         )
 
-    # BiasIntervention-style: exactly one plausible direction tensor.
+    # BiasIntervention checkpoints store one direction rather than a rotation.
     if len(state) == 1:
         vector = next(iter(state.values()))
     elif "source_representation" in state:
@@ -154,8 +191,7 @@ def from_lm_steer(path: str, vector_index: int = 0) -> LowRankProjector:
 
     Handles the published ``gpt2.pt`` layout (a list whose second entry
     is the parameter dict). Multi-vector checkpoints stack steer
-    vectors; ``vector_index`` selects one — explicitly, instead of the
-    silent first-vector default the engine loader used to apply.
+    vectors; ``vector_index`` selects one and defaults to the first.
     """
     import torch
 
@@ -210,8 +246,7 @@ def _find_pyreft_checkpoint(path: str) -> tuple[str, int]:
     ]
     if len(config_files) != 1:
         raise ValueError(
-            f"expected exactly one config file in {path}, found "
-            f"{len(config_files)}"
+            f"expected exactly one config file in {path}, found {len(config_files)}"
         )
     with open(config_files[0]) as f:
         config = json.load(f)

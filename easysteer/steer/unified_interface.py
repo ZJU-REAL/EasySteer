@@ -1,14 +1,12 @@
-"""
-Unified Interface for Steering Methods
-"""
+"""Dispatch control-vector extraction by method name."""
 
 import inspect
 
-from .utils import StatisticalControlVector
 from .diffmean import DiffMeanExtractor
-from .pca import PCAExtractor
 from .lat import LATExtractor
 from .linear_probe import LinearProbeExtractor
+from .pca import PCAExtractor
+from .utils import StatisticalControlVector
 
 _EXTRACTORS = {
     "diffmean": DiffMeanExtractor,
@@ -21,56 +19,22 @@ _COMMON_PARAMS = ("all_hidden_states", "positive_indices", "negative_indices")
 
 
 def _accepted_options(extract_fn):
-    """List the keyword options an extractor's extract() accepts.
-
-    The shared positional data arguments and the catch-all ``**kwargs``
-    are excluded, so the result names exactly the options a caller may
-    pass through the unified interface.
-
-    Args:
-        extract_fn (Callable): The extractor's extract function.
-
-    Returns:
-        list[str]: Accepted option names, in signature order.
-    """
+    """List named extractor options, excluding the shared data arguments."""
     signature = inspect.signature(extract_fn)
     return [
         name
         for name, param in signature.parameters.items()
-        if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                          inspect.Parameter.KEYWORD_ONLY)
+        if param.kind
+        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
         and name not in _COMMON_PARAMS
     ]
 
 
-def _dispatch(method, all_hidden_states, positive_indices, negative_indices,
-              kwargs):
-    """Validate options against the target extractor and dispatch.
-
-    Every public extraction function funnels through here: the method
-    name resolves to an extractor, and each keyword option is checked
-    against that extractor's actual signature so a typo raises instead
-    of being silently ignored.
-
-    Args:
-        method (str): Extraction method name.
-        all_hidden_states (list | CaptureResult): Hidden states input.
-        positive_indices (list[int]): Indices of positive samples.
-        negative_indices (list[int] | None): Indices of negative
-            samples, or None to derive them.
-        kwargs (dict): Method-specific options to validate.
-
-    Returns:
-        StatisticalControlVector: The extracted control vector.
-
-    Raises:
-        ValueError: If ``method`` is unknown, or any option in
-            ``kwargs`` is not accepted by the target extractor.
-    """
+def _dispatch(method, all_hidden_states, positive_indices, negative_indices, kwargs):
+    """Validate the method and options, then call the selected extractor."""
     if method not in _EXTRACTORS:
         raise ValueError(
-            f"Unsupported method: {method!r}. Supported methods: "
-            f"{list(_EXTRACTORS)}"
+            f"Unsupported method: {method!r}. Supported methods: {list(_EXTRACTORS)}"
         )
     extract_fn = _EXTRACTORS[method].extract
     accepted = _accepted_options(extract_fn)
@@ -89,11 +53,7 @@ def _dispatch(method, all_hidden_states, positive_indices, negative_indices,
 
 
 def extract_statistical_control_vector(
-    method: str,
-    all_hidden_states,
-    positive_indices,
-    negative_indices=None,
-    **kwargs
+    method: str, all_hidden_states, positive_indices, negative_indices=None, **kwargs
 ) -> StatisticalControlVector:
     """Unified control vector extraction interface.
 
@@ -142,8 +102,7 @@ def extract_diffmean_control_vector(
         StatisticalControlVector: The DiffMean control vector.
     """
     return _dispatch(
-        "diffmean", all_hidden_states, positive_indices, negative_indices,
-        kwargs
+        "diffmean", all_hidden_states, positive_indices, negative_indices, kwargs
     )
 
 
@@ -285,6 +244,5 @@ def extract_linear_probe_control_vector(
         ... )
     """
     return _dispatch(
-        "linear_probe", all_hidden_states, positive_indices,
-        negative_indices, kwargs
+        "linear_probe", all_hidden_states, positive_indices, negative_indices, kwargs
     )

@@ -105,8 +105,6 @@ extra:
       link: https://arxiv.org/abs/2509.25175
 
 # Only the docs/ tree is published; the top-level READMEs stay the GitHub landing page.
-# docs/design/ holds internal engineering records (linked from the contributing page
-# via GitHub URLs) — excluded so their repo-relative links don't trip --strict.
+# This README describes how to maintain the documentation site.
 exclude_docs: |
   README.md
-  design/

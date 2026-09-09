@@ -10,11 +10,9 @@ on output text, so no batch-shape numerics sensitivity):
   only at equal prompt lengths;
 - a prompt containing another request's generated tokens reuses only
   prompt-region blocks (phase boundary respected);
-- capture and fresh runtime server-steering installs are rejected on a
-  prefix-caching engine.
+Capture cache reads and default updates are covered by the shared compiled
+engine in test_capture_unified.py and test_server_steering.py.
 """
-
-import pytest
 
 from vllm import SamplingParams
 from vllm.inputs import TokensPrompt
@@ -110,32 +108,9 @@ class TestPhaseBoundary:
         )
 
 
-class TestCachingEngineRejections:
-    def test_capture_accepted_on_caching_engine(self, llm):
-        """Capture no longer needs prefix caching off: capture requests
-        carry a cache_salt (full recompute) and unsalted cache hits fail
-        explicitly at fetch — covered by test_capture_unified.py."""
-        llm.llm_engine.collective_rpc("start_capture", args=("hidden_states",))
-        llm.llm_engine.collective_rpc("stop_capture", args=("hidden_states",))
-
-    def test_fresh_server_install_rejected(self, llm):
-        from vllm.steer_vectors import to_engine_request
-
-        with pytest.raises(Exception, match="(?i)salt"):
-            llm.llm_engine.collective_rpc(
-                "add_steer_vector",
-                args=(to_engine_request(steering_spec(scale=1.0)),),
-            )
-
-
 class TestBaselineIsolation:
-    """The notebook flow: baseline, then steering, then the baseline
-    again in the same engine — the post-steering baseline must be
-    byte-identical. The reference is the WARM (cache-hit) baseline, not
-    the cold first run: a cache hit recomputes only the block tail via a
-    different kernel path, which shifts numerics on its own with no
-    steering involved (cold != warm even for pure baselines).
-    """
+    """Compare a warm baseline before and after steering in the same
+    engine. Both baseline requests use the cache-hit execution path."""
 
     PROMPT = list(range(300, 348))
 

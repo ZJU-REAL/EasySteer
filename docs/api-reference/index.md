@@ -12,9 +12,9 @@ torch or vLLM install required.
   legacy extraction helpers.
 - [Steering specs](steering-specs.md) — hand-written summary of `SteeringSpec` /
   `VectorSpec` / `ApplySpec` / `SelectSpec`; the
-  [Steering guide](../user-guide/steering.md) is the canonical reference (rendering the
-  `vllm-steer` fork with mkdocstrings would drag the CUDA/torch stack into the docs
-  build).
+  [Steering guide](../user-guide/steering.md) is the canonical reference. These
+  classes belong to the vLLM fork and are documented separately from the generated
+  `easysteer` package reference.
 
 <!-- TODO: consider vLLM-style api-autonav for full-module auto-navigation once the
 docstring coverage of easysteer.steer / easysteer.reft is raised. easysteer.reft is

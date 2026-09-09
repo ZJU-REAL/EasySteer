@@ -1,5 +1,4 @@
-# Core intervention classes
-# Extracted from pyvene for better organization
+"""Core pyvene intervention classes exposed by ReFT."""
 
 from .modeling.interventions import (
     Intervention,
@@ -53,4 +52,4 @@ __all__ = [
     'AutoencoderIntervention',
     'JumpReLUAutoencoderIntervention',
     'InterventionOutput'
-] 
+]

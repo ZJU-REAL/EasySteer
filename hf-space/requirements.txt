@@ -1,5 +1,5 @@
 # App dependencies
 # GPU mode: vLLM / torch / transformers ship in the base image
-# API mode: only gradio + openai are needed
-gradio>=5.0.0
+# API mode uses exported payload JSON for checkpoint-based algorithms.
+gradio>=5.0.0,<6
 openai>=1.0.0

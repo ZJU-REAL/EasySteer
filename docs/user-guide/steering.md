@@ -1,8 +1,6 @@
 # Steering (v2 API)
 
-Steering is configured with three objects from `vllm.steer_vectors`
-(see [`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md)
-for the design rationale):
+Steering is configured with three objects from `vllm.steer_vectors`:
 
 1. **`ApplySpec`** — *where and when* a vector applies (phases, token/position filters,
    generation window).
@@ -10,22 +8,41 @@ for the design rationale):
    algorithm-specific `params`, and its `apply` clause.
 3. **`SteeringSpec`** — an ordered list of `VectorSpec`s plus a conflict policy.
 
-Specs are backend-independent: eager, `split`, and `in_graph` engines accept the same
-spec; a request using an algorithm outside the engine's declared `steer_algorithms`
-is rejected at admission (the declaration is required whenever steering is enabled —
-see the [vllm-steer steering guide](../../vllm-steer/docs/features/steer_vectors.md)).
+Eager, `split`, and `in_graph` engines share the same spec API, with the graph
+payload conditions described below. A request using an algorithm outside the engine's declared `steer_algorithms`
+is rejected at admission. Set `steer_algorithms=["direct"]` for direct steering,
+or `steer_algorithms="all"` to serve all registered algorithms in `split` mode.
+An engine-default `steering_config` can infer the declaration from its spec.
+Requests with multiple vectors require `steer_multi_vector=True`
+(`--steer-multi-vector` on the CLI), which is also implied by an `"all"`
+declaration or a multi-vector engine-default spec.
 
 ## Attaching a spec
 
-Same object, two scopes:
+Every request resolves one effective configuration at admission. Python and HTTP
+use the same rules:
 
-- **Per request**: `llm.generate(prompts, steering=spec, ...)`, or the JSON field
-  `"steering"` on HTTP requests (see [OpenAI-compatible server](openai-server.md)).
-- **Engine default**: `--steering-config spec.json` (or inline JSON) at startup,
-  replaceable at runtime via `POST /v1/steering {"spec": {...}}` (resets the prefix
-  cache).
+| `steering` value | Effective configuration |
+|---|---|
+| Omitted or `None` (`null` in JSON) | The current default, if one exists. |
+| `False` (`false` in JSON) | No steering for this request. |
+| A `SteeringSpec` | This complete spec, overriding the default. |
 
-Server-level and per-request steering cannot currently be combined in one request.
+`llm.generate(prompts, steering=spec, ...)` applies one spec to the batch. A list
+such as `steering=[None, False, spec]` resolves these choices separately for each
+prompt. Defaults and overrides are not stacked.
+
+Set an initial default with `LLM(steering_config=...)` or
+`--steering-config spec.json` (inline JSON is also accepted). Update or clear it
+with `llm.set_default_steering(spec)` or `llm.set_default_steering(None)`;
+`llm.get_default_steering()` reports the current default. HTTP clients use
+`POST /v1/steering {"spec": ...}` or `{"spec": null}` and `GET /v1/steering`.
+See [OpenAI-compatible server](openai-server.md).
+
+Updates affect new requests. Requests already admitted retain their configuration
+and weight snapshot. Changing a default does not reset the prefix cache or reserve
+a permanent execution slot. Algorithms, graph mode and capacity remain engine
+settings, so every default and override must satisfy that declaration.
 
 ## `ApplySpec`: the where-clause
 
@@ -70,12 +87,17 @@ ApplySpec(prompt_window=(-4, None), generation_window=(0, 4))
 | `source` | `None` | Path to a vector file in a format EasySteer itself defines (its GGUF export; the `moe_router` JSON). For third-party checkpoint formats use `data` instead. Plain path only — no `"path\|algo"`. |
 | `data` | `None` | An in-memory payload (see [Steering with your own tensors](#steering-with-your-own-tensors)). Mutually exclusive with `source`. |
 | `algorithm` | `"direct"` | Registry key: `direct`, `linear`, `loreft`, `lm_steer`, `erase`, `replace`, `concept_replace`, `moe_router`. |
-| `scale` | `1.0` | Scale factor (negative suppresses the direction). |
-| `layers` | `None` | Layer indices to apply to; `None` lets the file decide. |
-| `normalize` | `False` | Normalize the vector before applying. |
+| `scale` | `1.0` | Algorithm-specific scale factor; `direct` adds `scale * vector`. |
+| `layers` | `None` | Layer indices to apply to; `None` uses the layer IDs in the source or payload. Payloads without layer IDs require an explicit list. |
+| `normalize` | `False` | Rescale the transformed hidden state to its original norm for `direct`, `erase`, `replace`, and `concept_replace`. Other algorithms reject `True`. |
 | `apply` | — | **Required** `ApplySpec`. |
 | `params` | `{}` | Algorithm-specific parameters, validated per algorithm; unknown keys are rejected. Only `moe_router` takes params: `expert_ids`, `mode`, `lambda`, `topk`. |
 | `name` | `None` | Label used in logs only (not identity). |
+
+For `moe_router`, explicit `mode`, `lambda` and `topk` parameters override those
+values in a source file or `RouterConfig`; omitted parameters retain the payload's
+values. `expert_ids` in `params` is only for inline configuration without `source`
+or `data`. A file or `RouterConfig` records its own expert IDs per layer.
 
 ## Steering with your own tensors
 
@@ -88,9 +110,10 @@ canonical payload structures:
 |---|---|---|
 | `DirectionVector({layer: vec})` | `direct`, `erase`, `replace` | one 1-D vector per layer |
 | `LinearMap(weight, bias=None)` | `linear` | one affine map, applied to each `layers` entry |
-| `LowRankProjector(p1, p2)` | `lm_steer` | low-rank update factors, applied to each `layers` entry |
-| `ReftIntervention(rotate, weight, bias=None, layer=None)` | `loreft` | LoReFT intervention; `layer` from the checkpoint wins |
-| `ConceptPair(h1=..., h2=...)` | `concept_replace` | named roles — steer toward `h1`, away from `h2` |
+| `LowRankProjector(projector1, projector2)` | `lm_steer` | low-rank update factors, applied to each `layers` entry |
+| `ReftIntervention(rotate_layer, learned_source_weight, learned_source_bias=None, layer=None)` | `loreft` | Uses its recorded `layer`; without one, requires `VectorSpec.layers` |
+| `ConceptPair(h1=..., h2=...)` | `concept_replace` | replace the component along `h1` with the corresponding component along `h2` |
+| `RouterConfig({layer: config})` | `moe_router` | per-layer expert IDs and routing mode |
 
 ```python
 from vllm.steer_vectors import ApplySpec, DirectionVector, SteeringSpec, VectorSpec
@@ -105,11 +128,22 @@ spec = SteeringSpec(vectors=[VectorSpec(
 
 Payloads are validated at construction (shapes, finiteness, role names) and
 identified engine-side by a content hash, so identical payloads share one
-resident copy regardless of how many requests carry them. `easysteer.vectors`
-ships adapters for the common third-party layouts (`from_pyreft`,
+resident copy regardless of how many requests carry them. Native files and
+in-memory data use the same payload validation, layer selection, identity and
+materialization path. The file is read before execution; workers consume that
+snapshot rather than reopen the source.
+
+`easysteer.vectors.load(path, format=...)` selects an explicit format adapter.
+Supported formats are `gguf`, `concept_pair`, `moe_router`, `pt_direction`,
+`pyreft`, `lm_steer`, and `linear_transport`. The existing convenience adapters
+remain available (`from_pyreft`,
 `from_lm_steer`, `from_linear_transport`, `from_pt_direction`, `from_gguf`),
 and `easysteer.vectors.from_control_vector(cv)` steers an extraction result
 with no GGUF round-trip.
+
+When a payload records layer IDs, `VectorSpec.layers` restricts those IDs; it does
+not move an intervention to a different layer. For a checkpoint with a recorded
+LoReFT layer, omit `layers` or include that layer in the list.
 
 ## `SteeringSpec`: vectors + conflict policy
 
@@ -117,7 +151,6 @@ with no GGUF round-trip.
 |---|---|---|
 | `vectors` | — | Non-empty ordered list of `VectorSpec`s. |
 | `conflict` | `"priority"` | When several vectors target one position: `"priority"` (first wins), `"sequential"` (stack in order), `"error"`. |
-| `debug` | `False` | Verbose logging during the forward pass. |
 
 `moe_router` is not yet supported in multi-vector specs.
 
@@ -128,11 +161,12 @@ from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
 # Single vector on every prompt + generated token
 sentiment = SteeringSpec(vectors=[
-    VectorSpec(source="vectors/happy.gguf", scale=2.0, layers=[10, 11, 12],
+    VectorSpec(source="vectors/happy_diffmean.gguf", scale=2.0, layers=[10, 11, 12],
                apply=ApplySpec(prompt="all", generation="all")),
 ])
 
-# Several directions stacked at the second-to-last prompt token
+# Several directions stacked at the second-to-last prompt token.
+# The engine must have steer_multi_vector=True; supply your own dir1/dir2 files.
 multi = SteeringSpec(
     conflict="sequential",
     vectors=[
@@ -145,20 +179,42 @@ multi = SteeringSpec(
 
 # Steer only the first 8 generated tokens
 early = SteeringSpec(vectors=[
-    VectorSpec(source="vectors/happy.gguf", scale=2.0, layers=[10, 11, 12],
+    VectorSpec(source="vectors/happy_diffmean.gguf", scale=2.0, layers=[10, 11, 12],
                apply=ApplySpec(generation_window=(0, 8))),
 ])
 ```
 
 ## Interaction with engine features
 
-- **Prefix caching** is supported: block hashes are keyed by the steering config
-  fingerprint; engine-default mode salts every hash, and spec updates reset the cache.
+- **Prefix caching** is supported: block hashes include the effective request's
+  steering fingerprint. Default and explicit requests with identical configs can
+  reuse blocks; different configs remain separate. Updating or clearing the default
+  preserves reusable blocks for previous configurations.
 - **Chunked prefill** is supported; negative positions resolve stably across chunks.
-- **CUDA graphs**: full-graph mode currently requires a single-vector, `direct`,
-  non-normalized spec; other specs are rejected at admission with an explicit error.
-  `--steer-graph-mode` is an engine optimization setting and never changes how a spec is
-  written.
+- **Beam search** requires steering to be disabled. Use `steering=False` (HTTP:
+  `"steering": false`) when a default is configured; effective steering with beam
+  search is rejected because its prompt/generation selection semantics differ.
+- **CUDA graphs**: `split` supports all algorithms and multi-vector specs, with
+  steering between compiled graph segments. `in_graph` requires a single-vector
+  spec whose algorithm has a graph kernel: `direct`, `erase`, `replace`, and
+  `concept_replace` support it; `loreft` and `lm_steer` also require payload rank
+  at most `steer_graph_max_rank` (default 32). `moe_router` supports inline and
+  file-backed `activate`, `deactivate`, `soft`, and `soft_topk` configurations;
+  `soft_random` and `linear` use `split`.
+  Normalization for the four direction algorithms above is supported in both
+  tiers. The default
+  `steer_graph_mode="auto"` evaluates an engine-default spec's actual payloads;
+  with a names-only declaration, conditional algorithms select `split`.
+  Resolution and admission share the same capability rules, and the engine logs
+  its selection reason. Eager execution uses
+  the same specs without graph capture. See the
+  [engine guide](https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/features/steer_vectors.md#graph-tiers)
+  for explicit graph settings.
+
+The algorithm selects its model component: `moe_router` edits `router_logits`
+at an accessible MoE gate; the other algorithms edit decoder `hidden_states`.
+Steering and capture share layer discovery and hook availability, including
+checks for fused routers whose gate modules are bypassed.
 
 ## Migrating from v1
 
@@ -168,8 +224,9 @@ The v1 surface (trigger fields, `steer_vector_request`, `--steer-vector-path` fl
 - Exclusions always subtract; nothing bypasses them.
 - `generation_window=(0, k)` steers exactly `k` decode steps (the v1 `first_k`
   off-by-one is gone).
-- Phase selection (`phases`) replaces the `-1` sentinel.
-- `normalize` defaults to `False` everywhere, including server-level steering.
+- `prompt="all"` / `generation="all"` replace the `-1` token sentinel. There is
+  no `phases` field; narrower selectors imply their own phase.
+- `normalize` defaults to `False` everywhere, including default configurations.
 - `generation_window` is an include selector like any other: it **unions** with
   the token/position selectors instead of constraining decode tokens, and a
   cross-phase clause with only a `generation_window` no longer covers the
@@ -178,6 +235,3 @@ The v1 surface (trigger fields, `steer_vector_request`, `--steer-vector-path` fl
   `prompt_tokens` / `generation_tokens`, and `prompt_positions` (formerly
   `positions`) selects prompt tokens only — decode steps are always addressed
   through `generation_positions` / `generation_window`.
-
-<!-- TODO: per-algorithm pages (file formats, payload shapes) — currently only the
-README's "Adding a New Algorithm" snippet covers this. -->

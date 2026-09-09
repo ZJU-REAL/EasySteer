@@ -1,15 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """MoE gate steering semantics and per-request routing on OLMoE-1B-7B.
 
-One eager engine (both source scripts, test_moe_modes.py and
-test_moe_slot_routing.py, booted identical engines). Canonical
-moe_router modes are 'activate' / 'deactivate' (log-softmax, per-token
-max+eps / min-eps); 'boost', 'soft_hard', 'suppress' and 'steermoe' are
-deprecated aliases resolving onto them. Gate steering routes per
-request through the same slot machinery as decoder-layer steering.
+One eager engine exercises 'activate' / 'deactivate' (log-softmax,
+per-token max+eps / min-eps). Gate steering routes per request through
+the same slot machinery as decoder-layer steering.
 
 Coverage:
-  - alias configs produce byte-identical outputs to canonical modes
   - a mixed layer config (activate_ids + deactivate_ids) forces the
     activated experts INTO and the deactivated experts OUT of every
     token's top-k (captured post-steering logits)
@@ -43,6 +39,7 @@ N_EXPERTS = _hf_cfg["num_experts"]
 TOP_K = _hf_cfg["num_experts_per_tok"]
 ALL_LAYERS = [str(layer) for layer in range(NUM_LAYERS)]
 
+ENGINE_PROFILE = "olmoe_eager"
 ENGINE_KWARGS = dict(
     model=MODEL,
     enable_steer_vector=True,
@@ -60,25 +57,6 @@ DEACT = list(range(20))
 X = list(range(20))
 Y = list(range(20, 40))
 Z = list(range(40, 60))
-
-ALIAS_PAIRS = [
-    (
-        "boost",
-        {"mode": "boost", "expert_ids": ACT},
-        {"mode": "activate", "expert_ids": ACT},
-    ),
-    (
-        "suppress",
-        {"mode": "suppress", "expert_ids": DEACT},
-        {"mode": "deactivate", "expert_ids": DEACT},
-    ),
-    (
-        "steermoe",
-        {"mode": "steermoe", "deactivate_ids": DEACT},
-        {"mode": "deactivate", "expert_ids": DEACT},
-    ),
-]
-
 
 def rpc(llm, method, *args, **kwargs):
     return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
@@ -98,7 +76,7 @@ def deact_spec(dirpath, name, deact_ids):
     return moe_json_spec(
         dirpath,
         name,
-        {l: {"mode": "deactivate", "expert_ids": deact_ids} for l in ALL_LAYERS},
+        {layer: {"mode": "deactivate", "expert_ids": deact_ids} for layer in ALL_LAYERS},
     )
 
 
@@ -166,39 +144,18 @@ def ids_b(tok):
 
 
 class TestModeSemantics:
-    @pytest.mark.parametrize(
-        "alias, alias_cfg, canonical_cfg",
-        ALIAS_PAIRS,
-        ids=[p[0] for p in ALIAS_PAIRS],
-    )
-    def test_alias_output_identical(
-        self, llm, ids_a, tmp_path, alias, alias_cfg, canonical_cfg
-    ):
-        """Deprecated mode aliases resolve byte-identically onto canon."""
-        spec_alias = moe_json_spec(
-            tmp_path, f"{alias}-alias", {l: alias_cfg for l in ALL_LAYERS}
-        )
-        spec_canon = moe_json_spec(
-            tmp_path, f"{alias}-canon", {l: canonical_cfg for l in ALL_LAYERS}
-        )
-        out_alias = generate(llm, [ids_a], [spec_alias])[0]
-        out_canon = generate(llm, [ids_a], [spec_canon])[0]
-        assert out_alias == out_canon, (
-            f"alias={out_alias!r} canonical={out_canon!r}"
-        )
-
     def test_mixed_config_forces_both_directions(self, llm, ids_a, tmp_path):
         """activate_ids enter and deactivate_ids leave every top-k."""
         spec = moe_json_spec(
             tmp_path,
             "mixed",
             {
-                l: {
+                layer: {
                     "mode": "activate",
                     "activate_ids": ACT,
                     "deactivate_ids": DEACT,
                 }
-                for l in ALL_LAYERS
+                for layer in ALL_LAYERS
             },
         )
         logits = captured(llm, [ids_a], [spec])
@@ -234,9 +191,8 @@ class TestModeSemantics:
         spec = moe_json_spec(
             tmp_path,
             "trig",
-            {l: {"mode": "deactivate", "expert_ids": DEACT} for l in ALL_LAYERS},
-            prompt="all",
-            positions=trig,
+            {layer: {"mode": "deactivate", "expert_ids": DEACT} for layer in ALL_LAYERS},
+            prompt_positions=trig,
         )
         logits = captured(llm, [ids_a], [spec])
         assert sorted(logits) == list(range(NUM_LAYERS)), sorted(logits)

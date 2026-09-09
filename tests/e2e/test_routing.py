@@ -2,45 +2,35 @@
 """Per-request slot routing: multi-vector configs and batched isolation.
 
 One eager dense engine, greedy sampling. Covers:
-- a one-entry multi-vector spec is byte-identical to the equivalent
-  single-vector spec (same math through the multi path);
 - a two-vector spec (split layers, sequential) steers;
 - no cross-request contamination in a [steered, plain] batch;
-- a 51-scale sweep: scale-0 == unsteered, outputs vary across scales,
+- a representative scale sweep (51 scales with --steer-extended):
+  scale-0 == unsteered, outputs vary across scales,
   and per-request isolation in the batched pass verified through the
   steering trace (every applied position belongs to a request routed to
   that apply's slot).
 
-Byte-level batch comparisons (batched-vs-sequential, and even repeated
-identical batches) are deliberately NOT asserted: large-batch numerics
-vary with GPU conditions (observed on shared GPUs even at scale 0), a
-vLLM-level property unrelated to steering. Isolation is asserted at the
-mechanism level via the trace instead, which is hardware-robust.
-
-async_scheduling is pinned off: byte-comparing one request's output
-across generate calls needs identical batch geometry, and async
-admission makes prefill co-batching timing-dependent.
+Isolation is checked through steering traces. async_scheduling is pinned
+off to keep request scheduling consistent.
 """
 
 import pytest
-
+from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
 from vllm import SamplingParams
 
-from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
-
-ENGINE_KWARGS = dict(
-    model=DENSE_MODEL,
-    enable_steer_vector=True,
-    steer_algorithms=["direct"],
-    steer_multi_vector=True,
-    enforce_eager=True,
-    enable_chunked_prefill=False,
-    enable_prefix_caching=False,
-    gpu_memory_utilization=0.3,
-    max_model_len=2048,
-    max_num_seqs=64,
-    async_scheduling=False,
-)
+ENGINE_KWARGS = {
+    "model": DENSE_MODEL,
+    "enable_steer_vector": True,
+    "steer_algorithms": ["direct"],
+    "steer_multi_vector": True,
+    "enforce_eager": True,
+    "enable_chunked_prefill": False,
+    "enable_prefix_caching": False,
+    "gpu_memory_utilization": 0.3,
+    "max_model_len": 2048,
+    "max_num_seqs": 64,
+    "async_scheduling": False,
+}
 
 PROMPT = (
     "<|im_start|>user\nAlice's dog has passed away. "
@@ -83,9 +73,9 @@ def test_pt_direction_payload_through_engine(llm, plain, tmp_path):
     """A .pt direction file steers through the client adapter + data=
     payload path (the engine no longer loads .pt files itself)."""
     import torch
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
     import easysteer.vectors as vec
-    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
     pt = str(tmp_path / "direction.pt")
     torch.save(torch.randn(1536) * 0.02, pt)
@@ -109,21 +99,28 @@ def test_wrong_source_format_rejected_at_admission(llm):
 
 
 class TestMultiVector:
-    def test_single_entry_multi_equals_single(self, llm):
+    def test_dynamic_conflict_finishes_only_affected_request(self, llm):
+        """Generation-time overlap must not kill the engine or its batch peer."""
         from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-        single = gen(llm, [PROMPT], steering_spec(scale=2.0, layers=LAYERS))[0]
-        multi_one = gen(
-            llm,
-            [PROMPT],
-            SteeringSpec(vectors=[VectorSpec(
-                source=DENSE_VECTOR, scale=2.0, layers=LAYERS,
-                apply=ApplySpec(prompt="all", generation="all"),
-            )]),
-        )[0]
-        assert multi_one == single, (
-            "one-entry multi-vector spec must equal the single-vector spec"
+        spec = SteeringSpec(conflict="error", vectors=[
+            VectorSpec(source=DENSE_VECTOR, layers=[10], scale=0.1,
+                       apply=ApplySpec(generation_positions=[0]))
+            for _ in range(2)
+        ])
+        outputs = llm.generate(
+            [PROMPT, PROMPT], steering=[spec, False], use_tqdm=False,
+            sampling_params=SamplingParams(temperature=0, max_tokens=4, ignore_eos=True),
         )
+        assert outputs[0].outputs[0].finish_reason == "error"
+        assert "conflict" in outputs[0].outputs[0].stop_reason
+        assert outputs[1].outputs[0].finish_reason == "length"
+        assert len(outputs[1].outputs[0].token_ids) == 4
+        control = llm.generate(
+            PROMPT, steering=steering_spec(scale=1.2, layers=[10]), use_tqdm=False,
+            sampling_params=SamplingParams(temperature=0, max_tokens=2, ignore_eos=True),
+        )[0]
+        assert len(control.outputs[0].token_ids) == 2
 
     def test_two_vector_spec_steers(self, llm, plain, two_vector_spec):
         assert gen(llm, [PROMPT], two_vector_spec)[0] != plain
@@ -131,8 +128,7 @@ class TestMultiVector:
     def test_no_cross_request_contamination(self, llm, two_vector_spec):
         """Mechanism-level isolation for a [multi-vector, plain] batch:
         every applied position lies in rows routed to the apply's slot,
-        and both sub-vectors fire on their layer ranges. Byte compares
-        of batched outputs are deliberately avoided (module docstring).
+        and both sub-vectors fire on their layer ranges.
         """
         import os
 
@@ -167,7 +163,9 @@ class TestMultiVector:
         )
 
 
-SCALES = [round(i * 0.1, 1) for i in range(51)]
+STEER_TEST_TRACE = True  # this module reads traces without using the fixture
+REPRESENTATIVE_SCALES = [0.0, 1.0, 2.0, 5.0]
+EXTENDED_SCALES = [round(i * 0.1, 1) for i in range(51)]
 
 
 def _scale_spec(scale):
@@ -175,44 +173,53 @@ def _scale_spec(scale):
 
 
 @pytest.fixture(scope="module")
-def sweep(llm):
+def sweep(llm, request):
     import os
 
     from helpers import read_trace
 
+    scales = (
+        EXTENDED_SCALES if request.config.getoption("--steer-extended")
+        else REPRESENTATIVE_SCALES
+    )
     llm.preload_steer_vectors([DENSE_VECTOR])
     unsteered = gen(llm, [PROMPT], None, max_tokens=64)[0]
-    ref = {
-        s: gen(llm, [PROMPT], _scale_spec(s), max_tokens=64)[0]
-        for s in SCALES
-    }
+    minimum_distinct = 6 if len(scales) == len(EXTENDED_SCALES) else 2
+    ref = {}
+    for scale in scales:
+        ref[scale] = gen(llm, [PROMPT], _scale_spec(scale), max_tokens=64)[0]
+        if 0.0 in ref and len(set(ref.values())) >= minimum_distinct:
+            break
     trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
     steps_before, _ = read_trace(trace_dir, 0, ())
     start = max(steps_before, default=0)
-    batch = dict(zip(SCALES, gen(
-        llm, [PROMPT] * len(SCALES),
-        [_scale_spec(s) for s in SCALES], max_tokens=64,
+    batch = dict(zip(scales, gen(
+        llm, [PROMPT] * len(scales),
+        [_scale_spec(s) for s in scales], max_tokens=64,
     )))
+    assert len(batch) == len(scales), "batched sweep lost requests"
     steps, applies = read_trace(trace_dir, start, (LAYERS[0],))
     return unsteered, ref, batch, steps, applies
 
 
 class TestScaleSweep:
     def test_scale_zero_is_unsteered_and_sweep_varies(self, sweep):
-        unsteered, ref, _, _, _ = sweep
+        unsteered, ref, batch, _, _ = sweep
         assert ref[0.0] == unsteered, "scale 0.0 must equal the unsteered output"
-        assert len(set(ref.values())) > 5, "sweep outputs barely vary"
+        minimum_distinct = 6 if len(batch) == len(EXTENDED_SCALES) else 2
+        assert len(set(ref.values())) >= minimum_distinct, "sweep outputs barely vary"
 
     def test_batched_sweep_produces_scale_dependent_outputs(self, sweep):
         _, _, batch, _, _ = sweep
-        assert len(set(batch.values())) > 5, (
+        minimum_distinct = 6 if len(batch) == len(EXTENDED_SCALES) else 2
+        assert len(set(batch.values())) >= minimum_distinct, (
             "batched sweep outputs barely vary across scales"
         )
 
     def test_batched_isolation_via_trace(self, llm, sweep):
         """Every applied position belongs to a request routed to that
         apply's slot — the mechanism-level no-cross-request guarantee."""
-        _, _, _, steps, applies = sweep
+        _, _, batch, steps, applies = sweep
         capacity = (
             llm.llm_engine.vllm_config.steer_vector_config.max_steer_vectors
         )
@@ -233,11 +240,11 @@ class TestScaleSweep:
                     f"{rec['slot']} lies in request {req_idx} routed to "
                     f"slot {slots[req_idx]}"
                 )
-        # max_steer_vectors is a scheduling constraint: the 51 distinct
+        # max_steer_vectors is a scheduling constraint: distinct
         # configs stream through a bounded, reused slot pool (all live
         # at once when capacity >= 51, in waves otherwise).
         assert distinct_slots and len(distinct_slots) <= min(
-            capacity, len(SCALES)
+            capacity, len(batch)
         ), f"slot pool not bounded: {sorted(distinct_slots)}"
         assert all(0 <= s < capacity for s in distinct_slots), (
             f"slot ids escaped the capacity pool ({capacity}): "

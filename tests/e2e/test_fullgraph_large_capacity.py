@@ -6,9 +6,8 @@ family switches from dense all-slot coefficients to per-token weight
 gathers (the dense [slots, tokens, hidden] product grows linearly with
 capacity and OOMs Inductor autotuning at a few hundred slots). This
 module boots the same engine as test_fullgraph.py at capacity 96 so
-every behavioral check runs through the gather formulation: the
-low-rank family steers, zero scale stays bit-exact, and co-batched
-plain requests stay uncontaminated.
+every behavioral check runs through the gather formulation: low-rank
+steering effects, zero-scale controls and co-batched plain requests.
 """
 
 import os
@@ -61,11 +60,11 @@ def gen(llm, prompts, **kwargs):
 
 
 def test_lowrank_gather_path_steers_and_zero_is_exact(llm):
-    """lm_steer (lowrank family) through the gather kernel: a rank-4
-    projector at high scale changes the output; scale 0 is bit-exact."""
+    """Compare a rank-4 lm_steer projector through the gather kernel
+    with the unsteered and zero-scale controls."""
     import numpy as np
 
-    from vllm.steer_vectors.payloads import LowRankProjector
+    from vllm.model_hooks.steering.payloads import LowRankProjector
 
     plain = gen(llm, [TEXT])[0]
     axes = np.zeros((HIDDEN, 4), dtype=np.float32)
@@ -80,7 +79,7 @@ def test_lowrank_gather_path_steers_and_zero_is_exact(llm):
 
 
 def test_loreft_emoji_gather_path(llm):
-    """The replication LoReFT checkpoint behaves identically through
+    """Check the replication LoReFT checkpoint's emoji effect through
     the gather kernel."""
     from easysteer.vectors import from_pyreft
 
@@ -99,14 +98,8 @@ def test_loreft_emoji_gather_path(llm):
 
 
 def test_many_distinct_configs_isolated(llm):
-    """A mixed batch of distinct direct configs plus a plain request on
-    the large-capacity engine: every request must match a plain-only
-    run byte-exactly (additive family + row routing at capacity 96).
-
-    Same nondeterminism guard as test_fullgraph's mixed-batch oracle:
-    on mismatch, re-run both batches; skip if the plain baseline is
-    unstable, fail only on a reproducible difference.
-    """
+    """Compare distinct zero-scale configs and a plain request with a
+    plain-only batch at capacity 96, repeating the control on mismatch."""
     import pytest
 
     prompts = [TEXT] * 8

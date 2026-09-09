@@ -12,6 +12,7 @@
         "name": "emoji_loreft",
         "id": "1",
         "path": "results/emoji_loreft/",
+        "payload_path": "results/emoji_loreft/payload.json",
         "scale": "1.0",
         "algorithm": "loreft",
         "target_layers": "22",

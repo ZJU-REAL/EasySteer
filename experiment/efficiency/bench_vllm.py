@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """EasySteer/vLLM efficiency benchmark (EasySteer paper, Section 5.1).
 
-Steering configurations, all with zero-valued vectors so the generated
-text matches the baseline exactly:
+Steering configurations, all using zero scale to measure intervention overhead:
     baseline      - no steering
     single_layer  - one vector at one layer (20)
     all_layer     - one vector on all 28 layers
@@ -18,7 +17,6 @@ import argparse
 import time
 
 from common import MODEL, N_SEQUENTIAL, SEAL_VECTOR, load_examples, report
-
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
@@ -40,24 +38,37 @@ def zero_scale_spec(n_vectors, layers):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode",
-                        choices=["baseline", "single_layer", "all_layer",
-                                 "multi_vector"],
-                        default="baseline")
-    parser.add_argument("--batch", type=int, default=0,
-                        help="batch size; 0 = sequential single requests")
-    parser.add_argument("--max-tokens", type=int, default=2048,
-                        choices=[128, 2048])
-    parser.add_argument("--cudagraph", action="store_true",
-                        help="enable CUDA graphs (paper numbers are eager)")
-    parser.add_argument("--graph-mode", choices=["split", "in_graph"],
-                        default=None,
-                        help="steering graph tier under --cudagraph: "
-                             "full captures the steering kernel into the "
-                             "graph (engine default when compiled); "
-                             "piecewise splits at steered layers "
-                             "(all algorithms)")
+    parser.add_argument(
+        "--mode",
+        choices=["baseline", "single_layer", "all_layer", "multi_vector"],
+        default="baseline",
+    )
+    parser.add_argument(
+        "--batch",
+        type=int,
+        default=0,
+        help="batch size; 0 = sequential single requests",
+    )
+    parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
+    parser.add_argument(
+        "--cudagraph",
+        action="store_true",
+        help="enable CUDA graphs (paper numbers are eager)",
+    )
+    parser.add_argument(
+        "--graph-mode",
+        choices=["split", "in_graph"],
+        default=None,
+        help="steering graph tier under --cudagraph: "
+        "in_graph captures the steering kernel into the "
+        "graph; split splits at steered layers "
+        "(all algorithms)",
+    )
     args = parser.parse_args()
+    if args.graph_mode is not None and not args.cudagraph:
+        parser.error("--graph-mode requires --cudagraph")
+    if args.mode == "multi_vector" and args.graph_mode == "in_graph":
+        parser.error("multi-vector steering requires --graph-mode split or auto")
 
     steering = {
         "baseline": None,
@@ -68,12 +79,20 @@ def main():
     engine_kwargs = {}
     if args.graph_mode is not None:
         engine_kwargs["steer_graph_mode"] = args.graph_mode
-    llm = LLM(model=MODEL, enable_steer_vector=True,
-              steer_algorithms=["direct"],
-              steer_multi_vector=args.mode == "multi_vector",
-              enforce_eager=not args.cudagraph, **engine_kwargs)
-    params = SamplingParams(temperature=0, max_tokens=args.max_tokens,
-                            skip_special_tokens=False)
+    llm = LLM(
+        model=MODEL,
+        enable_steer_vector=True,
+        steer_algorithms=["direct"],
+        steer_multi_vector=args.mode == "multi_vector",
+        enforce_eager=not args.cudagraph,
+        **engine_kwargs,
+    )
+    params = SamplingParams(
+        temperature=0,
+        max_tokens=args.max_tokens,
+        skip_special_tokens=False,
+        ignore_eos=True,
+    )
     one_token = SamplingParams(temperature=0, max_tokens=1)
 
     if args.batch:
@@ -94,8 +113,7 @@ def main():
         tokens = 0
         start = time.time()
         for example in examples:
-            outs = llm.generate(example, params, steering=steering,
-                                use_tqdm=False)
+            outs = llm.generate(example, params, steering=steering, use_tqdm=False)
             tokens += len(outs[0].outputs[0].token_ids)
         elapsed = time.time() - start
         report(tokens, elapsed, len(examples), ftl_s=ftl)

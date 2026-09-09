@@ -15,6 +15,8 @@ from vllm import SamplingParams
 
 from helpers import DENSE_MODEL, read_trace, steering_spec
 
+STEER_TEST_TRACE = True  # direct read_trace calls need tracing before boot
+
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,

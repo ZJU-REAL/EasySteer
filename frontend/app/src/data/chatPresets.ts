@@ -1,14 +1,6 @@
 /**
- * Built-in chat steering presets, ported from the legacy frontend's
- * configs/chat/*.json (translated to canonical v2 spec JSON).
- *
- * Every preset references its vector by server-side path — including the
- * SAE decoder rows saved as .pt, which the vector store loads by path as
- * long as the spec names the target layer. The legacy `trigger_tokens:
- * [-1]` wildcard becomes `prompt: "all", generation: "all"`.
- *
- * Presets are model-specific: the vector only means something for the
- * model it was extracted from, so each one carries that model id.
+ * Built-in chat steering presets with server-side vector paths.
+ * Each preset names the model its vector was extracted from.
  */
 
 import { range, type LocalizedText } from "./gallery";
@@ -17,7 +9,7 @@ export interface ChatPreset {
   id: string;
   label: LocalizedText;
   description: LocalizedText;
-  /** Emoji shown in the preset list, as in the legacy chat sidebar. */
+  /** Emoji shown in the preset list. */
   icon: string;
   /** Model the vector was extracted for. */
   model: string;

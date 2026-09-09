@@ -6,7 +6,7 @@
     1536
   ],
   "intervention_types": [
-    "<class 'pyreft.reft.interventions.LoreftIntervention'>"
+    "<class 'easysteer.reft.pyreft.reft.algorithms.loreft.LoreftIntervention'>"
   ],
   "mode": "parallel",
   "representations": [

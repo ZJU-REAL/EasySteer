@@ -14,9 +14,7 @@ describe("built-in job presets", () => {
     }
   });
 
-  // Stored training presets use the legacy nested layout; the form reads
-  // the flat one, so a missed field silently imports as an empty box.
-  it("flattens the ReFT training presets the form actually reads", () => {
+  it("ships ReFT presets in the request shape the form reads", () => {
     const loreft = builtinTrainingPresets.find((p) => p.name === "emoji_loreft");
     expect(loreft).toBeDefined();
     expect(loreft!.config).toMatchObject({

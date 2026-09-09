@@ -9,9 +9,27 @@ EasySteer ships as two packages installed from one repository: the vLLM fork
   the fork or to `easysteer` take effect immediately. Use this if you plan to
   develop, debug, or track the repository.
 
+## Validated inference environment
+
+The vLLM 0.28.0 steering and capture regression suites have been exercised with
+this combination on Linux x86_64:
+
+| Component | Version / hardware |
+|---|---|
+| Python | 3.12.13 |
+| vLLM | 0.28.0, with this repository's steering fork |
+| PyTorch | 2.13.0+cu130 |
+| Transformers | 5.16.1 |
+| CUDA runtime | 13.0.96 |
+| GPU | NVIDIA RTX PRO 6000 Blackwell Server Edition |
+
+This records an exercised inference combination, not a complete compatibility
+matrix or a ReFT training benchmark. Keep the official wheel's dependency pins
+when installing; other hardware and package combinations need their own checks.
+
 ## Route 1: quick install (prebuilt wheel + fork overlay)
 
-The fork's changes against upstream vLLM v0.26.0 are pure Python, so you can
+The fork's changes against upstream vLLM v0.28.0 are pure Python, so you can
 install the official wheel and overlay the fork's files onto it — no build,
 no editable checkouts:
 
@@ -19,17 +37,19 @@ no editable checkouts:
 conda create -n easysteer python=3.12 -y
 conda activate easysteer
 
-# Official vLLM wheel (kernels prebuilt)
-pip install vllm==0.26.0
+# Clone EasySteer with the fork commit recorded by its submodule
+git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
+cd EasySteer
 
-# Overlay the fork's Python files onto the installed package
-git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+# Official vLLM wheel (kernels prebuilt)
+pip install vllm==0.28.0
+
+# Overlay the pinned fork's Python files onto the installed package
 VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
-rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+rsync -a vllm-steer/vllm/ "$VLLM_DIR"/
 
 # EasySteer package
-git clone https://github.com/ZJU-REAL/EasySteer.git
-pip install ./EasySteer
+pip install .
 ```
 
 !!! warning
@@ -44,23 +64,31 @@ conda create -n easysteer python=3.12 -y
 conda activate easysteer
 
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
-cd EasySteer/vllm-steer
+cd EasySteer
 
-# EasySteer tracks the vLLM v0.26.0 release commit; pin it so the
+# For an existing checkout, start here from the EasySteer repository root
+git submodule update --init --recursive
+cd vllm-steer
+
+# EasySteer tracks the vLLM v0.28.0 release commit; pin it so the
 # precompiled kernels match.
-export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
+export VLLM_PRECOMPILED_WHEEL_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 cd ..
 pip install --editable .
 ```
 
+Both routes finish in the EasySteer repository root, where the examples'
+relative `vectors/` paths resolve.
+
 ## Fallback: build vLLM from source
 
 Needed only when no precompiled wheel exists for your platform.
 
 ```bash
-cd EasySteer/vllm-steer
+# From the EasySteer repository root
+cd vllm-steer
 python use_existing_torch.py
 
 # Set your GPU architecture (e.g. "8.0" for A100) to speed up the build.
@@ -81,18 +109,29 @@ A full source build can take from ~20 minutes (128 cores) to several hours.
 
 ## Docker
 
-!!! note
-    The published image (`xuhaolei/easysteer`, tag `v0.17.1`) predates the
-    vLLM v0.26.0 migration — it runs the previous engine and v1-era APIs.
-    A refreshed image is planned; until then, prefer the wheel install
-    above for current features.
+Build the image from the checked-out source to use the current steering API:
 
 ```bash
-docker pull xuhaolei/easysteer:latest
+# From the EasySteer repository root; requires Docker and NVIDIA Container Toolkit
+bash docker/build.sh
 docker run --gpus all -it \
   -v /path/to/your/models:/app/models \
   easysteer:latest
-python3 /app/easysteer/docker/docker_test.py
 ```
 
-<!-- TODO: verify supported Python/CUDA version matrix and document it here. -->
+Here `latest` is the image built locally by the script. The historical published
+`v0.17.1` image uses an older engine and v1-era APIs; it is not the v0.28.0 build
+described on this page.
+
+## CUDA library discovery
+
+If installation succeeds but the first generation fails with
+`ld: cannot find -lcudart`, check the toolkit path used for JIT compilation.
+`CUDA_HOME` must point to a toolkit whose library directory is discoverable by
+the compiler and contains the link name `libcudart.so`. Some pip-provided CUDA
+layouts contain only a versioned library such as `libcudart.so.13`, which is not
+enough for the linker's `-lcudart` lookup.
+
+Keep an already working system toolkit configuration unless the chosen package
+build requires a different one. A missing linker path or link name does not by
+itself establish a driver/runtime version incompatibility.

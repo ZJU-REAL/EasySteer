@@ -140,7 +140,7 @@ async function send(): Promise<void> {
       baseUrl: settings.openaiBaseUrl,
       model: settings.model,
       messages,
-      steering: steeringSpec,
+      steering: steeringSpec ?? false,
       temperature: settings.temperature,
       maxTokens: settings.maxTokens,
       signal: abort!.signal,
@@ -153,7 +153,7 @@ async function send(): Promise<void> {
   try {
     const runs = [stream(spec, (tok) => (reply.content += tok))];
     if (comparing) {
-      // The baseline reply streams concurrently with no steering attached.
+      // Explicitly disable steering for the concurrent baseline reply.
       runs.push(stream(null, (tok) => (reply.baseline = (reply.baseline ?? "") + tok)));
     }
     const results = await Promise.allSettled(runs);

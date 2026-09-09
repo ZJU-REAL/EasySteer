@@ -11,14 +11,7 @@ WORKDIR /app/easysteer
 # Copy EasySteer source
 COPY . /app/easysteer/
 
-# Install EasySteer dependencies
-RUN pip install --no-cache-dir \
-    scikit-learn \
-    datasets \
-    matplotlib \
-    accelerate
-
-# Install EasySteer package
+# Install the package and its dependencies from pyproject.toml.
 RUN pip install --no-cache-dir -e .
 
 # Environment variables for steering

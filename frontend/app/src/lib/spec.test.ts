@@ -188,6 +188,13 @@ describe("validateApplySpec", () => {
 });
 
 describe("validateVectorSpec", () => {
+  it("rejects normalize on algorithms without eager support", () => {
+    for (const algorithm of ["linear", "loreft", "lm_steer", "moe_router"]) {
+      const issues = validateVectorSpec(ggufVector({ algorithm, normalize: true }));
+      expect(issues.some((issue) => issue.path.endsWith(".normalize"))).toBe(true);
+    }
+    expect(validateVectorSpec(ggufVector({ normalize: true }))).toEqual([]);
+  });
   it("accepts a gguf-backed direct vector", () => {
     expect(validateVectorSpec(ggufVector())).toEqual([]);
   });
@@ -243,6 +250,16 @@ describe("validateVectorSpec", () => {
     const messages = validateVectorSpec(withoutSource).map((i) => i.message);
     expect(messages.some((m) => m.includes("expert_ids"))).toBe(true);
     expect(messages.some((m) => m.includes("requires layers"))).toBe(true);
+
+    expect(validateVectorSpec({
+      ...withoutSource,
+      data: { kind: "router", extra: { layers: { "3": { mode: "deactivate", expert_ids: [1] } } } },
+    })).toEqual([]);
+
+    for (const input of [{ source: "config.json" }, { source: null, data: { kind: "router" } }]) {
+      const invalid = { ...withoutSource, ...input, params: { expert_ids: [1] } };
+      expect(validateVectorSpec(invalid).some((issue) => issue.message.includes("without source or data"))).toBe(true);
+    }
   });
 
   it("rejects empty layers (null lets the file decide)", () => {

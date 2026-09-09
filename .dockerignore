@@ -1,24 +1,43 @@
 # Git
 .git
+**/.git
 .gitignore
 .gitmodules
 vllm-steer/.git
 
 # Python
 __pycache__
+**/__pycache__
 *.py[cod]
 *$py.class
 *.so
 .Python
 *.egg-info
 dist
+**/dist
 build
 *.egg
 
 # Virtual environments
+.venv/
+**/.venv/
 venv/
 env/
 ENV/
+
+# Private development records and generated local artifacts
+.local/
+**/.local/
+.runtime/
+**/.runtime/
+.environment-records/
+**/.environment-records/
+node_modules/
+**/node_modules/
+site/
+**/site/
+.ruff_cache/
+**/.ruff_cache/
 
 # IDE
 .vscode/
@@ -45,11 +64,13 @@ logs/
 
 # Cache
 .cache/
+**/.cache/
 *.cache
 
 # Tests
 tests/
 .pytest_cache/
+**/.pytest_cache/
 
 # Temporary files
 *.tmp

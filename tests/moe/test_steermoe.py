@@ -3,7 +3,7 @@
 
 Exercises the full MoE path end to end on a real MoE model: router-logit
 capture streams for expert detection, and gate-hook `moe_router` steering
-with the paper-exact `steermoe` mode (log-softmax, activated -> max+eps,
+with activate/deactivate modes (log-softmax, activated -> max+eps,
 deactivated -> min-eps, pre-top-k).
 
 Coverage:
@@ -50,6 +50,7 @@ NUM_LAYERS = _hf_cfg["num_hidden_layers"]
 N_EXPERTS = _hf_cfg["num_experts"]
 TOP_K = _hf_cfg["num_experts_per_tok"]
 
+ENGINE_PROFILE = "olmoe_eager"
 ENGINE_KWARGS = dict(
     model=MODEL,
     enable_steer_vector=True,

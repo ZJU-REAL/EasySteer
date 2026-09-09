@@ -1,0 +1,63 @@
+{
+  "direct": {
+    "payload_kind": "direction",
+    "source": "gguf",
+    "normalize": true,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "linear": {
+    "payload_kind": "linear",
+    "source": "none",
+    "normalize": false,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "loreft": {
+    "payload_kind": "reft",
+    "source": "none",
+    "normalize": false,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "lm_steer": {
+    "payload_kind": "lowrank",
+    "source": "none",
+    "normalize": false,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "erase": {
+    "payload_kind": "direction",
+    "source": "gguf",
+    "normalize": true,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "replace": {
+    "payload_kind": "direction",
+    "source": "gguf",
+    "normalize": true,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "concept_replace": {
+    "payload_kind": "concept_pair",
+    "source": "file",
+    "normalize": true,
+    "params": [],
+    "target_component": "hidden_states"
+  },
+  "moe_router": {
+    "payload_kind": "router",
+    "source": "file",
+    "normalize": false,
+    "params": [
+      "expert_ids",
+      "mode",
+      "lambda",
+      "topk"
+    ],
+    "target_component": "router_logits"
+  }
+}

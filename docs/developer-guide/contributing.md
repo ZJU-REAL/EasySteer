@@ -4,57 +4,131 @@ Contributions are welcome in three main forms:
 
 1. **Replications** — reproduce a steering paper as a notebook under `replications/`
    (README + notebook + vectors) and add it to the replications table.
-2. **New steering algorithms** — subclass `AlgorithmTemplate` and register it.
-3. **Component-level steers** — interfaces for steering attention/MLP modules are
-   reserved in `vllm-steer/vllm/steer_vectors/models.py` and are a key focus of future
-   updates.
+2. **New steering algorithms** — subclass `BaseSteerVectorAlgorithm` and register it.
+3. **Model and component support** — extend module discovery and steering controllers,
+   with tests for the model's hidden-state and residual layout.
 
 ## Adding a steering algorithm
 
-An algorithm needs exactly two methods:
+An algorithm implements `_transform`, which receives the selected hidden-state rows
+and one layer's canonical payload. Declare its payload kind in `capabilities.py`;
+the shared loader handles supported native files, validation and materialization.
+For example, this additive algorithm consumes the same `direction` payload as
+`direct`, `erase`, and `replace`:
 
 ```python
 import torch
-from vllm.steer_vectors.algorithms.template import AlgorithmTemplate
-from vllm.steer_vectors.algorithms.factory import register_algorithm
+from vllm.model_hooks.steering.algorithms.base import BaseSteerVectorAlgorithm
+from vllm.model_hooks.steering.algorithms.registry import register_algorithm
 
 @register_algorithm("my_algorithm")
-class MyAlgorithm(AlgorithmTemplate):
+class MyAlgorithm(BaseSteerVectorAlgorithm):
 
     def _transform(self, hidden_states: torch.Tensor, payload) -> torch.Tensor:
-        """Apply the intervention. `payload` is one layer's entry from
-        load_from_path's layer_payloads (Tensor or dict — your choice)."""
-        return hidden_states + payload
+        # Tensor payloads have already been multiplied by the requested scale.
+        transformed = hidden_states + payload
+        if self.normalize:
+            return self._renormalize(hidden_states, transformed)
+        return transformed
 
-    @classmethod
-    def load_from_path(cls, path, device, *, config, target_layers=None, **kwargs):
-        """Load per-layer payloads from a file (.gguf, .pt, ...).
-        Returns {"layer_payloads": {layer_id: payload}}. Raise on
-        underspecified inputs instead of assuming defaults."""
-        if not target_layers:
-            raise ValueError("my_algorithm requires target_layers")
-        vector = torch.load(path, map_location=device, weights_only=False)
-        return {"layer_payloads": {l: vector.to(config.adapter_dtype)
-                                   for l in target_layers}}
 ```
 
-Then export it from `vllm-steer/vllm/steer_vectors/algorithms/__init__.py`. The shared
-template handles triggers (where-clauses), scaling, and normalization; your algorithm
-only defines the math and the file format.
+Its entry in `capabilities.py` is
+`"my_algorithm": AlgorithmCapabilities("direction", "gguf", normalize=True)`.
+Algorithms sharing a payload kind also share its loader. Add a native format
+reader to `loading.py` only when a new EasySteer schema is needed; third-party
+checkpoint layouts belong in explicit `easysteer.vectors` adapters. File and
+in-memory paths must produce equivalent canonical payloads.
 
-## Module map (`vllm-steer/vllm/steer_vectors/`)
+Import the class from `vllm-steer/vllm/model_hooks/steering/algorithms/__init__.py` so every
+engine process registers it, then include `"my_algorithm"` in `steer_algorithms`.
+The controllers handle selection and conflict resolution; the base class prepares
+scaled tensor payloads and provides `_renormalize`. Each algorithm decides how to
+apply normalization in its transformation.
+
+New algorithms run in eager or `split` mode by default. To support `in_graph`, also
+declare a `graph_family` and implement `graph_lower` with matching math; low-rank
+families need `wire_rank` for admission checks. Use the existing algorithm classes
+and [engine architecture](https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/design/steer_vectors.md)
+as references. Test eager and graph implementations against the same inputs.
+
+Declare the payload kind, source format, normalization support and allowed
+`VectorSpec.params` in `capabilities.py`. Run `python tools/export_client_contracts.py`
+from the repository root to update the packaged browser and HF client rules.
+Provide a client-side checkpoint adapter when needed. Graph capabilities remain
+on the algorithm class.
+
+## Shared model hooks
+
+The public Python APIs remain `vllm.steer_vectors` and `vllm.capture`.
+Their implementation lives under `vllm-steer/vllm/model_hooks/`:
+
+```text
+model_hooks/
+  selection/              # Selection specs, token matching and batch geometry
+  components/             # Model discovery and component output adapters
+  steering/
+    algorithms/           # Transformations and their registration
+    controllers/          # Hidden-state and router-logit execution
+    graph/                # Eligibility, persistent state and kernels
+  capture/                # Capture sessions, selection, storage and serialization
+```
+
+Capture and steering independently consume `selection` and `components`.
+Capture can run without a steering declaration, algorithm or payload cache.
+The shared packages have no dependency on either consumer.
+`selection/spec.py` defines `SelectSpec`, `schema.py` defines its fields, and
+`runtime.py` resolves token selections against batch geometry.
+
+## Steering modules (`model_hooks/steering/`)
 
 | File | Role |
 |---|---|
 | `api.py` | User-facing v2 API (`SteeringSpec`/`VectorSpec`/`ApplySpec`) |
-| `request.py` | Internal engine request struct + field registry |
-| `worker_manager.py` | Config slots, fingerprints, vector store owner |
-| `store.py` | Versioned vector store (dedup + reload) |
-| `models.py` | Controller discovery & vector loading |
-| `layers.py` | Slot-routed steering controllers (decoder/MoE gate) |
+| `request.py` | `SteeringRequest` with an ordered list of `ResolvedVector` payloads and application fields |
+| `defaults.py` | Default configuration snapshots and per-request inheritance / override resolution |
+| `input_validation.py` | Shared source, data and algorithm-parameter validation before file loading |
+| `loading.py` | Native file adapters and content snapshots before request admission |
+| `payloads.py` | Canonical payload validation, content identity and materialization |
+| `capabilities.py` | Algorithm authoring rules shared with packaged clients |
+| `worker_manager.py` | `WorkerSteeringState`: config slots, fingerprints and payload-cache ownership |
+| `payload_cache.py` | `PayloadCache` of content-addressed, materialized per-layer payload dictionaries |
+| `controllers/base.py` | Shared slot lifecycle and graph-buffer interface |
+| `controllers/hidden_states.py` / `controllers/router_logits.py` | Component-specific steering, with eager and graph execution kept together |
+| `controllers/manager.py` | Index controllers by component and layer; attach hooks and install/release slot payloads |
+| `graph/policy.py` | Graph mode resolution and request admission |
+| `graph/state.py` | Persistent graph tables, slot distribution and step masks |
+| `graph/kernels.py` | Steering tensor kernels |
 | `ops.py` | `vllm::steer_apply` custom op (piecewise graphs) |
 | `trace.py` | Steering trace (test/debug oracle) |
 | `algorithms/` | Algorithm framework & implementations |
+
+Single-vector and multi-vector specs use the same internal request structure;
+each resolved vector carries a canonical `payload` regardless of its input format.
+The original `source` is retained for reporting and preload policy, while worker
+caches use payload content and broadcast layer targets. HTTP management routes
+live in `vllm/entrypoints/serve/steering/api_router.py`.
+
+`components/registry.py` supplies shared component descriptors and hook targets;
+`components/discovery.py` locates decoder layers and accessible MoE gates;
+`components/outputs.py` handles component output layouts. Steering and capture
+consume the same discovered component targets. Standard decoder
+stacks use their global stack indices; pipeline-parallel placeholders retain
+those indices. Architecture exceptions belong in discovery and output-layout
+rules, rather than separate name parsing in each consumer. ReFT uses its own
+Transformers model profiles; repeated decoder layouts share an implementation,
+while component dimensions and special layouts remain explicit.
+
+Controllers declare their graph mask names and allocate their own component
+tables. Shared graph state calls that interface without branching on concrete
+controller classes. A new component supplies its discovery, output adapter,
+controller and graph-buffer contract; its algorithms still own their graph math.
+
+Capture keeps its session, graph dispatch, selection, store and serialization
+modules together under `model_hooks/capture/`. Its selection module attaches
+capture row labels and reduction plans to the shared token-selection result.
+`serialization.py` owns the dtype and wire-format contract in both directions;
+`store.py` owns buffered values, row budgets and clearing.
 
 ## Ground rules
 
@@ -64,23 +138,6 @@ only defines the math and the file format.
 - Update the docs: the relevant page under `docs/`, and the README pointer line if a
   user-facing surface changed (the PR template has a checklist).
 
-## Engineering records
-
-Internal design documents live in
-[`docs/design/`](https://github.com/ZJU-REAL/EasySteer/tree/main/docs/design). They are
-records of *why* things are the way they are — kept out of the rendered site nav, but
-worth reading before touching the corresponding subsystem:
-
-- [`STEERING_API_V2.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/STEERING_API_V2.md)
-  — design of the v2 spec API (`SteeringSpec`/`VectorSpec`/`ApplySpec`), the semantics
-  it fixed, and what was deleted from v1.
-- [`CAPTURE_REDESIGN_PROPOSAL.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/CAPTURE_REDESIGN_PROPOSAL.md)
-  — the hook-based hidden-state capture redesign (`capture()` / `CaptureResult`).
-- [`MIGRATION_PLAN_vllm-0.26.0.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/MIGRATION_PLAN_vllm-0.26.0.md)
-  — plan and validation notes for porting the fork onto vLLM 0.26.0.
-- [`README-pre-docs-site.md`](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/design/README-pre-docs-site.md)
-  — snapshot of the full pre-docs-site README, kept during the transition to the
-  shopfront README + docs-site split.
-
-<!-- TODO: code style/linting instructions for the easysteer package itself
-(the vllm-steer fork follows upstream vLLM's pre-commit setup). -->
+For the current public contracts, read the [steering guide](../user-guide/steering.md),
+[capture guide](../user-guide/hidden-state-capture.md), and the engine architecture
+linked above. The `vllm-steer` fork follows upstream vLLM's pre-commit configuration.

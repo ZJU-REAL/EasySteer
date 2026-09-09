@@ -1,60 +1,41 @@
-# EasySteer documentation
+# Maintaining the documentation
 
-MkDocs (Material theme) documentation site, modeled on vLLM's docs setup
-(mkdocs-material + mkdocstrings; vLLM additionally uses api-autonav, gen-files, minify,
-redirects — we can adopt those later as the site grows).
-
-This `docs/README.md` is excluded from the built site (`exclude_docs` in `mkdocs.yml`),
-as is `docs/design/` — internal engineering records, linked from the contributing page.
-
-Canonical-home principle: the top-level `README.md` is the shopfront (badges, news,
-one install path, one example, pointer lines); this site is the reference. Every piece
-of content has exactly one home — README changes that add detail belong here, with a
-pointer line there.
+The MkDocs site is the reference for installation, public APIs, examples and
+contributor workflows. The English and Chinese root READMEs introduce the project
+and link to the relevant guides. Update both READMEs when their shared example or
+installation instructions change.
 
 ## Build locally
 
 ```bash
-pip install -r requirements-docs.txt
-mkdocs serve          # http://127.0.0.1:8000, live-reloads on edit
-mkdocs build --strict # what CI runs
+python -m pip install -r requirements-docs.txt
+mkdocs serve          # http://127.0.0.1:8000
+mkdocs build --strict # also run in CI
 ```
 
-The api-reference pages use mkdocstrings in **static-analysis mode**
-(`allow_inspection: false` in `mkdocs.yml`): griffe parses the `easysteer` source tree
-without importing it, so the full site — api-reference included — builds in a plain
-environment with only `requirements-docs.txt`. No torch, no easysteer install, no
-`vllm-steer`. The steering-spec API page is deliberately hand-written
-(`api-reference/steering-specs.md`) because rendering the fork's classes would require
-importing `vllm-steer`; the [Steering guide](user-guide/steering.md) is canonical for
-that surface.
+API pages use mkdocstrings in static-analysis mode (`allow_inspection: false`), so
+building the site requires only `requirements-docs.txt`. It does not import torch
+or vLLM. A successful site build checks rendering, navigation and the Python
+identifiers referenced by mkdocstrings; it does not import or execute fenced
+examples. Validate changed examples
+against the matching package or engine API and run the relevant tests described
+in [Testing](developer-guide/testing.md).
 
-## CI and versioned deployment (mike + GitHub Pages)
+Keep reproducible usage, API contracts, architecture and general testing methods
+in the public documentation. Keep machine-specific paths, process IDs, individual
+run logs, migration worklists and superseded proposals in the Git-ignored
+`.local/development/` directory. Do not link public pages to those local records.
 
-`.github/workflows/docs.yml`:
+## CI and deployment
 
-- **PRs** touching `docs/`, `mkdocs.yml`, or `requirements-docs.txt` run
-  `mkdocs build --strict`.
-- **Pushes to `main`** deploy the rolling `dev` version with the `latest` alias
-  (`mike deploy --push --update-aliases dev latest`).
-- **Version tags** (`v*`) deploy that version (`mike deploy --push <tag>`).
+The docs workflow runs a strict build for pull requests that change documentation,
+READMEs or the package source used by the API reference. Pushes to `main` deploy
+the rolling `dev` version with the `latest` alias. Version tags (`v*`) deploy that
+version through mike.
 
-One-time manual setup before the site is served: enable GitHub Pages
-(Settings → Pages → deploy from branch `gh-pages`, root), and run
-`mike set-default --push latest` so the site root redirects. `mkdocs.yml` already
-declares `extra.version.provider: mike`, which renders the version selector.
+For initial GitHub Pages setup, select the `gh-pages` branch and its root directory
+in repository settings, then run `mike set-default --push latest`. The version
+selector is configured in `mkdocs.yml`.
 
-## Status / what remains to be written
-
-Seed content is in place; look for `TODO` comments in the pages. Highest-value gaps:
-
-- Per-algorithm documentation (file formats, payload shapes) under user-guide.
-- `easysteer.reft` API surface (guide seed exists at `user-guide/reft-training.md`;
-  api-reference page pending docstring coverage).
-- Frontend tour/screenshots (seed exists at `user-guide/web-demo.md`).
-- Docstring coverage in `easysteer.steer` (several extractors have minimal or Chinese
-  docstrings; api-reference pages will render whatever is there).
-- Link checking in CI.
-- Logo/favicon assets (`docs/assets/`), currently commented out in `mkdocs.yml`.
-- The Chinese README (`README_zh.md`) mirrors the English shopfront; decide whether to
-  add mkdocs-static-i18n for a Chinese docs site.
+This README is excluded from the rendered navigation; public guides live under
+the directories listed in `mkdocs.yml`.

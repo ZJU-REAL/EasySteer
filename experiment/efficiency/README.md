@@ -5,8 +5,8 @@ same MATH prompts (`../math/math_train_1000.json`, not committed — see
 `../math/README.md`), comparing EasySteer against HF-transformers-based
 steering frameworks and across EasySteer's steering execution tiers.
 
-Steering is configured at **scale 0** everywhere, so all frameworks
-generate identical text and only the steering-path overhead differs.
+These comparisons measure intervention overhead with zero-scale vectors or
+zeroed LoReFT parameters.
 
 Setup follows the EasySteer paper (Section 5.1): steering configurations
 are single-layer, all-layer (28 layers), and multi-vector (three
@@ -56,6 +56,17 @@ a slot; differently-configured requests beyond the capacity queue); see
 `bench_capacity_sweep.py` for capacity as the throttle.
 
 ## Commands
+
+Run these commands from `experiment/efficiency/` in the installed EasySteer
+environment. The default model is `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`;
+set `EASYSTEER_MODEL` to an existing local copy of that model if desired.
+`EASYSTEER_VECTOR` overrides the SEAL GGUF path, and `EASYSTEER_BENCH_DATA`
+overrides the JSON list of MATH prompts. The tables above are historical
+v0.26.0 measurements; rerun the commands to obtain results for v0.28.0.
+
+Current throughput commands use greedy decoding and fixed generation lengths
+(`ignore_eos` in vLLM, matching `min_new_tokens`/`max_new_tokens` in Transformers),
+then count the generated token IDs.
 
 ```bash
 # EasySteer / vLLM (continuous batching); add --cudagraph for the

@@ -5,10 +5,7 @@ Steer a chat model toward a "happy" direction and compare against the baseline.
 ## 1. Start a steering-enabled engine
 
 ```python
-import os
 from vllm import LLM, SamplingParams
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # enable_steer_vector=True turns on steering support; without it the
 # engine behaves like stock vLLM. steer_algorithms declares the
@@ -22,6 +19,9 @@ llm = LLM(
     tensor_parallel_size=1,
 )
 ```
+
+If needed, select a GPU with `CUDA_VISIBLE_DEVICES` before starting Python. Run
+from the EasySteer repository root so the bundled vector path resolves.
 
 ## 2. Describe the steering with a spec
 

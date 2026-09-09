@@ -9,6 +9,10 @@ on:
   pull_request:
     paths:
       - "docs/**"
+      - "README.md"
+      - "README_zh.md"
+      - "easysteer/**"
+      - "pyproject.toml"
       - "mkdocs.yml"
       - "requirements-docs.txt"
       - ".github/workflows/docs.yml"
@@ -17,7 +21,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write # deploy jobs push to the gh-pages branch
+  contents: read
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -50,6 +54,8 @@ jobs:
   # once so the site root redirects to the latest version.
   deploy:
     if: github.event_name == 'push'
+    permissions:
+      contents: write # mike pushes only in the deployment job
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

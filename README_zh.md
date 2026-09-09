@@ -8,7 +8,6 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
-[![Docker](https://img.shields.io/badge/docker-v0.17.1-orange)](https://hub.docker.com/r/xuhaolei/easysteer/tags)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 [![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
 [![Jiqizhixin](https://img.shields.io/badge/机器之心-Report-blue)](https://mp.weixin.qq.com/s/dxuJHvXOfzA1euvFUPN_vg)
@@ -43,9 +42,9 @@
 
 ## 关于 EasySteer
 
-EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。当前版本基于 vLLM v0.26.0（V2 模型运行器），提供连续批处理、兼容前缀缓存的干预、CUDA 图支持、声明式 v2 干预 API（`SteeringSpec`/`ApplySpec`），以及重新设计的隐状态捕获管线（源侧选择、行标签、按请求捕获）。
+EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一框架：它在推理过程中向模型隐状态空间施加干预向量，在不修改模型权重的前提下改变模型行为，并保持推理服务级别的速度。当前版本基于 vLLM v0.28.0（V2 模型运行器），提供连续批处理、兼容前缀缓存的干预、CUDA 图支持、声明式 v2 干预 API（`SteeringSpec`/`ApplySpec`），以及重新设计的隐状态捕获管线（源侧选择、行标签、按请求捕获）。
 
-- **高性能**: 通过对接 vLLM，实现 10.8-22.3× 的速度提升
+- **高性能**: 论文实验中，通过对接 vLLM，相比所比较的干预框架实现 10.8-22.3× 的速度提升
 - **模块化设计**: 插拔式接口，便于在不改动核心代码的情况下扩展自定义算法
 - **细粒度控制**: 支持按 token、按位置、按多向量的精细化干预
 - **可即用**: 提供覆盖 8 个领域（安全、推理、知识等）的预计算向量
@@ -72,15 +71,17 @@ EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一
 conda create -n easysteer python=3.12 -y
 conda activate easysteer
 
-# 官方 vLLM wheel，然后覆盖分支的 Python 文件
-pip install vllm==0.26.0
-git clone --depth 1 https://github.com/ZJU-REAL/EasySteer-vllm-v1.git
+# 克隆 EasySteer 及其固定版本的 vLLM 子模块
+git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
+cd EasySteer
+
+# 官方 vLLM wheel，然后覆盖固定版本分支的 Python 文件
+pip install vllm==0.28.0
 VLLM_DIR=$(python -c "import vllm, os; print(os.path.dirname(vllm.__file__))")
-rsync -a EasySteer-vllm-v1/vllm/ "$VLLM_DIR"/
+rsync -a vllm-steer/vllm/ "$VLLM_DIR"/
 
 # EasySteer 包
-git clone https://github.com/ZJU-REAL/EasySteer.git
-pip install ./EasySteer
+pip install .
 ```
 
 注意：重装或升级 `vllm` 会还原该覆盖，需重新执行 `rsync` 一步。
@@ -93,11 +94,15 @@ conda activate easysteer
 
 # 克隆仓库（包含子模块）
 git clone --recurse-submodules https://github.com/ZJU-REAL/EasySteer.git
-cd EasySteer/vllm-steer
+cd EasySteer
+
+# 已有仓库时，在 EasySteer 根目录从这一步开始
+git submodule update --init --recursive
+cd vllm-steer
 
 # 使用预编译版本安装（推荐）
-# EasySteer 适配的是 vLLM v0.26.0 发布时的 commit，请指定该 commit 以匹配预编译内核。
-export VLLM_PRECOMPILED_WHEEL_COMMIT=568afb3a13806beb53bb2e6bd518269357b237c0
+# EasySteer 适配的是 vLLM v0.28.0 发布时的 commit，请指定该 commit 以匹配预编译内核。
+export VLLM_PRECOMPILED_WHEEL_COMMIT=2cf0a6915ce544dc493a0990f2ea38d81601128a
 VLLM_USE_PRECOMPILED=1 pip install --editable .
 
 # 安装 EasySteer
@@ -108,6 +113,8 @@ pip install --editable .
 完整说明、源码编译与 Docker 方案见[安装指南](https://zju-real.github.io/EasySteer/latest/getting-started/installation/)。
 
 ### 30 秒示例
+
+请在 EasySteer 仓库根目录运行，以便找到相对路径 `vectors/` 下的向量。
 
 ```python
 from vllm import LLM, SamplingParams
@@ -124,7 +131,7 @@ def happy_steering(scale):
         source="vectors/happy_diffmean.gguf",
         scale=scale,
         layers=list(range(10, 26)),
-        apply=ApplySpec(phases=["prompt", "generation"]),
+        apply=ApplySpec(prompt="all", generation="all"),
     )])
 
 text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
@@ -150,7 +157,7 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 
 ## 如何贡献
 
-欢迎通过 PR 复现你的论文、贡献新的干预算法（只需实现两个方法），以及贡献组件级干预（attention/MLP 接口已在 `vllm-steer/vllm/steer_vectors/models.py` 预留）。如果你在研究中使用了 EasySteer，欢迎联系我们，我们很乐意在[新闻](#news)中展示你的工作。算法模板、模块结构与基本规范见[贡献指南](https://zju-real.github.io/EasySteer/latest/developer-guide/contributing/)，测试套件见[测试指南](https://zju-real.github.io/EasySteer/latest/developer-guide/testing/)。
+欢迎通过 PR 复现你的论文、贡献新的干预算法，以及支持更多模型和组件。算法通过继承 `BaseSteerVectorAlgorithm` 扩展，模型适配通过模块发现和干预控制器实现。如果你在研究中使用了 EasySteer，欢迎联系我们，我们很乐意在[新闻](#news)中展示你的工作。扩展示例与模块结构见[贡献指南](https://zju-real.github.io/EasySteer/latest/developer-guide/contributing/)，测试套件见[测试指南](https://zju-real.github.io/EasySteer/latest/developer-guide/testing/)。
 
 ## 论文复现
 

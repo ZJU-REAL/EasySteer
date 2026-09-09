@@ -2,27 +2,27 @@
 """In-memory payload steering (VectorSpec.data) against the file path.
 
 One eager dense engine, greedy sampling. Covers:
-- a DirectionVector payload built from the test GGUF steers
-  byte-identically to source= loading of the same file;
-- payload identity: two requests carrying byte-identical payloads share
-  one slot (same fingerprint), different content gets its own;
+- compare a DirectionVector payload built from the test GGUF with
+  source= loading of the same file;
 - from_control_vector: an extraction-shaped object steers with no file.
 
-async_scheduling pinned off for cross-call byte comparisons.
+Payload fingerprint and kind validation live in cpu/test_payloads.py.
+
+async_scheduling is pinned off to keep request scheduling consistent.
 """
 
 import numpy as np
 import pytest
 
 from vllm import SamplingParams
-from vllm.steer_vectors import ApplySpec, DirectionVector, SteeringSpec, VectorSpec
+from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
 from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enable_steer_vector=True,
-    steer_algorithms=["direct", "lm_steer"],
+    steer_algorithms=["direct"],
     enforce_eager=True,
     enable_chunked_prefill=False,
     enable_prefix_caching=False,
@@ -50,30 +50,24 @@ def gen(llm, steering):
     return out[0].outputs[0].text
 
 
-def test_data_matches_source_byte_identical(llm):
+@pytest.fixture(scope="module")
+def plain(llm):
+    return gen(llm, None)
+
+
+def test_data_matches_source_byte_identical(llm, plain):
     import easysteer.vectors as vec
 
     payload = vec.from_gguf(DENSE_VECTOR)
     via_source = gen(llm, steering_spec(scale=2.0, layers=tuple(LAYERS)))
     via_data = gen(llm, data_spec(payload, scale=2.0))
-    unsteered = gen(llm, None)
     assert via_data == via_source, (
         "data= must reproduce source= byte-for-byte for the same vector"
     )
-    assert via_data != unsteered, "the payload must actually steer"
+    assert via_data != plain, "the payload must actually steer"
 
 
-def test_identical_payloads_reproduce(llm):
-    """Two independently constructed but byte-identical payloads produce
-    the same output (they share a fingerprint and thus one slot)."""
-    import easysteer.vectors as vec
-
-    a = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=2.0))
-    b = gen(llm, data_spec(vec.from_gguf(DENSE_VECTOR), scale=2.0))
-    assert a == b
-
-
-def test_from_control_vector_no_disk(llm):
+def test_from_control_vector_no_disk(llm, plain):
     import easysteer.vectors as vec
 
     class FakeCV:
@@ -83,15 +77,4 @@ def test_from_control_vector_no_disk(llm):
 
     payload = vec.from_control_vector(FakeCV())
     steered = gen(llm, data_spec(payload, scale=8.0))
-    unsteered = gen(llm, None)
-    assert steered != unsteered
-
-
-def test_wrong_payload_kind_rejected_at_authoring():
-    with pytest.raises(Exception, match="requires a 'lowrank'"):
-        VectorSpec(
-            data=DirectionVector({0: np.ones(8)}),
-            algorithm="lm_steer",
-            layers=[0],
-            apply=APPLY,
-        )
+    assert steered != plain

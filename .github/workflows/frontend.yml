@@ -1,0 +1,59 @@
+name: frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "hf-space/**"
+      - "easysteer/vectors.py"
+      - "tools/export_client_contracts.py"
+      - "vllm-steer"
+      - ".github/workflows/frontend.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "hf-space/**"
+      - "easysteer/vectors.py"
+      - "tools/export_client_contracts.py"
+      - "vllm-steer"
+      - ".github/workflows/frontend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+
+  python-clients:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            frontend/requirements.txt
+            hf-space/requirements.txt
+      - run: python -m pip install -r frontend/requirements.txt -r hf-space/requirements.txt pytest
+      - run: python tools/export_client_contracts.py --check
+      # These tests mock GPU/job imports and remote generation.
+      - run: python -m pytest frontend/tests hf-space/tests -q

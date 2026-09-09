@@ -1,23 +1,19 @@
-"""
-Utility classes and functions for steering methods
-Contains the StatisticalControlVector class and shared helpers
-"""
+"""Control-vector serialization, token selection, and shared extraction math."""
 
 import dataclasses
+import logging
 import os
 import warnings
 
-import gguf
 import numpy as np
-import torch
 
-import logging
 logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
 class StatisticalControlVector:
-    """Statistical control vector with multi-layer directions"""
+    """Statistical control vector with per-layer directions."""
+
     method: str
     directions: dict[int, np.ndarray]
     metadata: dict = None
@@ -26,16 +22,15 @@ class StatisticalControlVector:
     model_type: str = "unknown"
 
     def export_gguf(self, path: os.PathLike[str] | str):
-        """
-        Export a trained StatisticalControlVector to a llama.cpp .gguf file.
-        Compatible with repeng format.
-        """
+        """Export directions and metadata to a repeng-compatible GGUF file."""
+        import gguf
+
         arch = "controlvector"
         writer = gguf.GGUFWriter(path, arch)
         writer.add_string(f"{arch}.model_hint", self.model_type)
         writer.add_string(f"{arch}.method", self.method)
         writer.add_uint32(f"{arch}.layer_count", len(self.directions))
-        
+
         if self.metadata:
             for key, value in self.metadata.items():
                 if isinstance(value, (int, float)):
@@ -43,16 +38,15 @@ class StatisticalControlVector:
                 elif isinstance(value, str):
                     writer.add_string(f"{arch}.{key}", value)
                 elif isinstance(value, dict):
-                    # Handle nested dictionaries like explained_variance
                     for subkey, subvalue in value.items():
                         if isinstance(subvalue, (int, float)):
                             writer.add_float32(
                                 f"{arch}.{key}.{subkey}", float(subvalue)
                             )
-        
+
         for layer in self.directions.keys():
             writer.add_tensor(f"direction.{layer}", self.directions[layer])
-        
+
         writer.write_header_to_file()
         writer.write_kv_data_to_file()
         writer.write_tensors_to_file()
@@ -60,7 +54,9 @@ class StatisticalControlVector:
 
     @classmethod
     def import_gguf(cls, path: os.PathLike[str] | str) -> "StatisticalControlVector":
-        """Import a StatisticalControlVector from a .gguf file"""
+        """Import a StatisticalControlVector from a GGUF file."""
+        import gguf
+
         reader = gguf.GGUFReader(path)
 
         archf = reader.get_field("general.architecture")
@@ -86,8 +82,7 @@ class StatisticalControlVector:
 
         directions = {}
         metadata = {}
-        
-        # Extract metadata
+
         skipped_suffixes = (".model_hint", ".method", ".layer_count")
         for field_name, field in reader.fields.items():
             if field_name.startswith("controlvector.") and not (
@@ -98,7 +93,7 @@ class StatisticalControlVector:
                     metadata[key] = float(field.parts[0])
                 elif field.types == [gguf.GGMLQuantizationType.I32]:
                     metadata[key] = int(field.parts[0])
-        
+
         for tensor in reader.tensors:
             if not tensor.name.startswith("direction."):
                 continue
@@ -119,14 +114,7 @@ class StatisticalControlVector:
 
 
 def l2_normalize(v):
-    """Scale a vector to unit L2 norm.
-
-    Args:
-        v (np.ndarray): Vector to normalize.
-
-    Returns:
-        np.ndarray: `v / ||v||`, or ``v`` unchanged when its norm is 0.
-    """
+    """Scale a vector to unit L2 norm, leaving zero vectors unchanged."""
     norm = np.linalg.norm(v)
     if norm > 0:
         return v / norm
@@ -135,10 +123,6 @@ def l2_normalize(v):
 
 def correct_sign(component, pos_rows, neg_rows):
     """Point ``component`` from the negative toward the positive samples.
-
-    Both row sets are projected onto ``component``; when the mean
-    positive projection falls below the mean negative projection the
-    direction is inverted, so the negated component is returned.
 
     Args:
         component (np.ndarray): Candidate direction, shape `(dim,)`.
@@ -161,21 +145,7 @@ def correct_sign(component, pos_rows, neg_rows):
 
 
 def _metadata(*, normalize, n_positive, n_negative, **extra):
-    """Build the canonical extractor metadata dict.
-
-    Every extraction path — batch `extract()` and streaming
-    `from_moments()` — reports sample counts and normalization under
-    one vocabulary: ``normalize``/``n_positive``/``n_negative``.
-
-    Args:
-        normalize (bool): Whether directions were L2-normalized.
-        n_positive (int): Number of positive samples (or rows).
-        n_negative (int): Number of negative samples (or rows).
-        **extra (Any): Method-specific entries appended verbatim.
-
-    Returns:
-        dict: Metadata dict for a StatisticalControlVector.
-    """
+    """Combine sample counts and normalization with method-specific metadata."""
     metadata = {
         "normalize": normalize,
         "n_positive": n_positive,
@@ -186,50 +156,23 @@ def _metadata(*, normalize, n_positive, n_negative, **extra):
 
 
 def derive_negative_indices(n_samples, positive_indices):
-    """Derive negative sample indices from the shared convention.
-
-    Every extractor uses one rule when ``negative_indices`` is None:
-    the negatives are every sample index not in ``positive_indices``,
-    in ascending sample order. ``positive_indices`` is never modified
-    or rebound.
-
-    Args:
-        n_samples (int): Total number of samples.
-        positive_indices (list[int]): Indices of positive samples.
-
-    Returns:
-        list[int]: Indices of negative samples, in ascending order.
-    """
+    """Return sample indices outside positive_indices in ascending order."""
     positive = set(positive_indices)
     return [i for i in range(n_samples) if i not in positive]
 
 
+def _to_numpy(value):
+    """Detach tensor-like rows and convert them through CPU float32."""
+    return value.detach().cpu().float().numpy() if hasattr(value, "detach") else value
+
+
 def _tokens_to_numpy(token_sequence):
-    """Convert a per-token sequence to a list of numpy arrays.
-
-    Args:
-        token_sequence (Sequence): Hidden states of one layer of one
-            sample, as tensors or numpy arrays.
-
-    Returns:
-        list[np.ndarray]: One float numpy array per token.
-    """
-    return [
-        t.cpu().float().numpy() if torch.is_tensor(t) else t
-        for t in token_sequence
-    ]
+    """Convert tensor-like token rows to CPU NumPy arrays."""
+    return [_to_numpy(token) for token in token_sequence]
 
 
 def _extreme_norm_token(argfn):
-    """Build a reducer picking the token whose L2 norm wins ``argfn``.
-
-    Args:
-        argfn (Callable): `np.argmax` or `np.argmin`.
-
-    Returns:
-        Callable: Reducer mapping a token sequence to the token with
-            the largest (argmax) or smallest (argmin) L2 norm.
-    """
+    """Build a token reducer using np.argmax or np.argmin of the L2 norms."""
 
     def reducer(token_sequence):
         tokens = _tokens_to_numpy(token_sequence)
@@ -284,7 +227,6 @@ def extract_token_hiddens(
             a tensor or numpy array, or a CaptureResult from
             easysteer.hidden_states.
         positive_indices (list[int]): Indices of positive samples.
-            Never modified or rebound by this function.
         negative_indices (list[int] | None): Indices of negative
             samples. If None, every sample index not in
             ``positive_indices`` becomes a negative, in ascending
@@ -297,13 +239,9 @@ def extract_token_hiddens(
     Returns:
         tuple[dict, dict]: `(positive_hiddens, negative_hiddens)`, each
             a dict mapping layer key to a `(n_samples, hidden_dim)`
-            array. Layer keys are the TRUE layer ids for CaptureResult
+            array. Layer keys are the model layer ids for CaptureResult
             input and positional indices for nested-list input.
     """
-    # CaptureResult (easysteer.hidden_states) is accepted directly; it
-    # converts to the nested [sample][layer][token] shape with exact,
-    # label-driven per-sample rows, and its TRUE layer ids key the
-    # output dicts (legacy nested input keeps positional keys).
     layer_keys = None
     if hasattr(all_hidden_states, "to_nested"):
         layer_keys = list(all_hidden_states.layer_ids)
@@ -326,9 +264,7 @@ def extract_token_hiddens(
                 token_hidden = extract_token_from_sequence(
                     sample_hiddens[layer_pos], token_pos
                 )
-                if torch.is_tensor(token_hidden):
-                    token_hidden = token_hidden.cpu().float().numpy()
-                hiddens[layer_key].append(token_hidden)
+                hiddens[layer_key].append(_to_numpy(token_hidden))
         return hiddens
 
     positive_hiddens = collect(positive_indices)
@@ -341,6 +277,3 @@ def extract_token_hiddens(
         negative_hiddens = {}
 
     return positive_hiddens, negative_hiddens
-
-
-

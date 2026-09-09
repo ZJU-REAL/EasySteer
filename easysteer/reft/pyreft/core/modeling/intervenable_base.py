@@ -1,4 +1,4 @@
-import json, logging, torch, types
+import json, logging, sys, torch, types
 import numpy as np
 from collections import OrderedDict
 from typing import List, Optional, Tuple, Union, Dict, Any
@@ -25,12 +25,6 @@ from transformers import get_linear_schedule_with_warmup
 from dataclasses import dataclass
 from transformers.utils import ModelOutput
 from tqdm import tqdm, trange
-
-try:
-    import nnsight
-except:
-    print("nnsight is not detected. Please install via 'pip install nnsight' for nnsight backend.")
-
 
 @dataclass
 class IntervenableModelOutput(ModelOutput):
@@ -1306,26 +1300,15 @@ class IntervenableModel(BaseModel):
             intervention.is_source_constant = \
                 saving_config.intervention_constant_sources[i]
             dim = saving_config.intervention_dimensions[i]
-            if dim is None:
-                # Infer interchange dimension from component name to be compatible with old versions
-                component_name = saving_config.representations[i].component
-                if component_name.startswith("head_"):
-                    dim = model.config.hidden_size // model.config.num_attention_heads
-                else:
-                    dim = model.config.hidden_size
-
             intervention.set_interchange_dim(dim)
             if saving_config.intervention_constant_sources[i] and \
                 not isinstance(intervention, ZeroIntervention) and \
                 not isinstance(intervention, SourcelessIntervention):
                 # logging.warn(f"Loading trainable intervention from {binary_filename}.")
                 saved_state_dict = torch.load(os.path.join(load_directory, binary_filename))
-                try:
-                    intervention.register_buffer(
-                        'source_representation', saved_state_dict['source_representation']
-                    )
-                except:
-                    intervention.source_representation = saved_state_dict['source_representation']
+                intervention.set_source_representation(
+                    saved_state_dict['source_representation']
+                )
             elif isinstance(intervention, TrainableIntervention):
                 saved_state_dict = torch.load(os.path.join(load_directory, binary_filename))
                 intervention.load_state_dict(saved_state_dict)
@@ -2419,8 +2402,10 @@ def build_intervenable_model(config, model, **kwargs):
     """
     Factory design pattern for different types of intervenable models.
     """
-    if isinstance(model, nnsight.LanguageModel):
+    # An nnsight model can only exist after its package was imported. Native
+    # PyTorch models do not need to import this optional backend.
+    nnsight = sys.modules.get("nnsight")
+    if nnsight is not None and isinstance(model, nnsight.LanguageModel):
         return IntervenableNdifModel(config, model, **kwargs)
     else:
         return IntervenableModel(config, model, **kwargs)
-

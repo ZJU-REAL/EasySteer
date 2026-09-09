@@ -1,6 +1,4 @@
-"""
-Linear Probe Extractor
-"""
+"""Logistic-regression control-vector extraction."""
 
 import logging
 
@@ -25,9 +23,7 @@ def _build_classifier(penalty, C):
     Returns:
         LogisticRegression: The configured (unfitted) classifier.
     """
-    # sklearn >= 1.8 deprecates the penalty argument; the penalty is
-    # expressed through l1_ratio / C instead (verified coefficient-
-    # identical to the old constructions per branch).
+    # sklearn >= 1.8 expresses the penalty through l1_ratio and C.
     if penalty == "elasticnet":
         return LogisticRegression(
             C=C,
@@ -60,7 +56,7 @@ def _build_classifier(penalty, C):
 
 
 class LinearProbeExtractor(BaseExtractor):
-    """Linear Probe method for control vector extraction"""
+    """Extract directions from logistic-regression coefficients."""
 
     method = "linear_probe"
     progress_desc = "Computing LinearProbe directions"
@@ -87,10 +83,12 @@ class LinearProbeExtractor(BaseExtractor):
             RuntimeError: If the classifier fit fails.
         """
         features = np.vstack([pos_rows, neg_rows])
-        labels = np.hstack([
-            np.ones(len(pos_rows)),  # positive samples labeled 1
-            np.zeros(len(neg_rows)),  # negative samples labeled 0
-        ])
+        labels = np.hstack(
+            [
+                np.ones(len(pos_rows)),  # positive samples labeled 1
+                np.zeros(len(neg_rows)),  # negative samples labeled 0
+            ]
+        )
 
         if standardize:
             features = StandardScaler().fit_transform(features)
@@ -99,15 +97,12 @@ class LinearProbeExtractor(BaseExtractor):
         try:
             clf.fit(features, labels)
         except Exception as e:
-            raise RuntimeError(
-                f"linear probe fit failed for layer {layer}: {e}"
-            ) from e
+            raise RuntimeError(f"linear probe fit failed for layer {layer}: {e}") from e
 
         # The classifier weights point toward the positive class
         direction = clf.coef_[0]  # [hidden_dim]
         train_score = float(clf.score(features, labels))
 
-        # Check weight sparsity (relevant for L1 regularization)
         non_zero_weights = np.count_nonzero(direction)
         sparsity_ratio = 1.0 - (non_zero_weights / len(direction))
         logger.info(
@@ -133,7 +128,7 @@ class LinearProbeExtractor(BaseExtractor):
         regularization: str = "l2",
         C: float = 1.0,
         standardize: bool = True,
-        **kwargs
+        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the Linear Probe method.
 

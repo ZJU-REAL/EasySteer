@@ -1,4 +1,13 @@
 __pycache__/
+# Local development records, environments, and test runs are not project docs.
+/.local/
+/.venv/
+.runtime/
+.environment-records/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
 .idea/
 /temp/
 easysteer.egg-info/
@@ -10,7 +19,7 @@ replications/sake/edit_uk_capital_to_paris.pkl
 site/
 
 # Datasets and inference artifacts are not committed (fetch/build them
-# locally; see experiment/math/README.md and replications/DATA.md).
+# locally using the corresponding experiment or notebook).
 experiment/math/*.json
 replications/*/math500.json
 replications/*/math500_problems.json

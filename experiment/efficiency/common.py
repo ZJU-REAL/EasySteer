@@ -10,17 +10,23 @@ import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MODEL = "/home/shenyl/hf/model/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/"  # deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-SEAL_VECTOR = os.path.join(
-    HERE, "..", "..", "replications", "seal", "execution_avg_vector.gguf"
+MODEL = os.environ.get("EASYSTEER_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B")
+SEAL_VECTOR = os.environ.get(
+    "EASYSTEER_VECTOR",
+    os.path.join(HERE, "..", "..", "replications", "seal", "execution_avg_vector.gguf"),
 )
 N_SEQUENTIAL = 10
 
 
 def load_examples(n):
     """First `n` MATH training prompts in the R1 reasoning format."""
-    with open(os.path.join(HERE, "..", "math", "math_train_1000.json"),
-              encoding="utf-8") as f:
+    with open(
+        os.environ.get(
+            "EASYSTEER_BENCH_DATA",
+            os.path.join(HERE, "..", "math", "math_train_1000.json"),
+        ),
+        encoding="utf-8",
+    ) as f:
         problems = json.load(f)
     if n > len(problems):
         raise ValueError(f"requested {n} problems, only {len(problems)} available")

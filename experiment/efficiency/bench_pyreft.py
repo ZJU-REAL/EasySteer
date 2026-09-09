@@ -1,21 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
 """pyreft (HF transformers) efficiency benchmark (EasySteer paper, 5.1).
 
-The paper's framework comparison uses all-layer intervention with
-zero-valued vectors, so a rank-4 LoReFT is built on every layer and its
-parameters are zeroed — output text matches an unsteered run. Sequential
-by default; --batch N (paper: 256) times one padded batch instead.
+The framework comparison attaches rank-4 LoReFT to every layer and zeros its
+parameters. Sequential by default; --batch N (paper: 256) times one padded
+batch instead.
 """
 
 import argparse
-import os
 import time
 
 import torch
 import transformers
-
-import easysteer.reft.pyreft as pyreft
 from common import MODEL, N_SEQUENTIAL, load_examples, report
+
+from easysteer.reft import pyreft
 
 
 def load_reft_model(device):
@@ -27,9 +25,7 @@ def load_reft_model(device):
     )
     tokenizer.pad_token = tokenizer.eos_token
 
-    # All-layer rank-4 LoReFT with zeroed parameters: the intervention
-    # runs on every layer but is the identity, matching the paper's
-    # zero-valued-vector setup.
+    # Retain the all-layer LoReFT computation with zeroed parameters.
     reft_config = pyreft.ReftConfig(
         representations=[
             {
@@ -46,62 +42,66 @@ def load_reft_model(device):
     reft_model = pyreft.get_reft_model(model, reft_config)
     with torch.no_grad():
         for intervention in reft_model.interventions.values():
-            module = intervention[0] if isinstance(intervention, (list, tuple)) else intervention
-            for p in module.parameters():
-                p.zero_()
+            module = (
+                intervention[0]
+                if isinstance(intervention, (list, tuple))
+                else intervention
+            )
+            for parameter in module.parameters():
+                parameter.zero_()
     reft_model.set_device(device)
     reft_model.eval()
     return reft_model, tokenizer
 
 
-def generated_token_count(generated, attention_mask, pad_token_id):
-    """Per-sample valid output length minus input length, summed."""
-    input_lens = attention_mask.sum(dim=1).to(generated.device)
-    out_valid = (generated != pad_token_id).sum(dim=1)
-    return int((out_valid - input_lens).clamp(min=0).sum().item())
+def generated_token_count(generated, input_width):
+    """Count the generated suffix after the padded input in fixed-length runs."""
+    return generated.shape[0] * (generated.shape[1] - input_width)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", type=int, default=0,
-                        help="batch size; 0 = sequential (paper: 256)")
-    parser.add_argument("--max-tokens", type=int, default=2048,
-                        choices=[128, 2048])
+    parser.add_argument(
+        "--batch", type=int, default=0, help="batch size; 0 = sequential (paper: 256)"
+    )
+    parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
     args = parser.parse_args()
 
     device = "cuda"
     reft_model, tokenizer = load_reft_model(device)
-    gen_kwargs = dict(
-        intervene_on_prompt=False,
-        max_new_tokens=args.max_tokens,
-        do_sample=False,
-        eos_token_id=tokenizer.eos_token_id,
-        early_stopping=True,
-    )
+    gen_kwargs = {
+        "intervene_on_prompt": False,
+        "max_new_tokens": args.max_tokens,
+        "min_new_tokens": args.max_tokens,
+        "do_sample": False,
+        "eos_token_id": tokenizer.eos_token_id,
+    }
 
     if args.batch:
-        inputs = tokenizer(load_examples(args.batch), return_tensors="pt",
-                           padding=True).to(device)
-        input_dict = {"input_ids": inputs["input_ids"],
-                      "attention_mask": inputs["attention_mask"]}
+        inputs = tokenizer(
+            load_examples(args.batch), return_tensors="pt", padding=True
+        ).to(device)
+        input_dict = {
+            "input_ids": inputs["input_ids"],
+            "attention_mask": inputs["attention_mask"],
+        }
         start = time.time()
         _, generated = reft_model.generate(input_dict, **gen_kwargs)
         elapsed = time.time() - start
-        tokens = generated_token_count(generated, inputs["attention_mask"],
-                                       tokenizer.pad_token_id)
+        tokens = generated_token_count(generated, inputs["input_ids"].shape[1])
         report(tokens, elapsed, args.batch)
     else:
         examples = load_examples(N_SEQUENTIAL)
-        prepared = [tokenizer(e, return_tensors="pt").to(device)
-                    for e in examples]
+        prepared = [tokenizer(e, return_tensors="pt").to(device) for e in examples]
         tokens = 0
         start = time.time()
         for inputs in prepared:
-            input_dict = {"input_ids": inputs["input_ids"],
-                          "attention_mask": inputs["attention_mask"]}
+            input_dict = {
+                "input_ids": inputs["input_ids"],
+                "attention_mask": inputs["attention_mask"],
+            }
             _, generated = reft_model.generate(input_dict, **gen_kwargs)
-            tokens += generated_token_count(
-                generated, inputs["attention_mask"], tokenizer.pad_token_id)
+            tokens += generated_token_count(generated, inputs["input_ids"].shape[1])
         elapsed = time.time() - start
         report(tokens, elapsed, len(examples))
 

@@ -1,15 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Streaming accumulators for vector construction.
 
-Cross-sample aggregation lives client-side by design (the engine
-capture layer never computes corpus statistics — see
-CAPTURE_REDESIGN_PROPOSAL.md §3.4). These accumulators consume
-per-sample rows incrementally, so client memory stays O(1) while the
-corpus streams through in chunks; `from_moments` constructors on the
-extractors turn the accumulated statistics into control vectors.
+Retain per-layer statistics instead of corpus rows. The extractors'
+``from_moments`` methods turn these statistics into control vectors.
 """
-
-from typing import Dict
 
 import numpy as np
 
@@ -26,18 +20,15 @@ class MomentsAccumulator:
 
     def __init__(self, track_second_moment: bool = False):
         self.track_second_moment = track_second_moment
-        self.count: Dict[int, int] = {}
-        self.sum: Dict[int, np.ndarray] = {}
-        self.sum_outer: Dict[int, np.ndarray] = {}
+        self.count: dict[int, int] = {}
+        self.sum: dict[int, np.ndarray] = {}
+        self.sum_outer: dict[int, np.ndarray] = {}
 
     def update(self, layer: int, rows) -> None:
         """Add rows (n, dim) of one layer (torch tensor or ndarray)."""
-        # Duck-typed tensor handling (as in TopKCountAccumulator), so
-        # the module needs no torch import of its own.
+        # Accept tensors without requiring a torch dependency.
         x = np.asarray(
-            rows.detach().float().cpu().numpy()
-            if hasattr(rows, "detach")
-            else rows,
+            rows.detach().float().cpu().numpy() if hasattr(rows, "detach") else rows,
             dtype=np.float64,
         )
         if x.ndim == 1:
@@ -63,9 +54,7 @@ class MomentsAccumulator:
 
     def covariance(self, layer: int) -> np.ndarray:
         if not self.track_second_moment:
-            raise ValueError(
-                "covariance requires track_second_moment=True"
-            )
+            raise ValueError("covariance requires track_second_moment=True")
         n = self.count.get(layer, 0)
         if n < 2:
             raise ValueError(f"need >=2 rows for covariance, layer {layer}")
@@ -90,9 +79,6 @@ class DiffMeanAccumulator:
     def direction(self, layer: int, normalize: bool = True) -> np.ndarray:
         """One layer's mean(pos) - mean(neg) direction.
 
-        `DiffMeanExtractor.from_moments` delegates its per-layer math
-        here, so both public entry points share this computation.
-
         Args:
             layer (int): Layer key to compute the direction for.
             normalize (bool): Normalize the direction to unit L2 norm.
@@ -111,8 +97,8 @@ class TopKCountAccumulator:
 
     def __init__(self, top_k: int):
         self.top_k = top_k
-        self.counts: Dict[int, np.ndarray] = {}
-        self.tokens: Dict[int, int] = {}
+        self.counts: dict[int, np.ndarray] = {}
+        self.tokens: dict[int, int] = {}
 
     def update(self, layer: int, logits) -> None:
         """Add router logits (n_tokens, n_experts) of one layer."""

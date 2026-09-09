@@ -1,6 +1,6 @@
 """Train a BiasIntervention (h + b) emoji-response steering vector.
 
-Set REFT_MODEL_PATH (or edit the call below) to the base model directory.
+Set REFT_MODEL_PATH to the base model directory or Hugging Face model ID.
 """
 
 import os

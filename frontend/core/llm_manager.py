@@ -1,34 +1,65 @@
-"""
-Unified LLM instance management.
+"""Cache vLLM instances by effective model configuration and GPU selection."""
 
-This module provides centralized management of vLLM model instances with
-automatic caching, GPU device management, and memory cleanup capabilities.
-"""
-
-import os
+import hashlib
 import logging
-from typing import Dict, Optional, Any
+import os
+import pickle
+import uuid
+from typing import Any, Dict, Optional
+
 from vllm import LLM
 
 logger = logging.getLogger(__name__)
 
 
+def _ordered_config(value):
+    """Stabilize containers without changing the values passed to vLLM."""
+    if type(value) is dict:
+        return {
+            key: _ordered_config(item)
+            for key, item in sorted(
+                value.items(), key=lambda pair: pickle.dumps(pair[0])
+            )
+        }
+    if type(value) is list:
+        return [_ordered_config(item) for item in value]
+    if type(value) is tuple:
+        return tuple(_ordered_config(item) for item in value)
+    return value
+
+
+def _cache_key(gpu_devices: str, config: dict) -> str:
+    """Snapshot all settings; unsupported custom objects must never reuse an engine.
+
+    Pickle is only used for serialization, never loading. It captures value
+    types such as torch dtypes and vLLM config objects without conflating
+    them with strings. A non-serializable argument (for example a local
+    callback) gets its own entry so cleanup still owns that engine.
+    """
+    try:
+        snapshot = pickle.dumps((gpu_devices, _ordered_config(config)))
+    except (
+        TypeError,
+        ValueError,
+        pickle.PicklingError,
+        AttributeError,
+        RecursionError,
+    ):
+        logger.info(
+            "LLM configuration cannot be snapshotted; creating a separate engine"
+        )
+        return "uncached:" + uuid.uuid4().hex
+    return hashlib.sha256(snapshot).hexdigest()
+
+
 class LLMManager:
-    """
-    Manager for LLM instances with caching and resource management.
-    
-    This class maintains a cache of loaded LLM instances to avoid repeated
-    model loading. Instances are keyed by model path and GPU device configuration.
-    
-    Attributes:
-        _instances: Dictionary storing cached LLM instances
-    """
-    
+    """Own cached vLLM instances keyed by all constructor arguments and GPUs."""
+
     def __init__(self):
         """Initialize the LLM manager with an empty instance cache."""
         self._instances: Dict[str, LLM] = {}
         logger.info("LLMManager initialized")
-    
+
     def get_or_create_llm(
         self,
         model_path: str,
@@ -37,160 +68,95 @@ class LLMManager:
         enforce_eager: bool = True,
         enable_chunked_prefill: bool = None,
         enable_prefix_caching: bool = None,
-        **kwargs
+        **kwargs,
     ) -> LLM:
-        """
-        Get an existing LLM instance or create a new one if not cached.
-        
+        """Reuse a matching engine or load a new one.
+
         Args:
-            model_path: Path to the model (local or HuggingFace model ID)
-            gpu_devices: Comma-separated GPU device IDs (e.g., "0" or "0,1,2,3")
-            enable_steer_vector: Whether to enable steering vector support
-            enforce_eager: Whether to enforce eager mode (fast startup for
-                short-lived job engines; steering and capture no longer
-                require it)
-            enable_chunked_prefill: Whether to enable chunked prefill (None = engine default)
-            enable_prefix_caching: Whether to enable prefix caching (None = engine default)
-            **kwargs: Additional arguments to pass to LLM constructor
-            
+            model_path: Local model path or Hugging Face model ID.
+            gpu_devices: Comma-separated GPU device IDs or UUIDs.
+            enable_steer_vector: Enable steering with all supported algorithms.
+            enforce_eager: Skip graph capture for faster startup of job engines.
+            enable_chunked_prefill: Override chunked prefill, or use the engine
+                default when None.
+            enable_prefix_caching: Override prefix caching, or use the engine
+                default when None.
+            **kwargs: Additional LLM constructor arguments and keyword overrides.
+
         Returns:
-            LLM: The loaded or cached LLM instance
-            
-        Raises:
-            Exception: If model loading fails
-            
-        Examples:
-            >>> manager = LLMManager()
-            >>> llm = manager.get_or_create_llm("/path/to/model", gpu_devices="0")
-            >>> # Second call returns cached instance
-            >>> llm2 = manager.get_or_create_llm("/path/to/model", gpu_devices="0")
-            >>> assert llm is llm2
+            The loaded or cached LLM instance.
         """
-        # Create a unique cache key
-        key = f"{model_path}_{gpu_devices}_{enable_steer_vector}"
-        
+        gpu_devices = ",".join(device.strip() for device in gpu_devices.split(","))
+        if not gpu_devices or any(not device for device in gpu_devices.split(",")):
+            raise ValueError("gpu_devices must contain one or more GPU IDs or UUIDs")
+
+        # Key the effective constructor arguments, including keyword overrides.
+        llm_config = {
+            "model": model_path,
+            "enforce_eager": enforce_eager,
+            "tensor_parallel_size": len(gpu_devices.split(",")),
+        }
+        if enable_chunked_prefill is not None:
+            llm_config["enable_chunked_prefill"] = enable_chunked_prefill
+        if enable_steer_vector:
+            llm_config.update(
+                enable_steer_vector=True,
+                steer_algorithms="all",
+                steer_multi_vector=True,
+            )
+        if enable_prefix_caching is not None:
+            llm_config["enable_prefix_caching"] = enable_prefix_caching
+        llm_config.update(kwargs)
+        key = _cache_key(gpu_devices, llm_config)
         if key in self._instances:
-            logger.info(f"Returning cached LLM instance: {key}")
+            logger.info("Returning cached LLM instance: %s", key)
             return self._instances[key]
-        
+
         try:
-            # Set GPU devices environment variable
             os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
-            logger.info(f"Set CUDA_VISIBLE_DEVICES={gpu_devices}")
-            
-            # Calculate tensor_parallel_size based on GPU count
-            gpu_count = len(gpu_devices.split(','))
-            
-            # Build LLM configuration
-            llm_config = {
-                'model': model_path,
-                'enforce_eager': enforce_eager,
-                'tensor_parallel_size': gpu_count,
-            }
-            if enable_chunked_prefill is not None:
-                llm_config['enable_chunked_prefill'] = enable_chunked_prefill
-            
-            # Add enable_steer_vector if True. The frontend serves
-            # whatever algorithm the user picks, so declare them all
-            # (runs in split graph mode).
-            if enable_steer_vector:
-                llm_config['enable_steer_vector'] = True
-                llm_config['steer_algorithms'] = 'all'
-                llm_config['steer_multi_vector'] = True
-            
-            # Add enable_prefix_caching if explicitly specified
-            if enable_prefix_caching is not None:
-                llm_config['enable_prefix_caching'] = enable_prefix_caching
-            
-            # Merge with any additional kwargs
-            llm_config.update(kwargs)
-            
-            # Create LLM instance
+            logger.info("Set CUDA_VISIBLE_DEVICES=%s", gpu_devices)
+
             logger.info(f"Creating new LLM instance with config: {llm_config}")
             llm_instance = LLM(**llm_config)
-            
-            # Cache the instance
+
             self._instances[key] = llm_instance
             logger.info(f"Created and cached LLM instance: {key}")
-            
+
             return llm_instance
-            
+
         except Exception as e:
             logger.error(f"Failed to create LLM instance for {model_path}: {str(e)}")
             raise
-    
+
     def get_instance(self, key: str) -> Optional[LLM]:
-        """
-        Get a specific cached LLM instance by key.
-        
-        Args:
-            key: The cache key for the instance
-            
-        Returns:
-            LLM instance if found, None otherwise
-        """
+        """Return the cached engine for a key, or None if absent."""
         return self._instances.get(key)
-    
+
     def clear_instance(self, key: str) -> bool:
-        """
-        Clear a specific LLM instance from cache.
-        
-        Args:
-            key: The cache key for the instance to clear
-            
-        Returns:
-            bool: True if instance was found and cleared, False otherwise
-        """
+        """Drop a cached engine reference and report whether it existed."""
         if key in self._instances:
             logger.info(f"Clearing LLM instance: {key}")
-            try:
-                del self._instances[key]
-                return True
-            except Exception as e:
-                logger.error(f"Failed to delete LLM instance {key}: {str(e)}")
-                return False
+            del self._instances[key]
+            return True
         return False
-    
+
     def clear_all_instances(self) -> int:
-        """
-        Clear all cached LLM instances.
-        
-        Returns:
-            int: Number of instances cleared
-            
-        Note:
-            This should be called before system restart or when memory cleanup is needed.
-        """
+        """Drop all cached engine references and return the number removed."""
         count = len(self._instances)
         logger.info(f"Clearing all {count} LLM instances...")
-        
-        for key in list(self._instances.keys()):
-            try:
-                logger.info(f"Deleting LLM instance: {key}")
-                del self._instances[key]
-            except Exception as e:
-                logger.error(f"Failed to delete LLM instance {key}: {str(e)}")
-        
+
         self._instances.clear()
         logger.info(f"Cleared {count} LLM instances")
         return count
-    
+
     def get_instance_info(self) -> Dict[str, Any]:
-        """
-        Get information about cached instances.
-        
-        Returns:
-            dict: Information including count and keys of cached instances
-        """
-        return {
-            'count': len(self._instances),
-            'keys': list(self._instances.keys())
-        }
-    
+        """Return the number and keys of cached engines."""
+        return {"count": len(self._instances), "keys": list(self._instances.keys())}
+
     def __len__(self) -> int:
         """Return the number of cached instances."""
         return len(self._instances)
-    
+
     def __contains__(self, key: str) -> bool:
         """Check if an instance with the given key is cached."""
         return key in self._instances

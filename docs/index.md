@@ -12,16 +12,16 @@ and CUDA-graph support.
 
 ## Why EasySteer
 
-- **High performance** — 10.8–22.3× faster than existing steering frameworks through
-  vLLM integration.
+- **High performance** — the paper reports 10.8–22.3× speedups over the compared
+  steering frameworks. Rerun benchmarks for the current engine and hardware.
 - **One spec, every backend** — the same `SteeringSpec` runs under eager, split, and
   in-graph CUDA-graph execution; declare your algorithms at launch and the engine
   picks the fastest tier that serves them, rejecting anything undeclared explicitly.
 - **Fine-grained control** — token-level, position-specific, phase-aware
   (prompt vs. generation), and multi-vector steering.
 - **Modular algorithms** — direct addition, linear maps, LoReFT, LM-Steer,
-  projection-based erase/replace, MoE router steering; new algorithms plug in with two
-  methods.
+  projection-based erase, replacement, and MoE router steering; new algorithms
+  extend `BaseSteerVectorAlgorithm`.
 - **Full research loop** — capture hidden states, extract vectors (DiffMean, PCA, LAT,
   linear probe, SAE), train interventions (ReFT), and serve them, all in one repo.
 
@@ -54,9 +54,10 @@ spec = SteeringSpec(vectors=[VectorSpec(
     apply=ApplySpec(prompt="all", generation="all"),
 )])
 
-out = llm.generate("Comfort Alice about her dog.",
+prompt = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
+out = llm.generate(prompt,
                    steering=spec,
-                   sampling_params=SamplingParams(max_tokens=128))
+                   sampling_params=SamplingParams(temperature=0.0, max_tokens=128))
 ```
 
 See the [Quickstart](getting-started/quickstart.md) for the full example, and the

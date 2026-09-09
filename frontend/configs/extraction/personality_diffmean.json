@@ -2,7 +2,7 @@
   "config_name": "personality_diffmean",
   "display_name": "Personality DiffMean Extraction",
   "description": "使用DiffMean方法提取个性控制向量",
-  "model_path": "/data/zju-46/shenyl/hf/model/Qwen/Qwen2.5-1.5B-Instruct/",
+  "model_path": "Qwen/Qwen2.5-1.5B-Instruct",
   "gpu_devices": "0",
   "method": "diffmean",
   "positive_samples": [
@@ -19,7 +19,6 @@
   ],
   "token_pos": "-1",
   "normalize": true,
-  "target_layer": null,
   "output_path": "./personality_diffmean_control_vector.gguf",
   "vector_name": "personality_diffmean"
-} 
+}

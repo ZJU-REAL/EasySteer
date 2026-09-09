@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "High-Performance LLM Steering Framework"
 readme = "README.md"
 authors = [
-    {name = "ZJU-REAL", email = "example@example.com"}
+    {name = "ZJU-REAL"}
 ]
 license = {text = "Apache License 2.0"}
 requires-python = ">=3.10"
 dependencies = [
+    "gguf",
     "scikit-learn",
     "datasets",
     "matplotlib",
@@ -26,6 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 keywords = ["llm", "steering", "nlp", "machine learning", "deep learning"]
@@ -37,4 +39,4 @@ Repository = "https://github.com/ZJU-REAL/EasySteer"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["easysteer*"]
-exclude = [] 
+exclude = []

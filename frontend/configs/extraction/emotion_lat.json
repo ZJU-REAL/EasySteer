@@ -2,7 +2,7 @@
   "config_name": "emotion_lat",
   "display_name": "Emotion LAT Extraction",
   "description": "使用LAT方法提取情感控制向量",
-  "model_path": "/data/zju-46/shenyl/hf/model/Qwen/Qwen2.5-1.5B-Instruct/",
+  "model_path": "Qwen/Qwen2.5-1.5B-Instruct",
   "gpu_devices": "0",
   "method": "lat",
   "positive_samples": [
@@ -19,7 +19,6 @@
   ],
   "token_pos": "-1",
   "normalize": true,
-  "target_layer": null,
   "output_path": "./emotion_lat_control_vector.gguf",
   "vector_name": "emotion_lat"
-} 
+}

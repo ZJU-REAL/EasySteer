@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Vector workshop: extraction and training merged into one flow.
- * Pick a method, configure, submit the job to the retained Flask backend,
- * poll status, then hand the produced vector to the playground.
+ * Submit extraction and training jobs, track progress, and load the
+ * produced vector into the playground.
  */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -74,8 +73,7 @@ async function refreshPresets(): Promise<void> {
         : await flask.listTrainingConfigs();
     serverPresets.value = resp.configs;
   } catch {
-    // An unreachable job backend is a normal state for a static review
-    // deployment; the built-in presets stay usable either way.
+    // Built-in presets remain available when the job backend is unreachable.
     serverPresets.value = [];
     presetsUnavailable.value = true;
   }

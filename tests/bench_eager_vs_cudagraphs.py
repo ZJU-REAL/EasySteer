@@ -1,252 +1,282 @@
 #!/usr/bin/env python3
-"""Benchmark: eager per-request steering vs server-level CUDA graphs.
+"""Compare eager and in-graph steering with the same HTTP request workload.
 
-Starts two servers sequentially, sends N sequential requests to each,
-and compares throughput.
+Each mode starts its own server sequentially. Both use the selected steering
+scope (per-request by default), fixed completion lengths, and the same prompts.
+Reported throughput includes prefill and HTTP overhead; it is not a decode-only
+kernel benchmark. Per-request steering supports CUDA graphs too.
 
-Usage:
-    CUDA_VISIBLE_DEVICES=0 python scripts/bench_eager_vs_cudagraphs.py \
-        --vector /path/to/vector.gguf \
-        --n 20 --max-tokens 200
+Usage from the repository root:
+    CUDA_VISIBLE_DEVICES=0 python tests/bench_eager_vs_cudagraphs.py \
+        --model Qwen/Qwen2.5-1.5B-Instruct \
+        --vector vectors/happy_diffmean.gguf --n 20 --max-tokens 200
 """
+
 from __future__ import annotations
 
 import argparse
+import asyncio
+import json
 import os
 import signal
+import socket
+import statistics
 import subprocess
 import sys
+import tempfile
 import time
-
-import httpx
-
-MODEL = os.environ.get("STEER_TEST_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
-TARGET_LAYERS = list(range(10, 26))
-PORT = 8019
+from pathlib import Path
 
 PROMPTS = [
+    "Alice's dog has passed away. Please comfort her.",
     "Describe a rainy Monday morning.",
     "Write a short story about a lost cat.",
     "Explain how a bicycle works.",
-    "What makes a good cup of coffee?",
     "Describe the view from a mountaintop.",
 ]
 
 
-def wait_for_server(port: int, timeout: float = 180.0) -> None:
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        try:
-            r = httpx.get(f"http://localhost:{port}/v1/models", timeout=2.0)
-            if r.status_code == 200:
-                print(f"  Server ready after {time.time() - t0:.1f}s")
-                return
-        except httpx.ConnectError:
-            pass
-        time.sleep(2.0)
-    raise TimeoutError(f"Server not ready after {timeout}s")
+def steering_spec(args: argparse.Namespace, scale: float | None = None) -> dict:
+    return {
+        "vectors": [
+            {
+                "source": args.vector,
+                "algorithm": "direct",
+                "scale": args.scale if scale is None else scale,
+                "layers": args.target_layers,
+                "normalize": False,
+                "apply": {"prompt": "all", "generation": "all"},
+            }
+        ]
+    }
 
 
-def start_server(
-    vector_path: str,
-    scale: float,
-    *,
-    server_level: bool,
-) -> subprocess.Popen:
-    cmd = [
-        sys.executable, "-m", "vllm.entrypoints.openai.api_server",
-        "--model", MODEL,
-        "--port", str(PORT),
-        "--gpu-memory-utilization", "0.4",
-        "--max-model-len", "512",
+def server_command(args: argparse.Namespace, *, eager: bool) -> list[str]:
+    command = [
+        sys.executable,
+        "-m",
+        "vllm.entrypoints.openai.api_server",
+        "--model",
+        args.model,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(args.port),
+        "--gpu-memory-utilization",
+        str(args.gpu_memory_utilization),
+        "--max-model-len",
+        str(args.max_model_len),
+        "--max-num-batched-tokens",
+        str(args.max_model_len),
+        "--max-num-seqs",
+        str(max(args.concurrency)),
         "--no-enable-prefix-caching",
         "--no-enable-chunked-prefill",
+        "--no-async-scheduling",
+        "--enable-steer-vector",
+        "--steer-algorithms",
+        "direct",
     ]
-    if server_level:
-        import json as _json
-        spec = {"vectors": [{
-            "source": vector_path,
-            "scale": scale,
-            "layers": TARGET_LAYERS,
-            "normalize": True,
-            "apply": {"prompt": "all", "generation": "all"},
-        }]}
-        cmd += ["--steering-config", _json.dumps(spec)]
+    if eager:
+        command += ["--enforce-eager"]
     else:
-        cmd += [
-            "--enable-steer-vector",
-            "--enforce-eager",
-        ]
-    mode = "server-level + CUDA graphs" if server_level else "per-request + eager"
-    log = f"/tmp/vllm_bench_{'cg' if server_level else 'eager'}.log"
-    print(f"  Starting {mode} server (log: {log})")
-    log_file = open(log, "w")  # noqa: SIM115
-    proc = subprocess.Popen(
-        cmd, stdout=log_file, stderr=subprocess.STDOUT,
-        env={**os.environ},
-    )
-    proc._log = log_file  # type: ignore[attr-defined]
-    return proc
+        command += ["--steer-graph-mode", "in_graph"]
+    if args.steering_mode == "default":
+        command += ["--steering-config", json.dumps(steering_spec(args))]
+    return command
+
+
+def wait_for_server(proc: subprocess.Popen, port: int, timeout: float) -> None:
+    import httpx
+
+    start = time.monotonic()
+    with httpx.Client(timeout=2.0, trust_env=False) as client:
+        while time.monotonic() - start < timeout:
+            if proc.poll() is not None:
+                raise RuntimeError(
+                    f"server exited with code {proc.returncode}; see log"
+                )
+            try:
+                if client.get(f"http://127.0.0.1:{port}/v1/models").status_code == 200:
+                    return
+            except httpx.RequestError:
+                pass
+            time.sleep(1)
+    raise TimeoutError(f"server not ready after {timeout}s; see log")
 
 
 def stop_server(proc: subprocess.Popen) -> None:
-    proc.send_signal(signal.SIGTERM)
+    # The benchmark owns this process group, including its vLLM workers.
     try:
-        proc.wait(timeout=15)
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        proc.wait(timeout=30)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait(timeout=5)
-    proc._log.close()  # type: ignore[attr-defined]
+        pass
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
 
 
-def bench(
-    vector_path: str,
-    scale: float,
-    n: int,
-    max_tokens: int,
-    *,
-    per_request: bool,
-) -> dict:
-    url = f"http://localhost:{PORT}"
-    client = httpx.Client(timeout=300.0)
-    total_tokens = 0
+async def bench(args: argparse.Namespace, concurrency: int, workload: str) -> dict:
+    import httpx
 
-    # Warmup
-    for i in range(2):
-        body: dict = {
-            "model": MODEL,
-            "messages": [{"role": "user", "content": PROMPTS[0]}],
-            "max_tokens": 10,
-            "temperature": 0.8,
+    def body(index: int) -> dict:
+        request = {
+            "model": args.model,
+            "messages": [{"role": "user", "content": PROMPTS[index % len(PROMPTS)]}],
+            "max_tokens": args.max_tokens,
+            "ignore_eos": True,
+            "temperature": 0,
+            "seed": 0,
         }
-        if per_request:
-            body["steering"] = {"vectors": [{
-                "source": vector_path,
-                "scale": scale,
-                "layers": TARGET_LAYERS,
-                "normalize": True,
-                "apply": {"prompt": "all", "generation": "all"},
-            }]}
-        r = client.post(f"{url}/v1/chat/completions", json=body)
-        if r.status_code != 200:
-            raise RuntimeError(f"Warmup failed: {r.status_code} {r.text[:300]}")
+        if args.steering_mode == "per-request" and workload != "unsteered":
+            request["steering"] = steering_spec(
+                args, 0.0 if workload == "zero" else args.scale
+            )
+        return request
 
-    # Benchmark
-    t0 = time.perf_counter()
-    for i in range(n):
-        prompt = PROMPTS[i % len(PROMPTS)]
-        body = {
-            "model": MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": 0.8,
-        }
-        if per_request:
-            body["steering"] = {"vectors": [{
-                "source": vector_path,
-                "scale": scale,
-                "layers": TARGET_LAYERS,
-                "normalize": True,
-                "apply": {"prompt": "all", "generation": "all"},
-            }]}
-        r = client.post(f"{url}/v1/chat/completions", json=body)
-        if r.status_code != 200:
-            raise RuntimeError(f"Request {i} failed: {r.status_code} {r.text[:300]}")
-        total_tokens += r.json()["usage"]["completion_tokens"]
+    async with httpx.AsyncClient(timeout=300, trust_env=False) as client:
+        url = f"http://127.0.0.1:{args.port}/v1/chat/completions"
+        semaphore = asyncio.Semaphore(concurrency)
 
-    elapsed = time.perf_counter() - t0
-    client.close()
+        async def request(index: int) -> tuple[int, float]:
+            async with semaphore:
+                start = time.perf_counter()
+                response = await client.post(url, json=body(index))
+                latency = time.perf_counter() - start
+            response.raise_for_status()
+            count = response.json()["usage"]["completion_tokens"]
+            if count != args.max_tokens:
+                raise RuntimeError(
+                    f"fixed-length request returned {count} completion tokens"
+                )
+            return count, latency
 
+        # Warm the same concurrency and steering workload being measured.
+        for _ in range(args.warmup):
+            await asyncio.gather(*(request(i) for i in range(concurrency)))
+        start = time.perf_counter()
+        samples = await asyncio.gather(*(request(i) for i in range(args.n)))
+        elapsed = time.perf_counter() - start
+    total_tokens = sum(count for count, _ in samples)
+    latencies = sorted(latency * 1000 for _, latency in samples)
     return {
-        "n_requests": n,
-        "total_tokens": total_tokens,
-        "elapsed_s": round(elapsed, 2),
-        "tokens_per_sec": round(total_tokens / elapsed, 1),
-        "avg_latency_ms": round(elapsed / n * 1000, 1),
+        "workload": workload,
+        "concurrency": concurrency,
+        "n_requests": args.n,
+        "completion_tokens": total_tokens,
+        "elapsed_s": elapsed,
+        "tokens_per_sec": total_tokens / elapsed,
+        "avg_latency_ms": statistics.mean(latencies),
+        "p50_latency_ms": statistics.median(latencies),
+        "p95_latency_ms": latencies[
+            min(len(latencies) - 1, int(len(latencies) * 0.95))
+        ],
     }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", default=os.environ.get("STEER_TEST_MODEL"))
     parser.add_argument("--vector", required=True)
-    parser.add_argument("--scale", type=float, default=4.0)
+    parser.add_argument(
+        "--target-layers", type=int, nargs="+", default=list(range(10, 26))
+    )
+    parser.add_argument("--scale", type=float, default=2.0)
+    parser.add_argument(
+        "--steering-mode", choices=("per-request", "default"), default="per-request"
+    )
     parser.add_argument("--n", type=int, default=20)
+    parser.add_argument("--warmup", type=int, default=2)
+    parser.add_argument("--concurrency", type=int, nargs="+", default=[1])
+    parser.add_argument(
+        "--workloads",
+        nargs="+",
+        choices=("unsteered", "zero", "steered"),
+        default=["unsteered", "zero", "steered"],
+        help="Per-request workloads; default steering mode measures steered only",
+    )
     parser.add_argument("--max-tokens", type=int, default=200)
+    parser.add_argument("--max-model-len", type=int, default=512)
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.4)
+    parser.add_argument("--port", type=int, default=8019)
+    parser.add_argument("--startup-timeout", type=float, default=600)
+    parser.add_argument(
+        "--results-dir", type=Path, help="New directory for logs and results"
+    )
     args = parser.parse_args()
-
-    vector_path = str(os.path.abspath(args.vector))
-    assert os.path.exists(vector_path), f"Vector not found: {vector_path}"
-
-    print("=" * 60)
-    print("Benchmark: eager per-request vs server-level CUDA graphs")
-    print("=" * 60)
-    print(f"  Requests: {args.n}, max_tokens: {args.max_tokens}")
-    print()
-
-    # ── Eager (per-request) ──────────────────────────────────────
-    print("[1/2] Eager mode (per-request steering)")
-    proc = start_server(vector_path, args.scale, server_level=False)
-    try:
-        wait_for_server(PORT)
-        eager = bench(
-            vector_path, args.scale, args.n, args.max_tokens,
-            per_request=True,
+    if not args.model:
+        parser.error("provide --model or STEER_TEST_MODEL")
+    args.vector = str(Path(args.vector).expanduser().resolve())
+    if not Path(args.vector).is_file():
+        parser.error(f"vector file does not exist: {args.vector}")
+    if args.n <= 0 or args.warmup < 1 or not 0 < args.max_tokens < args.max_model_len:
+        parser.error(
+            "--n and --warmup must be positive; max tokens must fit max model length"
         )
-    finally:
-        stop_server(proc)
-    print(f"  {eager}")
-    print()
-
-    # ── CUDA graphs (server-level) ───────────────────────────────
-    print("[2/2] CUDA graphs (server-level steering)")
-    proc = start_server(vector_path, args.scale, server_level=True)
-    try:
-        wait_for_server(PORT)
-        cg = bench(vector_path, args.scale, args.n, args.max_tokens, per_request=False)
-    finally:
-        stop_server(proc)
-    print(f"  {cg}")
-    print()
-
-    # ── Summary ──────────────────────────────────────────────────
-    speedup = (
-        eager["elapsed_s"] / cg["elapsed_s"]
-        if cg["elapsed_s"] > 0
-        else float("inf")
-    )
-    tps_speedup = (
-        cg["tokens_per_sec"] / eager["tokens_per_sec"]
-        if eager["tokens_per_sec"] > 0
-        else float("inf")
-    )
-
-    print("=" * 60)
-    print("RESULTS")
-    print("=" * 60)
-    hdr = f"  {'':>25} {'Eager':>12} {'CUDA graphs':>12}"
-    print(f"{hdr} {'Speedup':>10}")
-    print(f"  {'-'*60}")
-    e_tok = eager['total_tokens']
-    c_tok = cg['total_tokens']
-    print(f"  {'Tokens':>25} {e_tok:>12} {c_tok:>12}")
-    e_t = eager['elapsed_s']
-    c_t = cg['elapsed_s']
-    print(
-        f"  {'Wall time':>25} {e_t:>11.1f}s"
-        f" {c_t:>11.1f}s {speedup:>9.2f}x"
-    )
-    e_tps = eager['tokens_per_sec']
-    c_tps = cg['tokens_per_sec']
-    print(
-        f"  {'Throughput (tok/s)':>25} {e_tps:>12.1f}"
-        f" {c_tps:>12.1f} {tps_speedup:>9.2f}x"
-    )
-    e_lat = eager['avg_latency_ms']
-    c_lat = cg['avg_latency_ms']
-    print(
-        f"  {'Avg latency (ms)':>25}"
-        f" {e_lat:>12.1f} {c_lat:>12.1f}"
-    )
+    if min(args.concurrency) < 1 or max(args.concurrency) > args.n:
+        parser.error("concurrency must be between 1 and --n")
+    args.concurrency = sorted(set(args.concurrency))
+    if args.steering_mode == "default":
+        args.workloads = ["steered"]
+    if args.results_dir:
+        args.results_dir.mkdir(parents=True, exist_ok=False)
+    else:
+        args.results_dir = Path(tempfile.mkdtemp(prefix="easysteer-benchmark-"))
+    # Refuse an occupied port; readiness must belong to the server we launch.
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", args.port))
+    print(f"Logs and results: {args.results_dir}", flush=True)
+    results = {}
+    environment = dict(os.environ)
+    environment.pop("VLLM_STEER_TRACE_DIR", None)
+    for mode, eager in (("eager", True), ("in_graph", False)):
+        command = server_command(args, eager=eager)
+        print(f"Benchmarking {mode}, steering={args.steering_mode}", flush=True)
+        with (args.results_dir / f"{mode}.log").open("x") as log:
+            proc = subprocess.Popen(
+                command,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                env=environment,
+            )
+            try:
+                startup = time.perf_counter()
+                wait_for_server(proc, args.port, args.startup_timeout)
+                results[mode] = {
+                    "command": command,
+                    "startup_s": time.perf_counter() - startup,
+                    "measurements": [
+                        asyncio.run(bench(args, concurrency, workload))
+                        for concurrency in args.concurrency
+                        for workload in args.workloads
+                    ],
+                }
+            finally:
+                stop_server(proc)
+    results["throughput_ratio_in_graph_over_eager"] = [
+        {
+            "concurrency": graph["concurrency"],
+            "workload": graph["workload"],
+            "ratio": graph["tokens_per_sec"] / eager["tokens_per_sec"],
+        }
+        for eager, graph in zip(
+            results["eager"]["measurements"], results["in_graph"]["measurements"]
+        )
+    ]
+    result = {
+        "settings": vars(args) | {"results_dir": str(args.results_dir)},
+        "results": results,
+    }
+    (args.results_dir / "results.json").write_text(json.dumps(result, indent=2))
+    print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":

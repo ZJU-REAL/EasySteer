@@ -15,10 +15,7 @@ import personalityDiffmean from "../../../configs/extraction/personality_diffmea
 import emojiBias from "../../../configs/training/emoji_bias.json";
 import emojiLoreft from "../../../configs/training/emoji_loreft.json";
 import {
-  interventionFromName,
-  normalizeTrainingConfig,
   type ExtractionConfig,
-  type RawTrainingConfig,
   type TrainingConfig,
 } from "../lib/jobConfig";
 
@@ -33,11 +30,11 @@ function extraction(raw: unknown): BuiltinPreset<ExtractionConfig> {
   return { name: cfg.config_name, display_name: cfg.display_name, config: cfg };
 }
 
-function training(name: string, display_name: string, raw: unknown): BuiltinPreset<TrainingConfig> {
+function training(name: string, display_name: string, config: unknown): BuiltinPreset<TrainingConfig> {
   return {
     name,
     display_name,
-    config: normalizeTrainingConfig(raw as RawTrainingConfig, interventionFromName(name)),
+    config: config as TrainingConfig,
   };
 }
 
