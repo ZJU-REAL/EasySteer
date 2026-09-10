@@ -12,6 +12,7 @@ on:
       - "README.md"
       - "README_zh.md"
       - "easysteer/**"
+      - "vllm-steer"
       - "pyproject.toml"
       - "mkdocs.yml"
       - "requirements-docs.txt"
