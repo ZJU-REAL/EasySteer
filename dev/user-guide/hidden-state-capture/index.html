@@ -993,6 +993,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#process-a-dataset-in-batches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process a dataset in batches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#moe-router-logits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1041,17 +1052,6 @@
     <span class="md-ellipsis">
       
         Prefix caching
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility-wrappers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility wrappers
       
     </span>
   </a>
@@ -2100,6 +2100,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#process-a-dataset-in-batches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process a dataset in batches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#moe-router-logits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2148,17 +2159,6 @@
     <span class="md-ellipsis">
       
         Prefix caching
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compatibility-wrappers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility wrappers
       
     </span>
   </a>
@@ -2343,6 +2343,10 @@ or MoE gates; test new model architectures before relying on their activations.<
 <td><code>SteeringSpec</code> or per-prompt list, as in <code>LLM.generate()</code>. Captured values include steering; use <code>False</code> to disable it even when the engine has a default.</td>
 </tr>
 <tr>
+<td><code>budget_bytes</code></td>
+<td>Optional limit on raw CPU values and row labels, including pending transfers, across the stream's layers. Exceeding it fails capture instead of returning a partial result.</td>
+</tr>
+<tr>
 <td><code>**generate_kwargs</code></td>
 <td>Forwarded into <code>SamplingParams</code> (e.g. <code>temperature</code>).</td>
 </tr>
@@ -2371,14 +2375,58 @@ position — the only correct grouping under continuous batching.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span><span class="o">.</span><span class="n">layer_ids</span>          <span class="c1"># sorted true layer ids</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">result</span><span class="o">.</span><span class="n">rows</span><span class="p">(</span><span class="mi">12</span><span class="p">)</span>           <span class="c1"># Tensor(total_rows, dim) for layer 12, all samples</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>          <span class="c1"># {layer_id: Tensor(rows, dim)} for sample 0</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_positions</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># absolute sequence positions of sample 0's rows</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_token_ids</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># input token ids of sample 0's rows</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">result</span><span class="o">.</span><span class="n">outputs</span>            <span class="c1"># the vLLM RequestOutput list, prompt order</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">result</span><span class="o">.</span><span class="n">layouts</span>            <span class="c1"># per-layer component widths and attention head layout</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">result</span><span class="o">.</span><span class="n">to_nested</span><span class="p">()</span>        <span class="c1"># legacy shape: [sample][layer_pos] tensors</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_rows</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span> <span class="c1"># sample 0's rows at layer 12 only</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">result</span><span class="o">.</span><span class="n">token</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># last captured row of sample 0 at layer 12</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_positions</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># absolute sequence positions of sample 0's rows</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">result</span><span class="o">.</span><span class="n">sample_token_ids</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># input token ids of sample 0's rows</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">result</span><span class="o">.</span><span class="n">outputs</span>            <span class="c1"># the vLLM RequestOutput list, prompt order</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">result</span><span class="o">.</span><span class="n">layouts</span>            <span class="c1"># per-layer component widths and attention head layout</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="n">result</span><span class="o">.</span><span class="n">to_nested</span><span class="p">()</span>        <span class="c1"># [sample][layer_pos] tensors, when explicitly needed</span>
 </code></pre></div>
-<p><code>result.meta(layer)</code> exposes the raw row labels (<code>req_ids</code> / <code>positions</code> / <code>token_ids</code>);
-<code>result.labelled</code> tells you whether per-sample views are available.</p>
+<p><code>result.meta(layer)</code> exposes the raw row labels (<code>req_ids</code> / <code>positions</code> / <code>token_ids</code>).
+Labels are mandatory. <code>token()</code> indexes a sample's captured rows, so <code>-1</code>
+means the last selected row, which may differ from the last original prompt
+position. <code>sample_rows()</code> returns a view when those rows are contiguous;
+noncontiguous rows are gathered in sequence order.</p>
+<h2 id="process-a-dataset-in-batches">Process a dataset in batches<a class="headerlink" href="#process-a-dataset-in-batches" title="Permanent link">&para;</a></h2>
+<p>Use <code>capture_batches()</code> to consume results a batch at a time. It preserves
+prompt order and slices per-prompt steering and selection lists along the same
+boundaries. Each result uses local sample indices starting at zero. Worker
+storage is cleared before the result is yielded, and compatible capture graphs
+remain cached for the next batch.</p>
+<p>For diffmean, keep running statistics rather than all captured samples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.steer</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffMeanAccumulator</span><span class="p">,</span> <span class="n">DiffMeanExtractor</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">accumulator</span> <span class="o">=</span> <span class="n">DiffMeanAccumulator</span><span class="p">()</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">for</span> <span class="n">positive</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="p">[(</span><span class="kc">True</span><span class="p">,</span> <span class="n">positive_prompts</span><span class="p">),</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="n">negative_prompts</span><span class="p">)]:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture_batches</span><span class="p">(</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">llm</span><span class="p">,</span> <span class="n">group</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">budget_bytes</span><span class="o">=</span><span class="mi">256</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">):</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">batch</span><span class="o">.</span><span class="n">layer_ids</span><span class="p">:</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>            <span class="n">accumulator</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">layer</span><span class="p">,</span> <span class="n">batch</span><span class="o">.</span><span class="n">rows</span><span class="p">(</span><span class="n">layer</span><span class="p">),</span> <span class="n">positive</span><span class="o">=</span><span class="n">positive</span><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="k">del</span> <span class="n">batch</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="n">vector</span> <span class="o">=</span> <span class="n">DiffMeanExtractor</span><span class="o">.</span><span class="n">from_moments</span><span class="p">(</span><span class="n">accumulator</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span> <span class="n">accumulator</span><span class="o">.</span><span class="n">neg</span><span class="p">)</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="n">vector</span><span class="o">.</span><span class="n">export_gguf</span><span class="p">(</span><span class="s2">"direction.gguf"</span><span class="p">)</span>
+</code></pre></div>
+<p><code>positive_prompts</code> and <code>negative_prompts</code> use the same prompt input format as
+<code>capture()</code>. Selecting one row per prompt gives each sample equal weight. For
+full activation datasets, write each yielded batch to a separate file instead
+of retaining the iterator as a list. One large batch can still exceed the byte
+budget; reduce its size, select fewer rows/layers, or increase the limit.</p>
+<p><code>capture_batches()</code> defaults to 32 prompts and a 256 MiB raw-storage budget.
+<code>capture()</code> retains its unrestricted default, with <code>budget_bytes</code> available
+explicitly. The budget counts values and labels in worker CPU storage and
+pending transfers. It excludes model memory, CUDA graph buffers, serialization
+copies, and tensors retained by the caller; it is not a process memory limit.
+The low-level <code>capture_status</code> RPC reports <code>storage_bytes</code> and <code>budget_bytes</code>.</p>
+<p>Per-layer extraction reads only the requested token rows and processes one
+layer at a time. Online means require space proportional to feature width.
+<code>MomentsAccumulator(track_second_moment=True)</code> also retains a square covariance
+matrix per layer; use it only when that statistic is needed. It is not a general
+memory-saving replacement for sample storage at large hidden dimensions.</p>
 <h2 id="moe-router-logits">MoE router logits<a class="headerlink" href="#moe-router-logits" title="Permanent link">&para;</a></h2>
 <p>Pass <code>stream="router_logits"</code> to <code>hs.capture()</code> on an MoE model to capture per-token
 router logits instead of hidden states (used e.g. by the
@@ -2386,16 +2434,16 @@ router logits instead of hidden states (used e.g. by the
 <h2 id="attention-head-outputs">Attention head outputs<a class="headerlink" href="#attention-head-outputs" title="Permanent link">&para;</a></h2>
 <p><code>stream="attention_heads"</code> captures attention aggregation outputs before the
 output projection, with the same selection and per-sample views:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">heads</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">llm</span><span class="p">,</span> <span class="n">prompts</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span> <span class="n">stream</span><span class="o">=</span><span class="s2">"attention_heads"</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">steering</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">)</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">layouts</span><span class="p">[</span><span class="mi">10</span><span class="p">]</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">head_outputs</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"num_heads"</span><span class="p">],</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"head_size"</span><span class="p">],</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">heads</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">llm</span><span class="p">,</span> <span class="n">prompts</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span> <span class="n">stream</span><span class="o">=</span><span class="s2">"attention_heads"</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">steering</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">layouts</span><span class="p">[</span><span class="mi">10</span><span class="p">]</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">head_outputs</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"num_heads"</span><span class="p">],</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"head_size"</span><span class="p">],</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
 </code></pre></div>
 <p>The stored tensors remain two-dimensional <code>(rows, width)</code>. The layout records
 <code>width = num_heads * head_size</code>, where <code>num_heads</code> is the query head count and
@@ -2418,6 +2466,11 @@ combination stays cached across <code>capture()</code> calls; changing the selec
 positions, storage dtype or reduction does not require recording it again.
 Changing components or layers replaces that cached graph. Ordinary model graphs
 do not contain capture operations.</p>
+<p>The graph's fixed output buffers contain whole execution batches before row
+selection. Selecting fewer rows reduces retained CPU data and transfer volume,
+but does not shrink those fixed GPU buffers. Stopping capture clears the stream
+while retaining the cached graph for reuse; status reports its buffer and total
+allocation sizes separately.</p>
 <h2 id="prefix-caching">Prefix caching<a class="headerlink" href="#prefix-caching" title="Permanent link">&para;</a></h2>
 <p>KV blocks do not contain the intermediate activations skipped by a prefix
 hit. Request admission therefore sets <code>skip_reading_prefix_cache=True</code> when
@@ -2437,19 +2490,12 @@ cleanup does not affect the new stream.</p>
 <p>If steering fails for a request, fetching its captured rows also reports that
 failure. Other requests remain available through a fetch restricted to their
 request IDs; clearing the stream removes its retained rows and errors.</p>
-<h2 id="compatibility-wrappers">Compatibility wrappers<a class="headerlink" href="#compatibility-wrappers" title="Permanent link">&para;</a></h2>
-<p><code>get_all_hidden_states_generate</code> and <code>get_moe_router_logits_generate</code> are thin
-wrappers over <code>capture()</code>. The hidden-state wrapper returns
-<code>(hidden_states, outputs)</code>, with nested <code>[sample][layer]</code> tensors by default or
-concatenated <code>[layer]</code> tensors when <code>split_by_samples=False</code>. The router-logit
-wrapper returns <code>(router_logits, outputs)</code>, with a <code>{layer_id: tensor}</code> dictionary
-by default or one such dictionary per sample when <code>split_by_samples=True</code>.</p>
-<p>Prefer <code>capture()</code> for new code: it preserves true layer IDs and per-sample
-metadata. In particular, pass the <code>CaptureResult</code> directly to the vector
-extractors when capturing a layer subset; converting to a plain nested list
-loses the mapping from list positions to true layer IDs. The embed-task variants
-(<code>get_all_hidden_states</code>, <code>get_moe_router_logits</code>) and the <code>vllm.hidden_states</code>
-alias package were removed.</p>
+<p>Pass <code>CaptureResult</code> directly to vector extractors when capturing a layer
+subset. Converting it to a plain nested list loses the mapping from list
+positions to true layer IDs. The older <code>get_all_hidden_states_generate</code> and
+<code>get_moe_router_logits_generate</code> wrappers have been removed; use <code>capture()</code>
+with the appropriate <code>stream</code>, then <code>result.outputs</code>, <code>result.layers</code>, or
+<code>result.to_nested()</code> when that representation is required.</p>
 
 
 
