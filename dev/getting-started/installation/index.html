@@ -1902,19 +1902,28 @@ relative <code>vectors/</code> paths resolve.</p>
 </code></pre></div>
 <p>A full source build can take from ~20 minutes (128 cores) to several hours.</p>
 <h2 id="docker">Docker<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h2>
-<p>Build the image from the checked-out source to use the current steering API:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># From the EasySteer repository root; requires Docker and NVIDIA Container Toolkit</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>bash<span class="w"> </span>docker/build.sh
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>easysteer:latest
+<p>The published v0.29.0 image includes EasySteer and its pinned vLLM fork for
+Linux x86_64. Docker and NVIDIA Container Toolkit are required on the host:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>pull<span class="w"> </span>xuhaolei/easysteer:v0.29.0
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>--shm-size<span class="o">=</span>16g<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-w<span class="w"> </span>/app/easysteer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>xuhaolei/easysteer:v0.29.0
 </code></pre></div>
-<p>Here <code>latest</code> is the image built locally by the script. The historical published
-<code>v0.17.1</code> image uses an older engine and v1-era APIs; it is not the v0.29.0 build
-described on this page.</p>
+<p>The version tag fixes the release; <code>xuhaolei/easysteer:latest</code> follows the
+latest published version. Model weights are supplied separately through the
+mounted directory.</p>
+<p>To build from your own checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># From the EasySteer repository root; requires Docker and NVIDIA Container Toolkit</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bash<span class="w"> </span>docker/build.sh
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>-it<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/your/models:/app/models<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>easysteer:latest
+</code></pre></div>
+<p>Here <code>easysteer:latest</code> is a local image built by the script.</p>
 <p>The default base image uses CUDA 13.0. For a CUDA 12.9 build, select the
 corresponding official image:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">VLLM_BASE_IMAGE</span><span class="o">=</span>vllm/vllm-openai:v0.29.0-cu129<span class="w"> </span>bash<span class="w"> </span>docker/build.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">VLLM_BASE_IMAGE</span><span class="o">=</span>vllm/vllm-openai:v0.29.0-cu129<span class="w"> </span>bash<span class="w"> </span>docker/build.sh
 </code></pre></div>
 <p>Check the NVIDIA driver on the machine that will run the container. The
 container supplies its CUDA runtime; it still uses the host's GPU driver.

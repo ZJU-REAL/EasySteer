@@ -1603,6 +1603,7 @@ Consult each experiment for its required model, data and checkpoint files.</p>
 <th>Folder</th>
 <th>One-liner</th>
 <th>Category</th>
+<th>Component</th>
 </tr>
 </thead>
 <tbody>
@@ -1610,84 +1611,103 @@ Consult each experiment for its required model, data and checkpoint files.</p>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/bipo"><code>bipo/</code></a></td>
 <td>Bi-directional preference optimization vectors steering power-seeking behavior</td>
 <td>Personalization</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/cast"><code>cast/</code></a></td>
 <td>Conditional activation steering to program refusal (CAST)</td>
 <td>Safety</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/controlingthinkingspeed"><code>controlingthinkingspeed/</code></a></td>
 <td>Speeding up / slowing down reasoning-model thinking on MATH500</td>
 <td>Reasoning</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/creative_writing"><code>creative_writing/</code></a></td>
 <td>Steering LLMs to evaluate and amplify creativity</td>
 <td>Style</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/fractreason"><code>fractreason/</code></a></td>
 <td>Fractional reasoning via latent steering vectors for inference-time compute</td>
 <td>Reasoning</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/improve_reasoning"><code>improve_reasoning/</code></a></td>
 <td>Representation-engineering vectors that improve reasoning performance</td>
 <td>Reasoning</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/iti"><code>iti/</code></a></td>
 <td>Llama-2-7B-Chat attention head steering with a TruthfulQA accuracy comparison and examples</td>
-<td>Reality</td>
+<td>Truthfulness</td>
+<td>Attention head outputs</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/lm_steer"><code>lm_steer/</code></a></td>
 <td>Word embeddings as steers for language models (LM-Steer, GPT-2)</td>
 <td>General</td>
+<td>Residual stream (final block)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/loreft"><code>loreft/</code></a></td>
 <td>ReFT: train and apply LoReFT representation finetuning</td>
 <td>General</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/refusal_direction"><code>refusal_direction/</code></a></td>
 <td>Refusal is mediated by a single direction (DiffMean ablation)</td>
 <td>Safety</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sae_entities"><code>sae_entities/</code></a></td>
 <td>SAE entity-knowledge directions and hallucination awareness</td>
-<td>Reality</td>
+<td>Truthfulness</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sake"><code>sake/</code></a></td>
 <td>SAKE: steering activations for knowledge editing</td>
 <td>Knowledge</td>
+<td>Residual stream (final block)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/seal"><code>seal/</code></a></td>
 <td>SEAL: steerable reasoning calibration (execution/reflection/transition vectors)</td>
 <td>Reasoning</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sharp"><code>sharp/</code></a></td>
 <td>SHARP: steering hallucination in LVLMs via representation engineering (EMNLP 2025)</td>
-<td>Reality</td>
+<td>Truthfulness</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steerable_chatbot"><code>steerable_chatbot/</code></a></td>
 <td>Personalizing LLMs with preference-based activation steering</td>
 <td>Style</td>
+<td>Residual stream</td>
 </tr>
 <tr>
 <td><a href="https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steermoe"><code>steermoe/</code></a></td>
-<td>SteerMoE: expert (de)activation steering of MoE routers on OLMoE-1B-7B (arXiv:2509.09660)</td>
+<td>SteerMoE: expert (de)activation steering of MoE routers on Qwen3-30B-A3B (arXiv:2509.09660)</td>
 <td>MoE</td>
+<td>MoE router logits</td>
 </tr>
 </tbody>
 </table>
+<p>Components identify the intervention points used by these notebooks. Residual
+stream denotes decoder block output; attention head outputs are captured and
+steered before the output projection.</p>
 <p>Contributions of new replications are welcome — see
 <a href="../developer-guide/contributing/">Contributing</a>.</p>
 <!-- TODO: link each row to the paper (arXiv) and note which notebooks need which
