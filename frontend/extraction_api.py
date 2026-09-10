@@ -9,8 +9,12 @@ from core.runtime import llm_manager, resource_manager
 from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
-    from easysteer.hidden_states import capture
-    from easysteer.steer import extract_statistical_control_vector
+    from easysteer.hidden_states import capture, capture_batches
+    from easysteer.steer import (
+        DiffMeanAccumulator,
+        DiffMeanExtractor,
+        extract_statistical_control_vector,
+    )
 
 extraction_bp = Blueprint("extraction", __name__)
 
@@ -66,7 +70,7 @@ def extract_vector():
         return jsonify({"success": True, "message": "Extraction task has been started"})
 
     except Exception as e:
-        update_extraction_status(f"Failed to start extraction: {str(e)}", is_error=True)
+        update_extraction_status(f"Failed to start extraction: {e!s}", is_error=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -104,18 +108,18 @@ def run_extraction(config):
         update_extraction_status("Loading VLLM model...")
         model_path = config["model_path"]
 
-        # Capture needs a local engine. Eager avoids compilation for this
-        # single prompt-only extraction pass.
+        # Reuse the local engine and its capture graphs across extraction batches.
         llm = llm_manager.get_or_create_llm(
             model_path=model_path,
             gpu_devices=gpu_devices,
-            enforce_eager=True,
         )
 
         update_extraction_status(f"VLLM model loaded: {model_path}")
 
         positive_samples = config["positive_samples"]
         negative_samples = config["negative_samples"]
+        if not positive_samples or not negative_samples:
+            raise ValueError("Extraction requires positive and negative samples")
 
         update_extraction_status(
             f"Preparing samples: {len(positive_samples)} positive, {len(negative_samples)} negative"
@@ -126,26 +130,43 @@ def run_extraction(config):
         positive_indices = list(range(len(positive_samples)))
         negative_indices = list(range(len(positive_samples), len(all_samples)))
 
-        # Preserve true layer IDs and per-request row labels through the
-        # primary capture API. One generated token requires only the prompt
-        # forward, so token_pos addresses the original prompt rows.
-        all_hidden_states = capture(llm, all_samples, max_tokens=1)
-
-        update_extraction_status(
-            f"Hidden states extracted, layers: {len(all_hidden_states.layer_ids)}"
-        )
-
         update_extraction_status(f"Using extraction method: {method.upper()}")
-
-        update_extraction_status("Extracting control vector...")
-        control_vector = extract_statistical_control_vector(
-            method=method,
-            all_hidden_states=all_hidden_states,
-            positive_indices=positive_indices,
-            negative_indices=negative_indices,
-            normalize=config.get("normalize", True),
-            token_pos=token_pos,
-        )
+        # This job captures prompt rows only, so the original token_pos can be
+        # selected at the source. The resulting sample contains just row 0.
+        capture_kwargs = {
+            "max_tokens": 1,
+            "select": {"prompt_positions": [token_pos]},
+            "budget_bytes": 256 * 1024 * 1024,
+        }
+        normalize = config.get("normalize", True)
+        if method == "diffmean":
+            accumulator = DiffMeanAccumulator()
+            for positive, samples in (
+                (True, positive_samples),
+                (False, negative_samples),
+            ):
+                for captured in capture_batches(llm, samples, **capture_kwargs):
+                    _require_prompt_rows(captured, token_pos)
+                    for layer in captured.layer_ids:
+                        accumulator.update(
+                            layer, captured.rows(layer), positive=positive
+                        )
+                    del captured
+            control_vector = DiffMeanExtractor.from_moments(
+                accumulator.pos, accumulator.neg, normalize=normalize
+            )
+        else:
+            captured = capture(llm, all_samples, **capture_kwargs)
+            _require_prompt_rows(captured, token_pos)
+            control_vector = extract_statistical_control_vector(
+                method=method,
+                all_hidden_states=captured,
+                positive_indices=positive_indices,
+                negative_indices=negative_indices,
+                normalize=normalize,
+                token_pos=0,
+            )
+        control_vector.metadata["token_pos"] = token_pos
 
         output_path = config["output_path"]
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -166,10 +187,18 @@ def run_extraction(config):
     except Exception as e:
         import traceback
 
-        error_msg = (
-            f"Error during extraction process: {str(e)}\n{traceback.format_exc()}"
-        )
+        error_msg = f"Error during extraction process: {e!s}\n{traceback.format_exc()}"
         update_extraction_status(error_msg, is_error=True)
+
+
+def _require_prompt_rows(captured, token_pos):
+    for i, output in enumerate(captured.outputs):
+        length = len(output.prompt_token_ids)
+        position = token_pos if token_pos >= 0 else length + token_pos
+        if not 0 <= position < length:
+            raise IndexError(f"token_pos={token_pos} is outside prompt {i}")
+        if captured.sample_positions(i) != [position]:
+            raise RuntimeError(f"Capture did not return prompt {i}'s selected row")
 
 
 @extraction_bp.route("/api/extract-status", methods=["GET"])
@@ -187,9 +216,9 @@ def list_extract_configs():
 
     except Exception as e:
         update_extraction_status(
-            f"Failed to list extraction configs: {str(e)}", is_error=True
+            f"Failed to list extraction configs: {e!s}", is_error=True
         )
-        return jsonify({"error": f"Failed to list extraction configs: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to list extraction configs: {e!s}"}), 500
 
 
 @extraction_bp.route("/api/extract-config/<config_name>", methods=["GET"])
@@ -204,9 +233,9 @@ def get_extract_config(config_name):
 
     except Exception as e:
         update_extraction_status(
-            f"Failed to get extraction config: {str(e)}", is_error=True
+            f"Failed to get extraction config: {e!s}", is_error=True
         )
-        return jsonify({"error": f"Failed to get extraction config: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to get extraction config: {e!s}"}), 500
 
 
 @extraction_bp.route("/api/extract-restart", methods=["POST"])
@@ -221,7 +250,7 @@ def restart_extraction_backend():
         result = resource_manager.restart_backend(delay=1.0)
         return jsonify(result)
     except Exception as e:
-        update_extraction_status(f"Failed to restart backend: {str(e)}", is_error=True)
+        update_extraction_status(f"Failed to restart backend: {e!s}", is_error=True)
         return jsonify(
-            {"success": False, "error": f"Failed to restart backend: {str(e)}"}
+            {"success": False, "error": f"Failed to restart backend: {e!s}"}
         ), 500

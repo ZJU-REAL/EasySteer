@@ -18,7 +18,13 @@ def test_training_helper_passes_explicit_experiment_settings(monkeypatch, tmp_pa
         train, "load_model_and_tokenizer", lambda *args: (model, tokenizer)
     )
     monkeypatch.setattr(train, "_build_intervention", lambda *args: object())
-    monkeypatch.setattr(train.pyreft, "ReftConfig", lambda **kwargs: kwargs)
+    monkeypatch.setattr(train, "_component_dimension", lambda *args: 8)
+
+    def reft_config(**kwargs):
+        events.append(("config", kwargs))
+        return kwargs
+
+    monkeypatch.setattr(train.pyreft, "ReftConfig", reft_config)
     monkeypatch.setattr(train.pyreft, "get_reft_model", lambda *args: wrapper)
 
     def make_data(tok, base, prompts, responses):
@@ -59,6 +65,12 @@ def test_training_helper_passes_explicit_experiment_settings(monkeypatch, tmp_pa
         learning_rate=4e-3,
     )
     assert result == (wrapper, tokenizer)
+    config = next(value for key, value in events if key == "config")
+    assert config["easysteer_training"] == {
+        "act_fn": "linear",
+        "prompt_template": "Prompt: %s",
+        "apply": {"prompt_positions": [-1]},
+    }
     kwargs = next(value for key, value in events if key == "trainer")
     assert kwargs["processing_class"] is tokenizer and "tokenizer" not in kwargs
     assert kwargs["args"]["num_train_epochs"] == 200.0

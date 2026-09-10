@@ -5,6 +5,7 @@ Per-sample views group rows by engine request labels and order them
 by sequence position.
 """
 
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 import torch
@@ -101,10 +102,24 @@ class CaptureResult:
     def __len__(self) -> int:
         return len(self.outputs)
 
+    def sample_rows(self, i: int, layer: int) -> torch.Tensor:
+        """One sample's rows for one layer, using a view when contiguous."""
+        rows = self._sample_rows[i]
+        tensor = self.layers[layer]
+        if not rows:
+            return tensor[:0]
+        start = rows[0]
+        if all(row == start + offset for offset, row in enumerate(rows)):
+            return tensor[start : start + len(rows)]
+        return tensor[rows]
+
+    def token(self, i: int, layer: int, position: int = -1) -> torch.Tensor:
+        """One captured row by sample-relative index, not absolute token position."""
+        return self.layers[layer][self._sample_rows[i][position]]
+
     def sample(self, i: int) -> dict[int, torch.Tensor]:
         """One sample's rows for every layer: {layer_id: (rows, dim)}."""
-        idx = torch.tensor(self._sample_rows[i], dtype=torch.long)
-        return {lid: t[idx] for lid, t in self.layers.items()}
+        return {layer: self.sample_rows(i, layer) for layer in self.layers}
 
     def sample_positions(self, i: int) -> list[int]:
         """Absolute sequence positions of sample i's rows (row order)."""
@@ -140,6 +155,7 @@ def capture(
     per_prompt_selects: list[Any | None] | None = None,
     stream: str = "hidden_states",
     steering: Any | None = None,
+    budget_bytes: int | None = None,
     **generate_kwargs,
 ) -> CaptureResult:
     """Capture intermediate state for a batch of prompts.
@@ -158,6 +174,9 @@ def capture(
             without engine-side reduction.
         stream: 'hidden_states', 'router_logits', or 'attention_heads'.
         steering: SteeringSpec (or per-prompt list), as in LLM.generate().
+        budget_bytes: Maximum raw CPU capture storage plus pending transfer
+            data, across the stream's layers. Exceeding it fails capture.
+            Excludes model/graph memory and RPC serialization temporaries.
         **generate_kwargs (Any): forwarded into SamplingParams.
 
     Returns:
@@ -188,6 +207,8 @@ def capture(
         enable_kwargs["dtype"] = dtype
     if select is not None:
         enable_kwargs["select"] = to_wire(select)
+    if budget_bytes is not None:
+        enable_kwargs["budget_bytes"] = budget_bytes
 
     capture_select = None
     if per_prompt_selects is not None:
@@ -206,8 +227,8 @@ def capture(
         **generate_kwargs,
     )
 
-    rpc("start_capture", stream, **enable_kwargs)
     try:
+        rpc("start_capture", stream, **enable_kwargs)
         outputs = llm.generate(
             prompts,
             sampling_params=sampling_params,
@@ -215,9 +236,58 @@ def capture(
             steering=steering,
             use_tqdm=False,
         )
+        status = rpc("capture_status", stream)[0]
+        if status["tokens_dropped"]:
+            raise RuntimeError(
+                f"Capture discarded {status['tokens_dropped']} rows; "
+                "a complete result is required. Reduce the capture batch "
+                "or increase its storage budget."
+            )
         raw = rpc("fetch_captured", stream, clear=True)[0]
     finally:
         rpc("stop_capture", stream)
     tensors, meta = deserialize_captured(raw)
     layouts = {lid: info["layout"] for lid, info in raw.items() if "layout" in info}
     return CaptureResult(tensors, meta, outputs, layouts=layouts)
+
+
+def capture_batches(
+    llm: Any,
+    prompts: Sequence,
+    *,
+    batch_size: int = 32,
+    per_prompt_selects: list[Any | None] | None = None,
+    steering: Any | None = None,
+    budget_bytes: int | None = 256 * 1024 * 1024,
+    **capture_kwargs,
+) -> Iterator[CaptureResult]:
+    """Yield captured batches in prompt order, releasing worker storage each time.
+
+    Consume or save each result before advancing instead of retaining the full
+    iterator as a list. Result sample indices are local to each yielded batch.
+    Per-prompt selections and steering lists follow the same batch boundaries.
+    The byte budget has the same scope as :func:`capture`; a single large
+    batch can still exceed it. Compatible capture graphs are reused.
+    """
+    if isinstance(prompts, (str, bytes, dict)) or not isinstance(prompts, Sequence):
+        raise TypeError("capture_batches requires a sequence of prompts")
+    if type(batch_size) is not int or batch_size < 1:
+        raise ValueError("batch_size must be a positive integer")
+    if per_prompt_selects is not None and len(per_prompt_selects) != len(prompts):
+        raise ValueError("per_prompt_selects length must match prompts")
+    if isinstance(steering, list) and len(steering) != len(prompts):
+        raise ValueError("steering length must match prompts")
+    for start in range(0, len(prompts), batch_size):
+        end = start + batch_size
+        yield capture(
+            llm,
+            prompts[start:end],
+            per_prompt_selects=(
+                per_prompt_selects[start:end]
+                if per_prompt_selects is not None
+                else None
+            ),
+            steering=steering[start:end] if isinstance(steering, list) else steering,
+            budget_bytes=budget_bytes,
+            **capture_kwargs,
+        )

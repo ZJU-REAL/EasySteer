@@ -65,6 +65,8 @@ def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
 
     def rpc(method, args, kwargs):
         calls.append(method)
+        if method == "capture_status":
+            return [{"tokens_dropped": 0}]
         return [{}] if method == "fetch_captured" else [True]
 
     llm = SimpleNamespace(
@@ -76,7 +78,12 @@ def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
     assert prompts == [{"prompt_token_ids": [10, 11], "cache_salt": "caller-salt"}]
     assert seen["steering"] is steering
     assert seen["sampling_params"].temperature == 0.25
-    assert calls == ["start_capture", "fetch_captured", "stop_capture"]
+    assert calls == [
+        "start_capture",
+        "capture_status",
+        "fetch_captured",
+        "stop_capture",
+    ]
     assert result.labelled and result.sample(0) == {}
     assert result.sample_positions(0) == result.sample_token_ids(0) == []
 
@@ -196,3 +203,83 @@ def test_failed_capture_rpc_does_not_change_admission_policy(async_engine):
         else:
             LLMEngine.collective_rpc(engine, "start_capture", args=("hidden_states",))
     assert not policy.skip_prefix_read([10, 11], None)
+
+
+def test_selected_token_reads_preserve_sample_order_without_copying_all_rows():
+    from easysteer.steer import extract_token_hiddens
+
+    labels = CaptureMeta(
+        ["b", "a", "a"], torch.tensor([8, 9, 2]), torch.tensor([18, 19, 12])
+    )
+    tensor = torch.arange(12.0).reshape(3, 4)
+    result = CaptureResult(
+        {7: tensor},
+        {7: labels},
+        [SimpleNamespace(request_id="a"), SimpleNamespace(request_id="b")],
+    )
+    assert result.token(0, 7, -1).data_ptr() == tensor[1].data_ptr()
+    assert result.sample_rows(1, 7).data_ptr() == tensor[0].data_ptr()
+    with patch.object(result, "to_nested", side_effect=AssertionError("full copy")):
+        pos, neg = extract_token_hiddens(result, [0], [1], token_pos=-1)
+    torch.testing.assert_close(torch.from_numpy(pos[7][0]), tensor[1])
+    torch.testing.assert_close(torch.from_numpy(neg[7][0]), tensor[0])
+    assert result.sample_positions(0) == [2, 9]
+
+
+def test_capture_batches_slices_prompt_configuration_together_and_yields_lazily():
+    import easysteer.hidden_states.capture_result as module
+
+    prompts = [f"prompt-{i}" for i in range(5)]
+    selections = [{"prompt_positions": [i]} for i in range(5)]
+    steering = [object() for _ in prompts]
+    calls = []
+
+    def capture(llm, batch, **kwargs):
+        calls.append((batch, kwargs))
+        return batch
+
+    with patch.object(module, "capture", capture):
+        batches = module.capture_batches(
+            object(),
+            prompts,
+            batch_size=2,
+            per_prompt_selects=selections,
+            steering=steering,
+        )
+        assert not calls
+        assert list(batches) == [prompts[:2], prompts[2:4], prompts[4:]]
+    for start, (batch, kwargs) in zip(range(0, 5, 2), calls):
+        end = start + len(batch)
+        assert kwargs["per_prompt_selects"] == selections[start:end]
+        assert kwargs["steering"] == steering[start:end]
+
+
+@pytest.mark.parametrize(
+    "failure", ["start_capture", "generate", "dropped", "fetch_captured"]
+)
+def test_capture_failures_stop_the_stream_without_returning_partial_rows(failure):
+    from easysteer.hidden_states import capture
+
+    calls = []
+
+    def rpc(method, args, kwargs):
+        calls.append(method)
+        if method == failure:
+            raise RuntimeError("capture failed")
+        if method == "capture_status":
+            return [{"tokens_dropped": int(failure == "dropped")}]
+        return [True]
+
+    def generate(*args, **kwargs):
+        if failure == "generate":
+            raise RuntimeError("generation failed")
+        return []
+
+    llm = SimpleNamespace(
+        generate=generate, llm_engine=SimpleNamespace(collective_rpc=rpc)
+    )
+    with pytest.raises(RuntimeError):
+        capture(llm, ["prompt"])
+    assert calls[-1] == "stop_capture"
+    if failure == "dropped":
+        assert "fetch_captured" not in calls

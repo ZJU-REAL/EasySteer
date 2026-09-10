@@ -76,9 +76,9 @@ def test_constant_source_save_load_forward(tmp_path, dimension, source_in_config
     restored.to(dtype=torch.float64)
     assert loaded.source_representation.dtype == torch.float64
     torch.testing.assert_close(
-        restored(
-            {"input_ids": inputs["input_ids"].double()}, unit_locations=locations
-        )[1],
+        restored({"input_ids": inputs["input_ids"].double()}, unit_locations=locations)[
+            1
+        ],
         expected.double(),
     )
     restored.save(str(tmp_path / "resaved"))
@@ -98,8 +98,8 @@ def test_interchange_dimension_can_clear_and_restore_registered_buffer():
 @pytest.mark.parametrize(
     "relative_path",
     [
-        "easysteer/reft/results/loreft/config.json",
-        "easysteer/reft/results/ssv/config.json",
+        "tests/fixtures/reft/loreft/config.json",
+        "tests/fixtures/reft/ssv/config.json",
         "hf-space/results/emoji_loreft/config.json",
         "replications/loreft/weight/config.json",
     ],

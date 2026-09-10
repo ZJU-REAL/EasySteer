@@ -76,6 +76,7 @@ use `capture()` instead of creating or attaching a second `CaptureSession`.
 | `reduce` | `"all"` retains rows; `"last"` or `"mean"` reduces within a request. |
 | `select` | A `SelectSpec.to_wire()` dictionary; requires `reduce="all"`. |
 | `budget_rows` | Optional nonnegative row limit per layer. |
+| `budget_bytes` | Optional limit across all layers on raw CPU values/labels and pending transfers. Overflow is reported at fetch; it does not fail the model forward. |
 
 The constructor validates the selection and resolves dtype/layer storage. These
 low-level reduction and budget arguments are not arguments to the high-level
@@ -85,7 +86,7 @@ low-level reduction and budget arguments are not arguments to the high-level
     options:
       heading: vllm.capture.StreamConfig
       merge_init_into_class: true
-      members: [layers, dtype, reduce, select, budget_rows, selects_rows]
+      members: [layers, dtype, reduce, select, budget_rows, budget_bytes, selects_rows]
       show_if_no_docstring: true
 
 ## Capture session

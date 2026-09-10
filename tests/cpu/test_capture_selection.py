@@ -857,3 +857,12 @@ def test_clearing_rows_preserves_active_request_history(context, clear):
     assert store.req_table == {}
     session.mark_cache_elided("a", [10, 11, 12], 2)
     assert not store.elided_reqs
+
+
+def test_budgeted_owned_rows_do_not_retain_the_full_activation_storage(context):
+    store = StreamStore(StreamConfig(budget_rows=1))
+    values = torch.arange(12.0).reshape(6, 2)
+    rows, meta = selection.prepare_rows(values, store, 0, tensor_owned=True)
+    torch.testing.assert_close(rows, values[:1])
+    assert rows.untyped_storage().nbytes() == rows.numel() * rows.element_size()
+    assert meta.shape == (1, 3)

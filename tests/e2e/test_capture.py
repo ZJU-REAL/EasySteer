@@ -17,11 +17,9 @@ from contextlib import contextmanager
 
 import pytest
 import torch
-from vllm import SamplingParams
-
-from vllm.capture import deserialize_captured
-
 from helpers import DENSE_MODEL
+from vllm import SamplingParams
+from vllm.capture import deserialize_captured
 
 
 def sel(**filters):
@@ -372,15 +370,19 @@ class TestLabeledRows:
             "One two three four five six seven",
             "Hi",
         ]
-        states, outs = hs.get_all_hidden_states_generate(
-            llm, prompts, max_tokens=SP.max_tokens,
-            layers=[10], ignore_eos=True,
+        captured = hs.capture(
+            llm,
+            prompts,
+            max_tokens=SP.max_tokens,
+            layers=[10],
+            ignore_eos=True,
         )
-        assert len(states) == len(outs)
-        for sample, out in zip(states, outs):
+        assert len(captured) == len(captured.outputs)
+        for i, out in enumerate(captured.outputs):
+            rows = captured.sample_rows(i, 10)
             expected = len(encoded_ids(out))
-            assert sample[0].shape[0] == expected, (
-                f"sample rows {sample[0].shape[0]} != encoded {expected}"
+            assert rows.shape[0] == expected, (
+                f"sample rows {rows.shape[0]} != encoded {expected}"
             )
 
 
@@ -466,8 +468,9 @@ class TestPerRequestSelect:
         )
 
     def test_client_capture_api(self, llm):
-        import easysteer.hidden_states as hs
         from vllm.model_hooks.steering.api import SelectSpec
+
+        import easysteer.hidden_states as hs
 
         result = hs.capture(
             llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],

@@ -61,6 +61,7 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 | `per_prompt_selects` | One `SelectSpec` or wire dict per prompt, overriding the global selection (`None` entries keep the global one). The list length must match `prompts`. |
 | `stream` | `"hidden_states"` (default), `"router_logits"` (MoE), or `"attention_heads"` (before the attention output projection). |
 | `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering; use `False` to disable it even when the engine has a default. |
+| `budget_bytes` | Optional limit on raw CPU values and row labels, including pending transfers, across the stream's layers. Exceeding it fails capture instead of returning a partial result. |
 | `**generate_kwargs` | Forwarded into `SamplingParams` (e.g. `temperature`). |
 
 ### Select rows
@@ -94,15 +95,67 @@ position — the only correct grouping under continuous batching.
 result.layer_ids          # sorted true layer ids
 result.rows(12)           # Tensor(total_rows, dim) for layer 12, all samples
 result.sample(0)          # {layer_id: Tensor(rows, dim)} for sample 0
+result.sample_rows(0, 12) # sample 0's rows at layer 12 only
+result.token(0, 12, -1)   # last captured row of sample 0 at layer 12
 result.sample_positions(0)  # absolute sequence positions of sample 0's rows
 result.sample_token_ids(0)  # input token ids of sample 0's rows
 result.outputs            # the vLLM RequestOutput list, prompt order
 result.layouts            # per-layer component widths and attention head layout
-result.to_nested()        # legacy shape: [sample][layer_pos] tensors
+result.to_nested()        # [sample][layer_pos] tensors, when explicitly needed
 ```
 
-`result.meta(layer)` exposes the raw row labels (`req_ids` / `positions` / `token_ids`);
-`result.labelled` tells you whether per-sample views are available.
+`result.meta(layer)` exposes the raw row labels (`req_ids` / `positions` / `token_ids`).
+Labels are mandatory. `token()` indexes a sample's captured rows, so `-1`
+means the last selected row, which may differ from the last original prompt
+position. `sample_rows()` returns a view when those rows are contiguous;
+noncontiguous rows are gathered in sequence order.
+
+## Process a dataset in batches
+
+Use `capture_batches()` to consume results a batch at a time. It preserves
+prompt order and slices per-prompt steering and selection lists along the same
+boundaries. Each result uses local sample indices starting at zero. Worker
+storage is cleared before the result is yielded, and compatible capture graphs
+remain cached for the next batch.
+
+For diffmean, keep running statistics rather than all captured samples:
+
+```python
+from easysteer.steer import DiffMeanAccumulator, DiffMeanExtractor
+
+accumulator = DiffMeanAccumulator()
+for positive, group in [(True, positive_prompts), (False, negative_prompts)]:
+    for batch in hs.capture_batches(
+        llm, group, batch_size=32, layers=[10, 11, 12],
+        select=SelectSpec(prompt_positions=[-1]),
+        budget_bytes=256 * 1024 * 1024,
+    ):
+        for layer in batch.layer_ids:
+            accumulator.update(layer, batch.rows(layer), positive=positive)
+        del batch
+
+vector = DiffMeanExtractor.from_moments(accumulator.pos, accumulator.neg)
+vector.export_gguf("direction.gguf")
+```
+
+`positive_prompts` and `negative_prompts` use the same prompt input format as
+`capture()`. Selecting one row per prompt gives each sample equal weight. For
+full activation datasets, write each yielded batch to a separate file instead
+of retaining the iterator as a list. One large batch can still exceed the byte
+budget; reduce its size, select fewer rows/layers, or increase the limit.
+
+`capture_batches()` defaults to 32 prompts and a 256 MiB raw-storage budget.
+`capture()` retains its unrestricted default, with `budget_bytes` available
+explicitly. The budget counts values and labels in worker CPU storage and
+pending transfers. It excludes model memory, CUDA graph buffers, serialization
+copies, and tensors retained by the caller; it is not a process memory limit.
+The low-level `capture_status` RPC reports `storage_bytes` and `budget_bytes`.
+
+Per-layer extraction reads only the requested token rows and processes one
+layer at a time. Online means require space proportional to feature width.
+`MomentsAccumulator(track_second_moment=True)` also retains a square covariance
+matrix per layer; use it only when that statistic is needed. It is not a general
+memory-saving replacement for sample storage at large hidden dimensions.
 
 ## MoE router logits
 
@@ -155,6 +208,12 @@ positions, storage dtype or reduction does not require recording it again.
 Changing components or layers replaces that cached graph. Ordinary model graphs
 do not contain capture operations.
 
+The graph's fixed output buffers contain whole execution batches before row
+selection. Selecting fewer rows reduces retained CPU data and transfer volume,
+but does not shrink those fixed GPU buffers. Stopping capture clears the stream
+while retaining the cached graph for reuse; status reports its buffer and total
+allocation sizes separately.
+
 ## Prefix caching
 
 KV blocks do not contain the intermediate activations skipped by a prefix
@@ -178,18 +237,9 @@ If steering fails for a request, fetching its captured rows also reports that
 failure. Other requests remain available through a fetch restricted to their
 request IDs; clearing the stream removes its retained rows and errors.
 
-## Compatibility wrappers
-
-`get_all_hidden_states_generate` and `get_moe_router_logits_generate` are thin
-wrappers over `capture()`. The hidden-state wrapper returns
-`(hidden_states, outputs)`, with nested `[sample][layer]` tensors by default or
-concatenated `[layer]` tensors when `split_by_samples=False`. The router-logit
-wrapper returns `(router_logits, outputs)`, with a `{layer_id: tensor}` dictionary
-by default or one such dictionary per sample when `split_by_samples=True`.
-
-Prefer `capture()` for new code: it preserves true layer IDs and per-sample
-metadata. In particular, pass the `CaptureResult` directly to the vector
-extractors when capturing a layer subset; converting to a plain nested list
-loses the mapping from list positions to true layer IDs. The embed-task variants
-(`get_all_hidden_states`, `get_moe_router_logits`) and the `vllm.hidden_states`
-alias package were removed.
+Pass `CaptureResult` directly to vector extractors when capturing a layer
+subset. Converting it to a plain nested list loses the mapping from list
+positions to true layer IDs. The older `get_all_hidden_states_generate` and
+`get_moe_router_logits_generate` wrappers have been removed; use `capture()`
+with the appropriate `stream`, then `result.outputs`, `result.layers`, or
+`result.to_nested()` when that representation is required.

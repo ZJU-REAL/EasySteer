@@ -25,7 +25,7 @@ def _schema_fields():
 
 
 def _examples():
-    for folder in ("experiment", "replications", "easysteer/reft/pyreft/examples"):
+    for folder in ("experiment", "replications", "examples"):
         for path in sorted((ROOT / folder).rglob("*.ipynb")):
             for index, cell in enumerate(json.loads(path.read_text())["cells"]):
                 if cell["cell_type"] == "code":

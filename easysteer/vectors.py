@@ -123,67 +123,48 @@ def load(path: str, *, format: str, **options) -> Payload:
 
 
 def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
-    """Payload from a pyreft checkpoint directory.
+    """Load one supported ReFT checkpoint without changing its target component.
 
-    Reads the single ``*.bin`` + config pair. A BiasIntervention-style
-    state dict (one vector) becomes a ``DirectionVector`` for the
-    ``direct`` algorithm; a LoReFT state dict (rotation + learned
-    source) becomes a ``ReftIntervention`` for ``loreft``. The
-    checkpoint's layer index is preserved.
+    The checkpoint must identify a BiasIntervention or LoreftIntervention on
+    ``block_output`` with ``unit="pos"`` and one unit. Bias becomes a
+    ``DirectionVector`` for ``direct``; LoReFT becomes a ``ReftIntervention``
+    for standard linear ``loreft``. Explicit nonlinear activation settings,
+    other components and intervention types raise ValueError, even when their
+    tensors happen to have the same width as hidden states. Older checkpoints
+    without activation metadata are interpreted as standard linear LoReFT.
+
+    The payload preserves the layer and weights. Token selection belongs to
+    ``VectorSpec.apply``: use the checkpoint config's ``easysteer_training.apply``
+    when present, or explicitly select the intended positions for older files.
     """
     import torch
 
-    bin_path, layer = _find_pyreft_checkpoint(path)
-    state = torch.load(bin_path, map_location="cpu", weights_only=False)
+    bin_path, layer, intervention = _find_pyreft_checkpoint(path)
+    state = torch.load(bin_path, map_location="cpu", weights_only=True)
     if not isinstance(state, dict):
-        raise ValueError(f"{bin_path} does not hold a state dict: {type(state)}")
-
-    rotate, weight, bias = None, None, None
-    for key, value in state.items():
-        if "rotate_layer" in key:
-            if "parametrizations.weight.original" in key or key.endswith(
-                "rotate_layer"
-            ):
-                rotate = value
-        elif "learned_source" in key:
-            if key.endswith("weight") and "parametrizations" not in key:
-                weight = value
-            elif key.endswith("bias"):
-                bias = value
-    if rotate is not None and weight is None:
-        # pyreft also saves LoReFT with bare keys (weight/bias alongside
-        # rotate_layer); the rotation's presence is what marks LoReFT.
-        weight = state.get("weight")
-        bias = state.get("bias")
-    if rotate is not None:
-        if weight is None:
+        raise TypeError(f"{bin_path} does not hold a state dict: {type(state)}")
+    if intervention == "bias":
+        if set(state) != {"bias"}:
             raise ValueError(
-                f"{bin_path} has a rotate_layer but no learned-source "
-                f"weight; keys: {sorted(state)}"
+                f"{bin_path}: BiasIntervention requires exactly one bias tensor"
             )
-        return ReftIntervention(
-            rotate_layer=rotate,
-            learned_source_weight=weight,
-            learned_source_bias=bias,
-            layer=layer,
-        )
+        return DirectionVector({layer: state["bias"]})
 
-    # BiasIntervention checkpoints store one direction rather than a rotation.
-    if len(state) == 1:
-        vector = next(iter(state.values()))
-    elif "source_representation" in state:
-        vector = state["source_representation"]
-    elif "bias" in state:
-        vector = state["bias"]
-    elif "weight" in state:
-        vector = state["weight"]
-    else:
-        raise ValueError(
-            f"cannot identify the intervention tensor in {bin_path}; "
-            f"keys: {sorted(state)}. Load the checkpoint yourself and "
-            "construct a payload directly."
-        )
-    return DirectionVector({layer: vector})
+    # Published PyReFT files use bare keys; earlier EasySteer exports used
+    # the module-prefixed learned-source keys.
+    layouts = (
+        ("rotate_layer", "weight", "bias"),
+        ("rotate_layer", "learned_source.weight", "learned_source.bias"),
+    )
+    for rotation, weight, bias in layouts:
+        if set(state) == {rotation, weight, bias}:
+            return ReftIntervention(
+                rotate_layer=state[rotation],
+                learned_source_weight=state[weight],
+                learned_source_bias=state[bias],
+                layer=layer,
+            )
+    raise ValueError(f"{bin_path}: unsupported LoReFT tensor keys: {sorted(state)}")
 
 
 def from_lm_steer(path: str, vector_index: int = 0) -> LowRankProjector:
@@ -230,8 +211,8 @@ def from_linear_transport(path: str) -> LinearMap:
     return LinearMap(weight=weight, bias=bias)
 
 
-def _find_pyreft_checkpoint(path: str) -> tuple[str, int]:
-    """Locate the weight file and layer index of a pyreft directory."""
+def _find_pyreft_checkpoint(path: str) -> tuple[str, int, str]:
+    """Validate the serialized ReFT target before reading its weight tensor."""
     if not os.path.isdir(path):
         raise ValueError(f"pyreft checkpoint path must be a directory: {path}")
     bin_files = glob.glob(os.path.join(path, "*.bin"))
@@ -240,34 +221,88 @@ def _find_pyreft_checkpoint(path: str) -> tuple[str, int]:
             f"expected exactly one .bin file in {path}, found {len(bin_files)}"
         )
     config_files = [
-        os.path.join(path, f)
-        for f in ("reft_config.json", "config.json")
-        if os.path.exists(os.path.join(path, f))
+        os.path.join(path, name)
+        for name in ("reft_config.json", "config.json")
+        if os.path.exists(os.path.join(path, name))
     ]
     if len(config_files) != 1:
         raise ValueError(
             f"expected exactly one config file in {path}, found {len(config_files)}"
         )
-    with open(config_files[0]) as f:
-        config = json.load(f)
+    with open(config_files[0]) as handle:
+        config = json.load(handle)
 
-    layer = None
-    representations = config.get("representations") or []
-    if representations:
-        first = representations[0]
-        if isinstance(first, dict):
-            layer = first.get("layer")
-        elif isinstance(first, list) and first:
-            layer = first[0]
-    if layer is None:
-        name = os.path.basename(bin_files[0])
-        if "intkey_layer_" in name:
-            layer_str = name.split("intkey_layer_")[1].split("_")[0]
-            if layer_str.isdigit():
-                layer = int(layer_str)
-    if layer is None:
-        raise ValueError(
-            f"could not determine the layer index from {config_files[0]} "
-            f"or the checkpoint filename"
+    training = config.get("easysteer_training") or {}
+    for act_fn in (config.get("act_fn"), training.get("act_fn")):
+        if act_fn not in (None, "linear"):
+            raise ValueError(
+                f"Unsupported pyreft activation {act_fn!r}; "
+                "vLLM ReFT conversion requires standard linear LoReFT"
+            )
+
+    representations = config.get("representations")
+    if not isinstance(representations, list) or len(representations) != 1:
+        raise ValueError("pyreft adapter requires exactly one representation")
+    representation = representations[0]
+    if isinstance(representation, list):
+        fields = (
+            "layer",
+            "component",
+            "unit",
+            "max_number_of_units",
+            "low_rank_dimension",
+            "intervention_type",
+            "intervention",
+            "subspace_partition",
+            "group_key",
+            "intervention_link_key",
+            "moe_key",
+            "source_representation",
+            "hidden_source_representation",
+            "latent_dim",
         )
-    return bin_files[0], int(layer)
+        if not 4 <= len(representation) <= len(fields):
+            raise ValueError("pyreft representation does not describe its target units")
+        representation = dict(zip(fields, representation))
+    if not isinstance(representation, dict):
+        raise TypeError("pyreft representation must be a dict or serialized field list")
+    target = (
+        representation.get("component"),
+        representation.get("unit"),
+        representation.get("max_number_of_units"),
+    )
+    if target != ("block_output", "pos", 1):
+        raise ValueError(
+            f"Unsupported pyreft target {target!r}; vLLM ReFT conversion requires "
+            "component='block_output', unit='pos', max_number_of_units=1"
+        )
+    allowed = {
+        "layer",
+        "component",
+        "unit",
+        "max_number_of_units",
+        "low_rank_dimension",
+    }
+    extra = {
+        key: value
+        for key, value in representation.items()
+        if key not in allowed and value is not None
+    }
+    if extra:
+        raise ValueError(f"Unsupported pyreft representation settings: {sorted(extra)}")
+    layer = representation.get("layer")
+    if type(layer) is not int or layer < 0:
+        raise ValueError("pyreft representation requires a non-negative integer layer")
+
+    types = config.get("intervention_types")
+    if not isinstance(types, list) or len(types) != 1 or not isinstance(types[0], str):
+        raise ValueError("pyreft config must identify exactly one intervention type")
+    type_name = types[0].removeprefix("<class '").removesuffix("'>")
+    supported = {
+        "easysteer.reft.pyreft.reft.algorithms.bias.BiasIntervention": "bias",
+        "easysteer.reft.pyreft.reft.algorithms.loreft.LoreftIntervention": "loreft",
+        "pyreft.interventions.LoreftIntervention": "loreft",
+    }
+    if type_name not in supported:
+        raise ValueError(f"Unsupported pyreft intervention type: {type_name!r}")
+    return bin_files[0], layer, supported[type_name]

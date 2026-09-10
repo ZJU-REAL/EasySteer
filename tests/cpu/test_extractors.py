@@ -51,7 +51,7 @@ def make_nested(n_samples=N_SAMPLES, layer_count=2, offset_indices=()):
 
 
 class FakeCapture:
-    """Duck-typed CaptureResult: true layer ids + nested conversion."""
+    """CaptureResult's row-reading contract without requiring torch."""
 
     def __init__(self, nested, layer_ids):
         self._nested = nested
@@ -62,7 +62,13 @@ class FakeCapture:
         return list(self._layer_ids)
 
     def to_nested(self):
-        return self._nested
+        raise AssertionError("extractors must not materialize the full nested capture")
+
+    def sample_rows(self, sample, layer):
+        return self._nested[sample][self._layer_ids.index(layer)]
+
+    def token(self, sample, layer, position=-1):
+        return self.sample_rows(sample, layer)[position]
 
     def __len__(self):
         return len(self._nested)
@@ -336,22 +342,18 @@ class TestUnifiedMetadata:
 
 
 class TestLATSingleExtraction:
-    def test_extract_token_hiddens_called_once(self, monkeypatch):
-        """LAT with direction correction must tokenize the corpus once.
-
-        The pre-refactor implementation re-ran extract_token_hiddens
-        inside its per-layer loop for the correction step.
-        """
-        import easysteer.steer.base_extractor as base_extractor
+    def test_capture_rows_are_visited_once(self, monkeypatch):
+        """LAT reuses selected rows for direction correction within each layer."""
+        from easysteer.steer import base_extractor
 
         calls = {"n": 0}
-        real = base_extractor.extract_token_hiddens
+        real = base_extractor.iter_token_hiddens
 
         def counting(*args, **kwargs):
             calls["n"] += 1
             return real(*args, **kwargs)
 
-        monkeypatch.setattr(base_extractor, "extract_token_hiddens", counting)
+        monkeypatch.setattr(base_extractor, "iter_token_hiddens", counting)
         nested = make_nested(offset_indices=(1, 3, 5))
         np.random.seed(0)
         vec = LATExtractor.extract(

@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from .utils import (
     StatisticalControlVector,
     _metadata,
-    extract_token_hiddens,
+    iter_token_hiddens,
     l2_normalize,
 )
 
@@ -72,7 +72,7 @@ class BaseExtractor(abc.ABC):
         if extraction_negatives is None:
             extraction_negatives = negative_indices or []
 
-        positive_hiddens, negative_hiddens = extract_token_hiddens(
+        layer_rows = iter_token_hiddens(
             all_hidden_states,
             positive_indices,
             extraction_negatives,
@@ -81,11 +81,8 @@ class BaseExtractor(abc.ABC):
 
         directions = {}
         layer_stats: dict[str, dict] = {}
-        for layer in tqdm(list(positive_hiddens), desc=cls.progress_desc):
-            neg_rows = negative_hiddens[layer] if negative_hiddens else None
-            direction, extras = cls._direction(
-                positive_hiddens[layer], neg_rows, layer=layer, **opts
-            )
+        for layer, pos_rows, neg_rows in tqdm(layer_rows, desc=cls.progress_desc):
+            direction, extras = cls._direction(pos_rows, neg_rows, layer=layer, **opts)
             if normalize:
                 direction = l2_normalize(direction)
             directions[layer] = direction.astype(np.float32)

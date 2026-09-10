@@ -242,38 +242,51 @@ def extract_token_hiddens(
             array. Layer keys are the model layer ids for CaptureResult
             input and positional indices for nested-list input.
     """
-    layer_keys = None
-    if hasattr(all_hidden_states, "to_nested"):
-        layer_keys = list(all_hidden_states.layer_ids)
-        all_hidden_states = all_hidden_states.to_nested()
+    positive_hiddens, negative_hiddens = {}, {}
+    for layer, positive, negative in iter_token_hiddens(
+        all_hidden_states, positive_indices, negative_indices, token_pos
+    ):
+        positive_hiddens[layer] = positive
+        if negative is not None:
+            negative_hiddens[layer] = negative
+    return positive_hiddens, negative_hiddens
+
+
+def iter_token_hiddens(
+    all_hidden_states, positive_indices, negative_indices=None, token_pos=-1
+):
+    """Yield one layer's selected positive/negative rows at a time.
+
+    For CaptureResult, integer positions index the sample's captured rows in
+    sequence order. Select a scalar row before materializing other layers or
+    positions; reducers needing multiple rows only read the current layer.
+    """
     if negative_indices is None:
         negative_indices = derive_negative_indices(
             len(all_hidden_states), positive_indices
         )
+    captured = hasattr(all_hidden_states, "sample_rows")
+    layers = (
+        all_hidden_states.layer_ids if captured else range(len(all_hidden_states[0]))
+    )
+    position = {"first": 0, "last": -1}.get(token_pos, token_pos)
 
-    n_layers = len(all_hidden_states[0])
-    if layer_keys is None:
-        layer_keys = list(range(n_layers))
-
-    def collect(indices):
-        """Gather one token row per sample for each layer key."""
-        hiddens = {layer: [] for layer in layer_keys}
-        for sample_idx in indices:
-            sample_hiddens = all_hidden_states[sample_idx]
-            for layer_pos, layer_key in enumerate(layer_keys):
-                token_hidden = extract_token_from_sequence(
-                    sample_hiddens[layer_pos], token_pos
+    def collect(indices, layer):
+        rows = []
+        for sample in indices:
+            if captured and isinstance(position, int):
+                row = all_hidden_states.token(sample, layer, position)
+            else:
+                sequence = (
+                    all_hidden_states.sample_rows(sample, layer)
+                    if captured
+                    else all_hidden_states[sample][layer]
                 )
-                hiddens[layer_key].append(_to_numpy(token_hidden))
-        return hiddens
+                row = extract_token_from_sequence(sequence, position)
+            rows.append(_to_numpy(row))
+        return np.vstack(rows)
 
-    positive_hiddens = collect(positive_indices)
-    negative_hiddens = collect(negative_indices or [])
-
-    positive_hiddens = {k: np.vstack(v) for k, v in positive_hiddens.items()}
-    if negative_indices and any(negative_hiddens.values()):
-        negative_hiddens = {k: np.vstack(v) for k, v in negative_hiddens.items()}
-    else:
-        negative_hiddens = {}
-
-    return positive_hiddens, negative_hiddens
+    for layer in layers:
+        positive = collect(positive_indices, layer)
+        negative = collect(negative_indices, layer) if negative_indices else None
+        yield layer, positive, negative

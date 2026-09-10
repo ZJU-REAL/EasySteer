@@ -138,68 +138,156 @@ def extraction(monkeypatch, tmp_path):
     runtime.llm_manager = SimpleNamespace(get_or_create_llm=load_engine)
     runtime.resource_manager = SimpleNamespace()
     monkeypatch.setitem(sys.modules, "core.runtime", runtime)
-    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=SimpleNamespace(is_available=cuda_available)))
-    captured = SimpleNamespace(layer_ids=[8, 22])
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        SimpleNamespace(cuda=SimpleNamespace(is_available=cuda_available)),
+    )
+
+    class Captured:
+        layer_ids = [8, 22]
+        prompts = []
+        position = -1
+
+        def __len__(self):
+            return len(self.prompts)
+
+        def sample_positions(self, sample):
+            position = self.position if self.position >= 0 else 4 + self.position
+            return [max(0, min(position, 3))]
+
+        @property
+        def outputs(self):
+            return [SimpleNamespace(prompt_token_ids=[10, 11, 12, 13]) for _ in self.prompts]
+
+        def rows(self, layer):
+            return [[float(layer)] for _ in self.prompts]
+
+    captured = Captured()
     hidden_states = ModuleType("easysteer.hidden_states")
 
-    def capture(llm, prompts, max_tokens=1):
+    def capture(llm, prompts, **kwargs):
         assert llm is engine
         activity.append("capture")
-        calls.append((prompts, max_tokens))
+        calls.append((prompts, kwargs))
+        captured.prompts = prompts
+        captured.position = kwargs["select"]["prompt_positions"][0]
         return captured
 
     hidden_states.capture = capture
+
+    def capture_batches(llm, prompts, **kwargs):
+        for start in range(0, len(prompts), 32):
+            yield capture(llm, prompts[start : start + 32], **kwargs)
+
+    hidden_states.capture_batches = capture_batches
     monkeypatch.setitem(sys.modules, "easysteer", ModuleType("easysteer"))
     monkeypatch.setitem(sys.modules, "easysteer.hidden_states", hidden_states)
     extracted = []
 
-    def extract_statistical_control_vector(method, all_hidden_states, positive_indices, negative_indices=None, **kwargs):
+    def extract_statistical_control_vector(
+        method, all_hidden_states, positive_indices, negative_indices=None, **kwargs
+    ):
         activity.append("extract")
-        extracted.append(dict(method=method, all_hidden_states=all_hidden_states,
-                              positive_indices=positive_indices, negative_indices=negative_indices, **kwargs))
+        extracted.append(
+            dict(
+                method=method,
+                all_hidden_states=all_hidden_states,
+                positive_indices=positive_indices,
+                negative_indices=negative_indices,
+                **kwargs,
+            )
+        )
         return SimpleNamespace(
-            directions={8: [1], 22: [2]}, metadata={},
+            directions={8: [1], 22: [2]},
+            metadata={},
             export_gguf=lambda output: Path(output).write_bytes(b"mock vector"),
         )
 
     steer = ModuleType("easysteer.steer")
     steer.extract_statistical_control_vector = extract_statistical_control_vector
+    updates = []
+
+    class Accumulator:
+        pos, neg = object(), object()
+
+        def update(self, layer, rows, positive):
+            updates.append((layer, len(rows), positive))
+
+    def from_moments(pos, neg, normalize):
+        assert pos is Accumulator.pos and neg is Accumulator.neg
+        return extract_statistical_control_vector(
+            "diffmean",
+            None,
+            None,
+            normalize=normalize,
+        )
+
+    steer.DiffMeanAccumulator = Accumulator
+    steer.DiffMeanExtractor = SimpleNamespace(from_moments=from_moments)
     monkeypatch.setitem(sys.modules, "easysteer.steer", steer)
     module = load_module("extraction_backend", FRONTEND / "extraction_api.py")
     monkeypatch.chdir(tmp_path)
     config = {
-        "model_path": "model", "gpu_devices": "0", "method": "diffmean",
-        "positive_samples": ["happy"], "negative_samples": ["sad"],
+        "model_path": "model",
+        "gpu_devices": "0",
+        "method": "diffmean",
+        "positive_samples": ["happy"],
+        "negative_samples": ["sad"],
         "output_path": "vector.gguf",
     }
-    return SimpleNamespace(module=module, config=config, calls=calls, extracted=extracted,
-                           captured=captured, activity=activity, output=tmp_path / "vector.gguf")
+    return SimpleNamespace(
+        module=module,
+        config=config,
+        calls=calls,
+        extracted=extracted,
+        captured=captured,
+        activity=activity,
+        updates=updates,
+        output=tmp_path / "vector.gguf",
+    )
 
 
-@pytest.mark.parametrize("method,token_pos,expected", [
-    ("diffmean", -1, -1), ("lat", " -2 ", -2), ("pca", 0, 0), ("diffmean", "+2", 2),
-])
-def test_extraction_uses_labelled_capture_and_shared_dispatch(extraction, method, token_pos, expected):
+@pytest.mark.parametrize(
+    "method,token_pos,expected",
+    [
+        ("diffmean", -1, -1),
+        ("lat", " -2 ", -2),
+        ("pca", 0, 0),
+        ("diffmean", "+2", 2),
+    ],
+)
+def test_extraction_uses_labelled_capture_and_shared_dispatch(
+    extraction, method, token_pos, expected
+):
     job = extraction
     job.config.update(method=method, token_pos=token_pos)
     job.module.run_extraction(job.config)
-    assert job.calls == [(["happy", "sad"], 1)]
-    call, = job.extracted
-    assert call["all_hidden_states"] is job.captured
-    assert call["positive_indices"] == [0]
-    assert call["negative_indices"] == [1]
+    assert [prompts for prompts, _ in job.calls] == (
+        [["happy"], ["sad"]] if method == "diffmean" else [["happy", "sad"]]
+    )
+    for _, options in job.calls:
+        assert options["max_tokens"] == 1
+        assert options["select"] == {"prompt_positions": [expected]}
+        assert options["budget_bytes"] > 0
+    (call,) = job.extracted
+    if method != "diffmean":
+        assert call["all_hidden_states"] is job.captured
+        assert call["positive_indices"] == [0]
+        assert call["negative_indices"] == [1]
+        assert call["token_pos"] == 0
     assert call["method"] == method
-    assert call["token_pos"] == expected
     assert call["normalize"] is True
     assert job.module.extraction_status["result"]["layers_extracted"] == 2
     assert job.module.extraction_status["result"]["method"] == method
+    assert job.module.extraction_status["result"]["metadata"]["token_pos"] == expected
     assert job.module.extraction_status["is_extracting"] is False
     assert job.output.exists()
 
 
 def test_extraction_default_position_remains_last_token(extraction):
     extraction.module.run_extraction(extraction.config)
-    assert extraction.extracted[0]["token_pos"] == -1
+    assert extraction.calls[0][1]["select"] == {"prompt_positions": [-1]}
 
 
 @pytest.mark.parametrize("token_pos", [True, False, 0.5, 1.0, "1.5", "1_0", "bad", "", None, []])
@@ -224,3 +312,26 @@ def test_unsupported_job_configuration_fails_before_model_load(extraction, chang
     assert error in job.module.extraction_status["error_message"]
     assert not job.activity
     assert not job.output.exists()
+
+
+def test_diffmean_consumes_batches_without_retaining_the_whole_capture(extraction):
+    extraction.config["positive_samples"] = ["happy"] * 33
+    extraction.module.run_extraction(extraction.config)
+    assert [len(prompts) for prompts, _ in extraction.calls] == [32, 1, 1]
+    assert extraction.updates == [
+        (8, 32, True),
+        (22, 32, True),
+        (8, 1, True),
+        (22, 1, True),
+        (8, 1, False),
+        (22, 1, False),
+    ]
+
+
+@pytest.mark.parametrize("token_pos", [4, -5])
+def test_out_of_range_position_fails_even_when_selection_clamps_to_a_valid_row(extraction, token_pos):
+    extraction.config["token_pos"] = token_pos
+    extraction.module.run_extraction(extraction.config)
+    assert "outside prompt" in extraction.module.extraction_status["error_message"]
+    assert not extraction.extracted
+    assert not extraction.output.exists()

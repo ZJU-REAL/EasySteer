@@ -87,6 +87,35 @@ def test_per_request_drain_releases_budget_and_preserves_other_rows():
     assert store.tokens_stored == 4
 
 
+@pytest.mark.parametrize("shape,budget", [((2, 2), 64), ((2, 2, 2), 80)])
+def test_byte_budget_counts_layers_dtype_and_labels_and_rejects_incomplete_capture(
+    shape, budget
+):
+    store = StreamStore(StreamConfig(dtype="float16", budget_bytes=budget))
+    index = store.req_index("a")
+    values = torch.ones(shape, dtype=torch.float32)
+    meta = torch.tensor([[index, 0, 10], [index, 1, 11]], dtype=torch.int32)
+    # Both layers include every feature dimension, FP16 values and row labels.
+    for layer in (0, 1):
+        store.append(layer, values, meta, f"layer.{layer}")
+    assert store.storage_bytes == budget
+    store.flush()
+    assert store.storage_bytes == budget
+    assert store.limit_rows(2, 1, store.row_bytes(values)) == 0
+    with pytest.raises(RuntimeError, match="CPU storage budget.*exceeded"):
+        store.serialize()
+    store.clear()
+    assert store.storage_bytes == 0
+    append_rows(store, values=values)
+    store.serialize(req_ids=["a"], clear_selected=True)
+    assert store.storage_bytes == 0
+    store.config.budget_bytes = budget // 4 - 1
+    store.append(0, values[:1], meta[:1], "layer.0")
+    assert store.storage_bytes == 0
+    with pytest.raises(RuntimeError, match="CPU storage budget.*exceeded"):
+        store.serialize()
+
+
 @pytest.mark.parametrize(
     "meta",
     [None, torch.zeros(2, 2, dtype=torch.int32), torch.zeros(2, 3)],

@@ -1,8 +1,8 @@
 """Tiny CPU models exercise hook paths and head geometry without checkpoints."""
 
-from types import SimpleNamespace
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -61,6 +61,8 @@ def test_supported_decoder_hooks_share_one_layout(model):
 
 
 def test_projection_dimensions_match_actual_gqa_modules(model):
+    from easysteer.reft.train import _component_dimension
+
     attention = model.model.layers[0].self_attn
     for component, projection in [
         ("query", attention.q_proj),
@@ -91,6 +93,15 @@ def test_projection_dimensions_match_actual_gqa_modules(model):
         get_dimension_by_component(type(model), model.config, "attention_value_output")
         == attention.o_proj.weight.shape[1]
     )
+    assert (
+        _component_dimension(model, "attention_value_output")
+        == attention.o_proj.weight.shape[1]
+    )
+    assert (
+        _component_dimension(model, "mlp_activation") == model.config.intermediate_size
+    )
+    with pytest.raises(ValueError, match="not heads"):
+        _component_dimension(model, "head_attention_value_output")
 
 
 def test_unknown_same_named_model_is_not_recognized():
@@ -123,6 +134,10 @@ assert not loaded, loaded
 assert 'nnsight' not in sys.modules
 """
     result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, timeout=180
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr

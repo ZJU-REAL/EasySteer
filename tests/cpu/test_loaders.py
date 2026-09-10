@@ -11,11 +11,9 @@ import pickle
 
 import numpy as np
 import pytest
-from vllm.model_hooks.steering.payloads import validate_router_mode
 import torch
-
 from vllm.model_hooks.steering.loading import resolve_vector_payload
-from vllm.model_hooks.steering.payloads import materialize
+from vllm.model_hooks.steering.payloads import materialize, validate_router_mode
 
 
 def load_source(path, algorithm, **params):
@@ -66,7 +64,7 @@ class TestGgufReaders:
         self, gguf_path, monkeypatch
     ):
         """Stat the real source version; parse/hash unchanged content only once."""
-        import vllm.model_hooks.steering.loading as loading
+        from vllm.model_hooks.steering import loading
 
         original_read = loading._read_payload
         reads = []
@@ -107,7 +105,7 @@ class TestGgufReaders:
     def test_changed_during_read_is_retried_as_one_snapshot(
         self, gguf_path, monkeypatch
     ):
-        import vllm.model_hooks.steering.loading as loading
+        from vllm.model_hooks.steering import loading
 
         original_read = loading._read_payload
         reads = []
@@ -129,8 +127,9 @@ class TestPayloadAdapters:
     """Client-side adapters replace the deleted engine file heuristics."""
 
     def test_pt_direction(self, tmp_path):
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import materialize
+
+        import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "vec.pt")
         torch.save(torch.arange(8, dtype=torch.float32), path)
@@ -154,8 +153,9 @@ class TestPayloadAdapters:
             vec.load(path, format="pt")
 
     def test_linear_transport(self, tmp_path):
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import materialize
+
+        import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "linear.pkl")
         with open(path, "wb") as f:
@@ -178,8 +178,9 @@ class TestPayloadAdapters:
             vec.from_linear_transport(bad)
 
     def test_lm_steer_checkpoints(self, tmp_path):
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import materialize
+
+        import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "lms.pt")
         torch.save(
@@ -216,14 +217,32 @@ class TestPayloadAdapters:
 
 
 class TestReft:
+    @staticmethod
+    def config(layer, intervention="loreft"):
+        name = "BiasIntervention" if intervention == "bias" else "LoreftIntervention"
+        return {
+            "representations": [
+                {
+                    "layer": layer,
+                    "component": "block_output",
+                    "unit": "pos",
+                    "max_number_of_units": 1,
+                }
+            ],
+            "intervention_types": [
+                f"<class 'easysteer.reft.pyreft.reft.algorithms.{intervention}.{name}'>"
+            ],
+        }
+
     def test_bias_intervention_dir(self, tmp_path):
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import DirectionVector, materialize
+
+        import easysteer.vectors as vec
 
         reft_dir = os.path.join(tmp_path, "reft")
         os.makedirs(reft_dir)
         with open(os.path.join(reft_dir, "reft_config.json"), "w") as f:
-            json.dump({"representations": [{"layer": 3}]}, f)
+            json.dump(self.config(3, "bias"), f)
         torch.save({"bias": torch.ones(8)}, os.path.join(reft_dir, "intervention.bin"))
         payload = vec.from_pyreft(reft_dir)
         assert isinstance(payload, DirectionVector)
@@ -231,13 +250,14 @@ class TestReft:
         assert set(out) == {3}
 
     def test_loreft_dir(self, tmp_path):
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import ReftIntervention, materialize
+
+        import easysteer.vectors as vec
 
         loreft_dir = os.path.join(tmp_path, "loreft")
         os.makedirs(loreft_dir)
         with open(os.path.join(loreft_dir, "reft_config.json"), "w") as f:
-            json.dump({"representations": [{"layer": 2}]}, f)
+            json.dump(self.config(2), f)
         torch.save(
             {
                 "rotate_layer": torch.ones(8, 2),
@@ -256,13 +276,18 @@ class TestReft:
     def test_loreft_dir_bare_keys(self, tmp_path):
         # pyreft's save() also emits LoReFT state dicts with unprefixed
         # weight/bias next to rotate_layer.
-        import easysteer.vectors as vec
         from vllm.model_hooks.steering.payloads import ReftIntervention
+
+        import easysteer.vectors as vec
 
         loreft_dir = os.path.join(tmp_path, "loreft_bare")
         os.makedirs(loreft_dir)
         with open(os.path.join(loreft_dir, "reft_config.json"), "w") as f:
-            json.dump({"representations": [{"layer": 8}]}, f)
+            config = self.config(8)
+            config["intervention_types"] = [
+                "<class 'pyreft.interventions.LoreftIntervention'>"
+            ]
+            json.dump(config, f)
         torch.save(
             {
                 "weight": torch.ones(2, 8),
@@ -276,6 +301,46 @@ class TestReft:
         assert payload.layer == 8
         assert payload.learned_source_weight.shape == (2, 8)
         assert payload.learned_source_bias.shape == (2,)
+
+    @pytest.mark.parametrize(
+        "invalid",
+        ["component", "unit", "count", "type", "subspace", "act_fn", "training_act_fn"],
+    )
+    def test_unsupported_reft_semantics_rejected_before_tensor_loading(
+        self, tmp_path, monkeypatch, invalid
+    ):
+        import easysteer.vectors as vec
+
+        config = self.config(2)
+        representation = config["representations"][0]
+        if invalid == "component":
+            # This component can have hidden_size width, so shape checks cannot catch it.
+            representation["component"] = "attention_output"
+        elif invalid == "unit":
+            representation["unit"] = "h.pos"
+        elif invalid == "count":
+            config["representations"].append(dict(representation))
+        elif invalid == "type":
+            config["intervention_types"] = [
+                "<class 'pyreft.interventions.ConsreftIntervention'>"
+            ]
+        elif invalid == "subspace":
+            representation["subspace_partition"] = [[0, 2]]
+        elif invalid == "act_fn":
+            config["act_fn"] = "relu"
+        else:
+            config["easysteer_training"] = {"act_fn": "relu"}
+        (tmp_path / "config.json").write_text(json.dumps(config))
+        (tmp_path / "intervention.bin").touch()
+        monkeypatch.setattr(
+            torch,
+            "load",
+            lambda *args, **kwargs: pytest.fail(
+                "weights read before validating target"
+            ),
+        )
+        with pytest.raises(ValueError, match="Unsupported|exactly one"):
+            vec.from_pyreft(str(tmp_path))
 
 
 class TestMoeRouterJson:
@@ -395,8 +460,11 @@ class TestMoeRouterJson:
         for source, payload in ((path, None), (None, data)):
             with pytest.raises(ValueError, match="unknown params.*expert_ids"):
                 VectorSpec(
-                    source=source, data=payload, algorithm="moe_router",
-                    params={"expert_ids": [3]}, apply=ApplySpec(generation="all"),
+                    source=source,
+                    data=payload,
+                    algorithm="moe_router",
+                    params={"expert_ids": [3]},
+                    apply=ApplySpec(generation="all"),
                 )
             with pytest.raises(ValueError, match="unknown params.*expert_ids"):
                 resolve_vector_payload(
