@@ -25,9 +25,9 @@
 - [2026/09/10] The current release runs on vLLM v0.29.0 (V2 model runner) and adds attention head output capture (`attention_heads`), `attention_add` steering, and an [ITI replication](replications/iti/). See the [docs](https://zju-real.github.io/EasySteer/latest/) for steering, capture, and Docker guides.
 - [2026/08/22] [EasySteer](https://arxiv.org/abs/2509.25175) has been accepted to EMNLP 2026 System Demonstrations 🎉
 - [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
-- [2026/02/15–16] Launched the [Hugging Face Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) and [OpenAI-compatible steering API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/). See the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) for the full interface.
+- [2026/02/16] Launched the [Hugging Face Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) and [OpenAI-compatible steering API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/). See the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) for the full interface.
 - [2025/10/10] Added support for vision-language models (VLMs).
-- [2025/09/28–29] Open-sourced EasySteer and released the [paper](https://arxiv.org/abs/2509.25175).
+- [2025/09/29] Open-sourced EasySteer and released the [paper](https://arxiv.org/abs/2509.25175).
 
 ## Awesome Work with EasySteer & PRs
 - [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions

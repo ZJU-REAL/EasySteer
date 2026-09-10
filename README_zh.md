@@ -25,9 +25,9 @@
 - [2026/09/10] 当前版本基于 vLLM v0.29.0（V2 模型运行器），新增注意力头输出捕获（`attention_heads`）、`attention_add` 干预与 [ITI 复现](replications/iti/)。干预、捕获与 Docker 用法见[文档站](https://zju-real.github.io/EasySteer/latest/)。
 - [2026/08/22] [EasySteer 论文](https://arxiv.org/abs/2509.25175)被 EMNLP 2026 System Demonstrations 接收 🎉
 - [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
-- [2026/02/15–16] 上线 [Hugging Face 轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 和 [OpenAI 兼容干预 API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)。完整 Web 界面见[演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)。
+- [2026/02/16] 上线 [Hugging Face 轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 和 [OpenAI 兼容干预 API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)。完整 Web 界面见[演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)。
 - [2025/10/10] 新增视觉语言模型（VLM）支持。
-- [2025/09/28–29] 开源 EasySteer 代码并发布[论文](https://arxiv.org/abs/2509.25175)。
+- [2025/09/29] 开源 EasySteer 代码并发布[论文](https://arxiv.org/abs/2509.25175)。
 
 ## 使用 EasySteer 的优秀工作与 PRs
 - [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions
