@@ -67,7 +67,8 @@ outputs = llm.generate(
 print(outputs[0].outputs[0].text)
 ```
 
-The selection matches the last prompt position used in training. Applying the
+The prompt preserves the training helper's exact `prompt_template`, and the
+selection matches the last prompt position used in training. Applying the
 intervention to every generated token is a different experiment; choose that
 explicitly with `generation="all"` if needed.
 

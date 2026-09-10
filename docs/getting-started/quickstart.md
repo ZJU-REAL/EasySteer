@@ -48,9 +48,10 @@ messages = [
     {"role": "system", "content": ""},
     {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
 ]
-prompt = {"prompt_token_ids": llm.get_tokenizer().apply_chat_template(
+prompt_ids = llm.get_tokenizer().apply_chat_template(
     messages, tokenize=True, return_dict=False, add_generation_prompt=True,
-)}
+)
+prompt = {"prompt_token_ids": prompt_ids}
 sampling_params = SamplingParams(
     temperature=0.0, max_tokens=128, repetition_penalty=1.1,
 )
@@ -64,10 +65,20 @@ print(baseline[0].outputs[0].text)  # ordinary condolences
 print(happy[0].outputs[0].text)     # conspicuously upbeat
 ```
 
-The tokenizer supplies the model's chat format. `steering=False` explicitly
-disables steering, including an engine default. Positive and negative scales
-move in opposite directions; the bundled vector and selected layers are for
-this Qwen model. Use a vector extracted for the target model when changing it.
+`steering=False` explicitly disables steering, including an engine default.
+Positive and negative scales move in opposite directions; the bundled vector and
+selected layers are for this Qwen model. Use a vector extracted for the target
+model when changing it.
+
+### Prompt inputs
+
+Local chat examples use `messages` for chat turns, `prompt_ids` for the token
+list returned by `apply_chat_template(tokenize=True, return_dict=False, ...)`,
+and `prompt = {"prompt_token_ids": prompt_ids}` for `generate()` or `capture()`.
+This applies the model's chat format once and explicitly requests a token list.
+HTTP chat clients send `messages` directly to the server. Raw completion/QA
+prompts, paper-specific text with a primer, multimodal processor inputs, and
+training text retain the formats required by those workflows.
 
 ## Where the vector came from
 

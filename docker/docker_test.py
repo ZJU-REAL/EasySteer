@@ -44,20 +44,17 @@ def main():
         max_tokens=128,
         ignore_eos=True,
     )
-    prompt = {
-        "prompt_token_ids": llm.get_tokenizer().apply_chat_template(
-            [
-                {"role": "system", "content": ""},
-                {
-                    "role": "user",
-                    "content": "Alice's dog has passed away. Please comfort her.",
-                },
-            ],
-            tokenize=True,
-            return_dict=False,
-            add_generation_prompt=True,
-        )
-    }
+    messages = [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
+    ]
+    prompt_ids = llm.get_tokenizer().apply_chat_template(
+        messages,
+        tokenize=True,
+        return_dict=False,
+        add_generation_prompt=True,
+    )
+    prompt = {"prompt_token_ids": prompt_ids}
 
     def generate(scale=None):
         steering = (

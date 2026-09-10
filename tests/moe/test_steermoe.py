@@ -77,8 +77,7 @@ PAIR = {
             {"role": "user", "content": "Count to ten"},
             {
                 "role": "assistant",
-                "content": "one, two, three, four, five, six, seven, "
-                "eight, nine, ten",
+                "content": "one, two, three, four, five, six, seven, eight, nine, ten",
             },
         ],
         "target": "one, two, three, four, five, six, seven, eight, nine, ten",
@@ -90,19 +89,18 @@ def rpc(llm, method, *args, **kwargs):
     return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
 
 
-def render(tok, messages, gen_prompt):
+def render_prompt_ids(tok, messages, *, add_generation_prompt):
     return tok.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=gen_prompt
+        messages,
+        tokenize=True,
+        return_dict=False,
+        add_generation_prompt=add_generation_prompt,
     )
 
 
 def find_sub_list(sub, seq):
     n = len(sub)
-    return [
-        (i, i + n - 1)
-        for i in range(len(seq) - n + 1)
-        if seq[i : i + n] == sub
-    ]
+    return [(i, i + n - 1) for i in range(len(seq) - n + 1) if seq[i : i + n] == sub]
 
 
 def captured_router_logits(llm, prompt_ids, spec=None):
@@ -142,9 +140,7 @@ def deact_json_spec(dirpath, name, layer_to_ids):
             },
             f,
         )
-    return steering_spec(
-        source=path, algorithm="moe_router", scale=1.0, layers=None
-    )
+    return steering_spec(source=path, algorithm="moe_router", scale=1.0, layers=None)
 
 
 def gen(llm, prompt_ids, spec=None, max_tokens=64):
@@ -164,10 +160,11 @@ def tok(llm):
 
 @pytest.fixture(scope="module")
 def count_ids(tok):
-    return tok(
-        render(tok, [{"role": "user", "content": "Count to fifteen."}], True),
-        add_special_tokens=False,
-    ).input_ids
+    return render_prompt_ids(
+        tok,
+        [{"role": "user", "content": "Count to fifteen."}],
+        add_generation_prompt=True,
+    )
 
 
 @pytest.fixture(scope="module")
@@ -175,9 +172,7 @@ def pair_captures(llm, tok):
     """{key: (prompt_ids, captured logits)} for both pair examples."""
     caps = {}
     for key, ex in PAIR.items():
-        prompt_ids = tok(
-            render(tok, ex["messages"], False), add_special_tokens=False
-        ).input_ids
+        prompt_ids = render_prompt_ids(tok, ex["messages"], add_generation_prompt=False)
         caps[key] = (prompt_ids, captured_router_logits(llm, prompt_ids))
     return caps
 
@@ -235,8 +230,7 @@ def test_detection_finds_digit_linked_experts(risk_diff):
     assert strong >= 10, f"only {strong} experts with risk_diff > 0.2"
 
 
-def test_deactivated_experts_out_of_topk(llm, count_ids, digit_deact,
-                                         digit_spec):
+def test_deactivated_experts_out_of_topk(llm, count_ids, digit_deact, digit_spec):
     """Steered router logits exclude every deactivated expert from top-k."""
     steered_logits = captured_router_logits(llm, count_ids, spec=digit_spec)
     leaks = 0
@@ -265,8 +259,7 @@ def test_output_changes_under_digit_steering(llm, count_ids, digit_spec):
     baseline = gen(llm, count_ids)
     steered = gen(llm, count_ids, digit_spec)
     assert baseline != steered, (
-        f"steering had no behavioral effect: baseline={baseline!r} "
-        f"steered={steered!r}"
+        f"steering had no behavioral effect: baseline={baseline!r} steered={steered!r}"
     )
 
 
@@ -297,10 +290,11 @@ def test_precomputed_rankings_steer_without_error(llm, tok, tmp_path):
         ),
     ]
     for demo in demos:
-        ids = tok(
-            render(tok, [{"role": "user", "content": demo}], True),
-            add_special_tokens=False,
-        ).input_ids
-        baseline = gen(llm, ids)
-        steered = gen(llm, ids, faith_spec)
+        prompt_ids = render_prompt_ids(
+            tok,
+            [{"role": "user", "content": demo}],
+            add_generation_prompt=True,
+        )
+        baseline = gen(llm, prompt_ids)
+        steered = gen(llm, prompt_ids, faith_spec)
         assert isinstance(baseline, str) and isinstance(steered, str)

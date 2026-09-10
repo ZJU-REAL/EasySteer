@@ -61,14 +61,18 @@ nav:
       - developer-guide/contributing.md
   - API Reference:
       - api-reference/index.md
-      - Engine configuration: api-reference/engine-configuration.md
-      - Algorithms and payloads: api-reference/algorithms.md
-      - api-reference/steering-specs.md
-      - Payload classes: api-reference/payloads.md
-      - Capture API: api-reference/capture.md
-      - Algorithm extension API: api-reference/algorithm-extension.md
-      - api-reference/steer.md
-      - api-reference/hidden-states.md
+      - Configuration:
+          - Engine arguments: api-reference/engine-configuration.md
+          - Algorithms and payloads: api-reference/algorithms.md
+      - Steering:
+          - Specs and LLM methods: api-reference/steering-specs.md
+          - Payload classes: api-reference/payloads.md
+      - Capture:
+          - capture() and CaptureResult: api-reference/hidden-states.md
+          - vllm.capture: api-reference/capture.md
+      - Extraction and Extension:
+          - Vector extraction and adapters: api-reference/steer.md
+          - Algorithm extension API: api-reference/algorithm-extension.md
 
 plugins:
   - search

@@ -25,23 +25,22 @@ per-rank shards and is rejected rather than merging them implicitly. Capture
 also depends on the engine being able to discover the model's decoder layers
 or MoE gates; test new model architectures before relying on their activations.
 
-Eligible FULL-graph batches use a separate CUDA graph that records activations.
-This path requires one worker, no LoRA or speculative decoding, and steering
-either disabled or running `in_graph`. Other batches that need captured rows
-run eagerly; steps with no selected rows keep ordinary model execution.
-The first eligible batch records the capture graph. One component/layer
-combination stays cached across `capture()` calls; changing the selected token
-positions, storage dtype or reduction does not require recording it again.
-Changing components or layers replaces that cached graph. Ordinary model graphs
-do not contain capture operations.
-
-## `hs.capture()`
+## Capture a batch
 
 One call captures a batch of prompts and returns a labelled
-[`CaptureResult`](../api-reference/hidden-states.md):
+[`CaptureResult`](../api-reference/hidden-states.md). For prompt-only analysis,
+`max_tokens=1` runs the prompt forward pass without subsequent decode steps:
 
 ```python
-prompts = ["What is steering?", "Explain PCA."]
+tokenizer = llm.get_tokenizer()
+prompts = []
+for content in ["What is steering?", "Explain PCA."]:
+    messages = [{"role": "user", "content": content}]
+    prompt_ids = tokenizer.apply_chat_template(
+        messages, tokenize=True, return_dict=False, add_generation_prompt=True,
+    )
+    prompt = {"prompt_token_ids": prompt_ids}
+    prompts.append(prompt)
 result = hs.capture(
     llm,
     prompts=prompts,
@@ -64,13 +63,12 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 | `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering; use `False` to disable it even when the engine has a default. |
 | `**generate_kwargs` | Forwarded into `SamplingParams` (e.g. `temperature`). |
 
-### Select clauses
+### Select rows
 
-Capture's `SelectSpec` and steering's `ApplySpec` share one selection language —
-per-phase `"all"` (`prompt="all"` / `generation="all"`), six phase-scoped include
-selectors (prompt tokens/positions/window, generation tokens/positions/window)
-and their symmetric exclude twins — resolved identically by the engine, so a
-clause means the same thing in both systems:
+Pass a `SelectSpec` to collect only the rows needed for analysis. It shares
+[steering's selection rules](steering.md#select-prompt-and-generation-rows):
+select each phase independently, combine includes by union, and subtract
+exclusions. For one representation per prompt, select its last token:
 
 ```python
 from vllm.capture import SelectSpec
@@ -87,7 +85,7 @@ selectors have no decode-forward rows to capture. Use a longer generation when
 selecting decode rows. An empty selection returns no layers and empty sample
 views.
 
-## Working with `CaptureResult`
+## Read captured rows
 
 Rows are grouped by their owning request via engine labels and ordered by sequence
 position — the only correct grouping under continuous batching.
@@ -140,24 +138,22 @@ MLA, encoder attention, and cross-attention are not exposed as head outputs.
 It shares capture's graph and prefix-cache policy. These activations feed the
 [ITI extractor](extracting-vectors.md#iti-attention-head-directions).
 
-## Compatibility wrappers
-
-`get_all_hidden_states_generate` and `get_moe_router_logits_generate` are thin
-wrappers over `capture()`. The hidden-state wrapper returns
-`(hidden_states, outputs)`, with nested `[sample][layer]` tensors by default or
-concatenated `[layer]` tensors when `split_by_samples=False`. The router-logit
-wrapper returns `(router_logits, outputs)`, with a `{layer_id: tensor}` dictionary
-by default or one such dictionary per sample when `split_by_samples=True`.
-
-Prefer `capture()` for new code: it preserves true layer IDs and per-sample
-metadata. In particular, pass the `CaptureResult` directly to the vector
-extractors when capturing a layer subset; converting to a plain nested list
-loses the mapping from list positions to true layer IDs. The embed-task variants
-(`get_all_hidden_states`, `get_moe_router_logits`) and the `vllm.hidden_states`
-alias package were removed.
+## Multimodal inputs
 
 Multimodal prompts use the same list of input dictionaries as `LLM.generate`,
 including `prompt` and `multi_modal_data`; capture preserves their cache salts.
+
+## Graph execution
+
+Eligible FULL-graph batches use a separate CUDA graph that records activations.
+This path requires one worker, no LoRA or speculative decoding, and steering
+either disabled or running `in_graph`. Other batches that need captured rows
+run eagerly; steps with no selected rows keep ordinary model execution.
+The first eligible batch records the capture graph. One component/layer
+combination stays cached across `capture()` calls; changing the selected token
+positions, storage dtype or reduction does not require recording it again.
+Changing components or layers replaces that cached graph. Ordinary model graphs
+do not contain capture operations.
 
 ## Prefix caching
 
@@ -181,3 +177,19 @@ cleanup does not affect the new stream.
 If steering fails for a request, fetching its captured rows also reports that
 failure. Other requests remain available through a fetch restricted to their
 request IDs; clearing the stream removes its retained rows and errors.
+
+## Compatibility wrappers
+
+`get_all_hidden_states_generate` and `get_moe_router_logits_generate` are thin
+wrappers over `capture()`. The hidden-state wrapper returns
+`(hidden_states, outputs)`, with nested `[sample][layer]` tensors by default or
+concatenated `[layer]` tensors when `split_by_samples=False`. The router-logit
+wrapper returns `(router_logits, outputs)`, with a `{layer_id: tensor}` dictionary
+by default or one such dictionary per sample when `split_by_samples=True`.
+
+Prefer `capture()` for new code: it preserves true layer IDs and per-sample
+metadata. In particular, pass the `CaptureResult` directly to the vector
+extractors when capturing a layer subset; converting to a plain nested list
+loses the mapping from list positions to true layer IDs. The embed-task variants
+(`get_all_hidden_states`, `get_moe_router_logits`) and the `vllm.hidden_states`
+alias package were removed.

@@ -1,13 +1,17 @@
 # Installation
 
-EasySteer ships as two packages installed from one repository: the vLLM fork
-(`vllm-steer/`) and the `easysteer` Python package. Pick one of two routes:
+EasySteer uses a pinned vLLM fork (`vllm-steer/`) and the `easysteer` Python
+package. Choose an installation based on how you will use them:
 
-- **Quick install** — stock vLLM wheel plus a file overlay of the fork's
-  Python changes. The fastest way to a working environment; not editable.
-- **Development install** — editable checkouts of both packages; changes to
-  the fork or to `easysteer` take effect immediately. Use this if you plan to
-  develop, debug, or track the repository.
+| Use case | Installation | What it provides |
+|---|---|---|
+| Run the published release in a container | [Docker](#docker) | EasySteer and the matching fork/runtime; supply model weights separately. |
+| Run examples in a Python environment | [Prebuilt wheel and overlay](#route-1-quick-install-prebuilt-wheel-fork-overlay) | Official kernels with the fork's Python files; no local compilation. |
+| Edit the engine or EasySteer | [Development install](#route-2-development-install-recommended-for-ongoing-work) | Editable checkouts of both packages with prebuilt kernels. |
+
+If the prebuilt artifacts do not fit your platform, use a
+[source build](#fallback-build-vllm-from-source). The examples in this guide
+use Linux and Python 3.12.
 
 ## Validated inference environment
 
@@ -106,7 +110,8 @@ cd ..
 pip install -e .
 ```
 
-A full source build can take from ~20 minutes (128 cores) to several hours.
+Build time depends on the selected architectures, compiler cache, and available
+CPU and memory. Use the prebuilt routes when they match the target platform.
 
 ## Docker
 

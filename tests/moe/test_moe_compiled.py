@@ -46,12 +46,12 @@ SP = SamplingParams(temperature=0.0, max_tokens=24)
 @pytest.fixture(scope="module")
 def prompt_ids(llm):
     tok = llm.get_tokenizer()
-    rendered = tok.apply_chat_template(
+    return tok.apply_chat_template(
         [{"role": "user", "content": "Count to fifteen."}],
-        tokenize=False,
+        tokenize=True,
+        return_dict=False,
         add_generation_prompt=True,
     )
-    return tok(rendered, add_special_tokens=False).input_ids
 
 
 @pytest.fixture(scope="module")
@@ -84,9 +84,7 @@ def test_only_router_steering_splits_compiled_graph(llm):
     assert "vllm::steer_apply" not in ops
 
 
-def test_steered_output_and_trace_cover_all_layers(
-    trace, prompt_ids, deact_spec
-):
+def test_steered_output_and_trace_cover_all_layers(trace, prompt_ids, deact_spec):
     """Steering changes the output and applies at every MoE layer with
     full prompt coverage on the prefill step."""
     baseline, baseline_layers = trace.run(prompt_ids, SP, layers=ALL_LAYERS)

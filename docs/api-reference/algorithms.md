@@ -7,25 +7,31 @@ to each request as shown in the [steering guide](../user-guide/steering.md).
 
 ## Capability table
 
-Every registered algorithm supports eager and `split` execution. `in_graph`
-accepts one vector per request and applies the additional conditions below.
+Every registered algorithm supports eager and `split` execution on a model
+that exposes the required component. `in_graph` accepts one vector per request
+and applies the additional payload conditions below.
+
+| Component | Representation / model requirement |
+|---|---|
+| `hidden_states` | Decoder-layer output; separate hidden and residual outputs are combined for the intervention. |
+| `attention_heads` | Concatenated query-head outputs before the output projection; standard decoder MHA/GQA with one GPU worker. |
+| `router_logits` | MoE gate scores; the model must expose a gate output that executes during inference. |
 
 | Algorithm | Component | Payload | `normalize=True` | `in_graph` |
 |---|---|---|---|---|
-| `direct` | Decoder hidden states | `DirectionVector` | Yes | Yes |
-| `attention_add` | Attention head outputs, before output projection | `DirectionVector` | No | Yes; standard decoder MHA/GQA, one GPU worker |
-| `erase` | Decoder hidden states | `DirectionVector` | Yes | Yes |
-| `replace` | Decoder hidden states | `DirectionVector` | Yes | Yes |
-| `concept_replace` | Decoder hidden states | `ConceptPair` | Yes | Yes |
-| `linear` | Decoder hidden states | `LinearMap` | No | No |
-| `loreft` | Decoder hidden states | `ReftIntervention` | No | Rank at most `steer_graph_max_rank` |
-| `lm_steer` | Decoder hidden states | `LowRankProjector` | No | Rank at most `steer_graph_max_rank` |
-| `moe_router` | Accessible MoE router logits | `RouterConfig` | No | `activate`, `deactivate`, `soft`, `soft_topk`; `soft_random` uses `split` |
+| `direct` | `hidden_states` | `DirectionVector` | Yes | Yes |
+| `attention_add` | `attention_heads` | `DirectionVector` | No | Yes |
+| `erase` | `hidden_states` | `DirectionVector` | Yes | Yes |
+| `replace` | `hidden_states` | `DirectionVector` | Yes | Yes |
+| `concept_replace` | `hidden_states` | `ConceptPair` | Yes | Yes |
+| `linear` | `hidden_states` | `LinearMap` | No | No |
+| `loreft` | `hidden_states` | `ReftIntervention` | No | Rank at most `steer_graph_max_rank` |
+| `lm_steer` | `hidden_states` | `LowRankProjector` | No | Rank at most `steer_graph_max_rank` |
+| `moe_router` | `router_logits` | `RouterConfig` | No | `activate`, `deactivate`, `soft`, `soft_topk`; `soft_random` uses `split` |
 
-MoE routing requires a model with accessible gate outputs and currently accepts
-only single-vector specs. Attention head intervention is limited to the component
-described in the [attention guide](../user-guide/attention.md). Declaring an
-algorithm does not make an unsupported model component available.
+MoE routing currently accepts only single-vector specs, including in `split`
+and eager execution. For attention layout and unsupported attention types,
+see the [attention guide](../user-guide/attention.md).
 
 ## Transformations and scale
 
@@ -101,8 +107,9 @@ payload = DirectionVector({10: direction})
 ```
 
 The width must match the selected model component. For attention, use the
-capture layout rather than the residual hidden size. Both NumPy and PyTorch
-tensors are accepted. The payload classes validate dimensions and finite values
+capture layout rather than the hidden-state width. Both NumPy and PyTorch
+tensors are accepted. The [payload class reference](payloads.md) gives constructor
+arguments and shapes; tensor payloads validate dimensions and finite values
 before workers materialize their tensors.
 
 An extraction result can be converted without writing a temporary file:

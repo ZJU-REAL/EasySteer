@@ -132,7 +132,7 @@ def _api_generate(messages, config, spec_wire) -> str:
 
 
 def _generate_comparison(
-    config_name: str, prompt: str, progress, *, scale=None, multi_vector=False
+    config_name: str, instruction: str, progress, *, scale=None, multi_vector=False
 ) -> tuple[str, str]:
     """Compare baseline and steered output with one preset and sampling config."""
     try:
@@ -141,7 +141,7 @@ def _generate_comparison(
             scale = config["steering"]["vectors"][0]["scale"]
         messages = [
             {"role": "system", "content": ""},
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": instruction},
         ]
 
         if USE_API:
@@ -150,18 +150,17 @@ def _generate_comparison(
         else:
             progress(0, desc="Loading model...")
             llm = load_model()
-            tokenized_prompt = {
-                "prompt_token_ids": llm.get_tokenizer().apply_chat_template(
-                    messages,
-                    tokenize=True,
-                    return_dict=False,
-                    add_generation_prompt=True,
-                )
-            }
+            prompt_ids = llm.get_tokenizer().apply_chat_template(
+                messages,
+                tokenize=True,
+                return_dict=False,
+                add_generation_prompt=True,
+            )
+            prompt = {"prompt_token_ids": prompt_ids}
             sampling_params = SamplingParams(**config["sampling"])
             progress(0.3, desc="Generating baseline...")
             baseline_out = llm.generate(
-                tokenized_prompt, steering=False, sampling_params=sampling_params
+                prompt, steering=False, sampling_params=sampling_params
             )
             baseline_text = baseline_out[0].outputs[0].text
 
@@ -184,7 +183,7 @@ def _generate_comparison(
                 else "Generating steered output...",
             )
             steered_out = llm.generate(
-                tokenized_prompt,
+                prompt,
                 steering=SteeringSpec.model_validate(spec_wire),
                 sampling_params=sampling_params,
             )

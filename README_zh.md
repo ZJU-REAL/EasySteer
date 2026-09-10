@@ -131,15 +131,14 @@ def happy_steering(scale):
     )])
 
 tokenizer = llm.get_tokenizer()
-prompt = {"prompt_token_ids": tokenizer.apply_chat_template(
-    [
-        {"role": "system", "content": ""},
-        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
-    ],
-    tokenize=True,
-    return_dict=False,
-    add_generation_prompt=True,
-)}
+messages = [
+    {"role": "system", "content": ""},
+    {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
+]
+prompt_ids = tokenizer.apply_chat_template(
+    messages, tokenize=True, return_dict=False, add_generation_prompt=True,
+)
+prompt = {"prompt_token_ids": prompt_ids}
 sampling_params = SamplingParams(temperature=0.0, max_tokens=128)
 
 baseline = llm.generate(prompt, steering=False, sampling_params=sampling_params)

@@ -58,6 +58,7 @@ X = list(range(20))
 Y = list(range(20, 40))
 Z = list(range(40, 60))
 
+
 def rpc(llm, method, *args, **kwargs):
     return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
 
@@ -76,7 +77,10 @@ def deact_spec(dirpath, name, deact_ids):
     return moe_json_spec(
         dirpath,
         name,
-        {layer: {"mode": "deactivate", "expert_ids": deact_ids} for layer in ALL_LAYERS},
+        {
+            layer: {"mode": "deactivate", "expert_ids": deact_ids}
+            for layer in ALL_LAYERS
+        },
     )
 
 
@@ -118,12 +122,12 @@ def signature(rows, ids):
 
 
 def prompt_ids(tok, text):
-    rendered = tok.apply_chat_template(
+    return tok.apply_chat_template(
         [{"role": "user", "content": text}],
-        tokenize=False,
+        tokenize=True,
+        return_dict=False,
         add_generation_prompt=True,
     )
-    return tok(rendered, add_special_tokens=False).input_ids
 
 
 @pytest.fixture(scope="module")
@@ -183,15 +187,16 @@ class TestModeSemantics:
             sig = signature(logits[lid], DEACT)
             assert sig.all(), f"L{lid}: unsteered rows {np.flatnonzero(~sig)}"
 
-    def test_position_filter_steers_exactly_those_rows(
-        self, llm, ids_a, tmp_path
-    ):
+    def test_position_filter_steers_exactly_those_rows(self, llm, ids_a, tmp_path):
         """positions on the prompt phase steer those rows and no others."""
         trig = list(range(6))
         spec = moe_json_spec(
             tmp_path,
             "trig",
-            {layer: {"mode": "deactivate", "expert_ids": DEACT} for layer in ALL_LAYERS},
+            {
+                layer: {"mode": "deactivate", "expert_ids": DEACT}
+                for layer in ALL_LAYERS
+            },
             prompt_positions=trig,
         )
         logits = captured(llm, [ids_a], [spec])
@@ -209,9 +214,7 @@ class TestSlotRouting:
     every token row to its config with no scheduler-order assumptions.
     """
 
-    def test_disjoint_configs_route_per_request(
-        self, llm, ids_a, ids_b, tmp_path
-    ):
+    def test_disjoint_configs_route_per_request(self, llm, ids_a, ids_b, tmp_path):
         """Each row bears exactly one of two disjoint signatures (XOR)."""
         spec_x = deact_spec(tmp_path, "deact-x", X)
         spec_y = deact_spec(tmp_path, "deact-y", Y)
@@ -231,18 +234,14 @@ class TestSlotRouting:
                 f"xor={bool(np.all(sig_x ^ sig_y))}"
             )
 
-    def test_unsteered_cobatch_request_untouched(
-        self, llm, ids_a, ids_b, tmp_path
-    ):
+    def test_unsteered_cobatch_request_untouched(self, llm, ids_a, ids_b, tmp_path):
         """Exactly the steered request's rows bear the signature."""
         spec_x = deact_spec(tmp_path, "deact-x", X)
         logits = captured(llm, [ids_a, ids_b], [spec_x, None])
         la, lb = len(ids_a), len(ids_b)
         for lid in sorted(logits):
             sig_x = signature(logits[lid], X)
-            assert (
-                int(sig_x.sum()) == la and logits[lid].shape[0] == la + lb
-            ), (
+            assert int(sig_x.sum()) == la and logits[lid].shape[0] == la + lb, (
                 f"L{lid}: X-rows={int(sig_x.sum())}/{la} "
                 f"total={logits[lid].shape[0]}/{la + lb}"
             )

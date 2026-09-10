@@ -36,19 +36,9 @@ PROMPTS = [
 def run_case(args: argparse.Namespace) -> dict:
     import torch
     import vllm
-    from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    prompts = [
-        tokenizer.apply_chat_template(
-            [{"role": "user", "content": prompt}],
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        for prompt in PROMPTS
-    ]
     kwargs = dict(
         model=args.model,
         enforce_eager=args._case != "steered_graph",
@@ -76,6 +66,18 @@ def run_case(args: argparse.Namespace) -> dict:
         if args._case == "steered_graph":
             kwargs["steer_graph_mode"] = "in_graph"
     llm = LLM(**kwargs)
+    tokenizer = llm.get_tokenizer()
+    prompts = [
+        {
+            "prompt_token_ids": tokenizer.apply_chat_template(
+                [{"role": "user", "content": text}],
+                tokenize=True,
+                return_dict=False,
+                add_generation_prompt=True,
+            )
+        }
+        for text in PROMPTS
+    ]
     params = SamplingParams(
         temperature=0,
         max_tokens=args.max_tokens,

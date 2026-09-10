@@ -32,6 +32,21 @@ in the public documentation. Keep machine-specific paths, process IDs, individua
 run logs, migration worklists and superseded proposals in the Git-ignored
 `.local/development/` directory. Do not link public pages to those local records.
 
+## Writing and organizing pages
+
+User guides explain a task: state the outcome and requirements, give the
+smallest useful example, then explain its result, options, and limits. Use
+headings that name the operation or feature so readers can scan the table of
+contents. Keep implementation details in the developer guide or API reference.
+
+API pages use source-generated class and method descriptions for signatures,
+fields, defaults, and returns. Keep a single detailed table for each capability
+or configuration contract and link to it from guides. Explain what an argument
+controls and when it applies; do not repeat complete schemas on several pages.
+Use component names (`hidden_states`, `attention_heads`, `router_logits`)
+consistently with the API. Keep per-paper READMEs concise: title, abstract, and
+links. Put worked usage and executed results in the notebooks.
+
 ## CI and deployment
 
 The docs workflow runs a strict build for pull requests that change documentation,

@@ -1,6 +1,19 @@
 # OpenAI-compatible server
 
-EasySteer exposes steering through vLLM's OpenAI-compatible HTTP API.
+Use vLLM's OpenAI-compatible HTTP API to serve baseline and steered requests
+from one engine. The request's `steering` field uses the same
+[spec schema](../api-reference/steering-specs.md) as Python inference.
+
+## Requirements
+
+Install the [EasySteer fork](../getting-started/installation.md) on the server.
+Clients need only an HTTP client or the OpenAI SDK. A vector's `source` path
+must be available to the server; use a JSON payload in `data` when sending
+weights from the client.
+
+The examples below use an unauthenticated local server. If the server sets
+`--api-key`, supply that key to the SDK and include `Authorization: Bearer <key>`
+in curl requests, including management requests.
 
 ## Start the server
 
@@ -16,11 +29,13 @@ vllm serve Qwen/Qwen2.5-1.5B-Instruct \
 The default graph mode is selected from the declared algorithms: this
 single-vector `direct` server uses `in_graph`. Multi-vector requests also
 require `--steer-multi-vector`, which selects `split` while retaining CUDA
-graphs. See the [steering guide](steering.md). Use `--enforce-eager` when
-debugging or when avoiding compilation startup cost is more useful than
-graph acceleration.
+graphs. For other algorithms and capacity settings, see
+[engine configuration](../api-reference/engine-configuration.md).
 
-## Per-request steering
+Wait until the server reports that it is ready. `GET /v1/models` lists the model
+IDs accepted in requests; use one of those IDs in the client's `model` field.
+
+## Send a steering request
 
 Pass the `SteeringSpec` as JSON in the `steering` field, using `extra_body` with
 the OpenAI SDK or sending the field directly with `curl`. Both examples use the
@@ -96,7 +111,7 @@ The [payload reference](../api-reference/algorithms.md) lists all supported
 native formats and third-party adapters. Startup options and CLI equivalents
 are listed in [engine configuration](../api-reference/engine-configuration.md).
 
-## Default steering
+## Set a startup default
 
 Save a complete spec as `spec.json`, for example:
 
@@ -126,6 +141,15 @@ with the OpenAI Python client.
 
 ## Management endpoints
 
+Use these endpoints to update a default or preload vectors while the model stays
+loaded. An engine started without a default can set one later if steering is
+enabled and the algorithms are declared.
+
+!!! note "Runtime default updates"
+    Changing the default at runtime requires one API frontend
+    (`--api-server-count=1`). Startup defaults and explicit per-request steering
+    also work with multiple API frontends. Runtime updates are rejected there.
+
 | Endpoint | Request / result |
 |---|---|
 | `GET /v1/steering` | Returns `{"active": false}` when no default is configured, otherwise its status and authoring spec. In-memory tensor data is omitted and summarized by payload kind and content hash. |
@@ -133,7 +157,9 @@ with the OpenAI Python client.
 | `GET /v1/steering/vectors` | Lists preloaded paths as `{"preloaded": [...]}`. |
 | `POST /v1/steering/vectors` | Preloads `{"paths": [...], "algorithm": "direct", "params": {...}}`. `params` is optional. Requires steering to be enabled. |
 
-For example, replace the engine default from a revised `spec.json`:
+### Replace or clear the default
+
+Replace the engine default from a revised `spec.json`:
 
 ```bash
 python -c 'import json; print(json.dumps({"spec": json.load(open("spec.json"))}))' \
@@ -143,18 +169,10 @@ python -c 'import json; print(json.dumps({"spec": json.load(open("spec.json"))})
 
 Updates must stay within the engine's declared algorithms, multi-vector support,
 and graph capabilities. Invalid specs or malformed management request bodies
-return HTTP 400; worker failures remain server errors. Preload `paths` must be a
-non-empty list of non-empty strings, and `params` must be an object or `null`.
-A server started without a
-default can set one later if steering is enabled and its algorithms are declared.
+return HTTP 400; worker failures remain server errors.
 Updates apply only to new requests; admitted requests retain their configuration
 and weight snapshot. Prefix-cache entries remain separated by the effective
 configuration, so updates do not require a cache reset.
-
-Runtime default updates require one API frontend (`--api-server-count=1`). A
-startup default and explicit per-request steering also work with multiple API
-frontends; runtime updates are rejected there rather than updating only one
-frontend.
 
 Clear the default without restarting the server:
 
@@ -162,6 +180,11 @@ Clear the default without restarting the server:
 curl -X POST http://localhost:8017/v1/steering \
   -H 'Content-Type: application/json' -d '{"spec": null}'
 ```
+
+### Preload file-backed vectors
+
+`paths` must be a non-empty list of non-empty strings. `params`, if supplied,
+must be an object or `null`; malformed requests return HTTP 400.
 
 To require advance loading of file-backed vectors, start the server with
 `--steer-require-preload`, then preload the file before sending generation requests:
@@ -182,6 +205,3 @@ request's scale, layer subset or selection reuses the preloaded payload.
 
 The Python equivalent is
 `llm.preload_steer_vectors(paths, algorithm="moe_router", params={"mode": "soft", "lambda": 0.7})`.
-
-When `vllm serve` is configured with `--api-key`, include
-`Authorization: Bearer <key>` on these requests, just as for generation requests.

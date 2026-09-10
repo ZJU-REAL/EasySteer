@@ -64,9 +64,7 @@ def captured(llm, prompt_ids, spec=None, max_tokens=1):
     try:
         outs = llm.generate(
             {"prompt_token_ids": prompt_ids},
-            sampling_params=SamplingParams(
-                temperature=0.0, max_tokens=max_tokens
-            ),
+            sampling_params=SamplingParams(temperature=0.0, max_tokens=max_tokens),
             steering=spec,
             use_tqdm=False,
         )
@@ -83,13 +81,13 @@ def captured(llm, prompt_ids, spec=None, max_tokens=1):
 @pytest.fixture(scope="module")
 def prompt_ids(llm):
     tok = llm.get_tokenizer()
-    rendered = tok.apply_chat_template(
+    return tok.apply_chat_template(
         [{"role": "user", "content": "Count to ten."}],
-        tokenize=False,
+        tokenize=True,
+        return_dict=False,
         add_generation_prompt=True,
         enable_thinking=False,
     )
-    return tok(rendered, add_special_tokens=False).input_ids
 
 
 def test_capture_on_internal_router_gate_path(llm, prompt_ids):

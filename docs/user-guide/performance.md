@@ -79,7 +79,7 @@ or layer set replaces the cached capture graph.
 This graph path requires one GPU worker, no LoRA or speculative decoding, and
 steering disabled or using `in_graph`. Other batches with selected rows use
 eager capture. A step with no selected rows follows normal model execution.
-The [capture guide](hidden-state-capture.md#engine-requirements) describes these
+The [capture guide](hidden-state-capture.md#graph-execution) describes these
 requirements; an eager capture step does not mean ordinary generation has lost
 its graphs.
 
