@@ -14,6 +14,10 @@ Analysis-based extraction of steering vectors from captured hidden states.
 
 ::: easysteer.steer.extract_linear_probe_control_vector
 
+## ITI attention extraction
+
+::: easysteer.steer.ITIExtractor
+
 ## Containers and utilities
 
 ::: easysteer.steer.StatisticalControlVector
@@ -28,14 +32,14 @@ Analysis-based extraction of steering vectors from captured hidden states.
 
 ::: easysteer.steer.extract_sae_decoder_vector
 
-<!-- TODO: add the extractor classes (DiffMeanExtractor, PCAExtractor, LATExtractor,
-LinearProbeExtractor, SAEFeatureExplorer) and accumulators once their docstrings are
-reviewed. -->
-
 ## Payload adapters (`easysteer.vectors`)
 
 Client-side adapters from third-party checkpoint formats to the canonical
 steering payloads passed via `VectorSpec(data=...)`.
+
+::: easysteer.vectors.load
+
+::: easysteer.vectors.to_json_payload
 
 ::: easysteer.vectors.from_control_vector
 

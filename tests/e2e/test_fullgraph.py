@@ -33,7 +33,7 @@ ENGINE_KWARGS = dict(
     # pessimistically to split — so pin the in-graph tier explicitly
     # (the expert path; boots with the conditional-algorithms warning).
     steer_algorithms=[
-        "concept_replace", "direct", "erase", "lm_steer", "loreft",
+        "attention_add", "concept_replace", "direct", "erase", "lm_steer", "loreft",
         "replace",
     ],
     steer_graph_mode="in_graph",
@@ -126,6 +126,51 @@ def test_mixed_batch_completes_and_steers(outs):
     mixed = outs["batch_mixed"]
     assert len(mixed) == 2 and all(mixed)
     assert mixed[0] != mixed[1], "the mixed-batch steering effect is missing"
+
+
+def test_attention_head_delta_is_isolated(llm):
+    """Check the head delta and request/token isolation on fixed decode inputs."""
+    import numpy as np
+    import torch
+    from vllm.model_hooks.steering.payloads import DirectionVector
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+
+    from easysteer.hidden_states import capture
+
+    if llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size != 1:
+        pytest.skip("attention_heads currently requires tensor_parallel_size=1")
+    layer = 10
+    token = llm.get_tokenizer().encode(" the", add_special_tokens=False)[0]
+    options = dict(
+        layers=[layer], stream="attention_heads", max_tokens=4,
+        temperature=0.0, ignore_eos=True, allowed_token_ids=[token],
+    )
+    baseline = capture(llm, [TEXT, TEXT], steering=False, **options)
+    layout = baseline.layouts[layer]
+    direction = np.zeros(layout["width"], dtype=np.float32)
+    direction[:layout["head_size"]] = 0.5
+    spec = SteeringSpec(vectors=[VectorSpec(
+        data=DirectionVector({layer: direction}), algorithm="attention_add",
+        scale=2.0, layers=[layer],
+        apply=ApplySpec(prompt_positions=[-1], generation_positions=[0]),
+    )])
+    result = capture(llm, [TEXT, TEXT], steering=[False, spec], **options)
+    for index in range(2):
+        reference = baseline.sample(index)[layer]
+        actual = result.sample(index)[layer]
+        assert result.sample_positions(index) == baseline.sample_positions(index)
+        expected = reference.clone()
+        if index == 1:
+            prompt_len = len(result.outputs[index].prompt_token_ids)
+            selected = torch.tensor([
+                position in (prompt_len - 1, prompt_len)
+                for position in result.sample_positions(index)
+            ])
+            expected[selected] += torch.from_numpy(direction).to(expected.dtype) * 2
+            assert selected.sum() == 2
+            assert (actual[selected] - reference[selected]).abs().max() > 0.5
+        tolerance = 2 * torch.finfo(actual.dtype).eps
+        torch.testing.assert_close(actual, expected, rtol=tolerance, atol=tolerance)
 
 
 # ---------------------------------------------------------------------------

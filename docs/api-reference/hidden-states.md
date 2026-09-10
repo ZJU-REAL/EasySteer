@@ -1,6 +1,8 @@
 # `easysteer.hidden_states`
 
-Hidden-state and MoE router-logit capture from a running vLLM engine.
+Hidden-state, attention-head, and MoE router-logit capture from a running vLLM
+engine. The [capture guide](../user-guide/hidden-state-capture.md) explains
+selection, graph execution, and prefix-cache behavior.
 
 ## Capture (recommended)
 

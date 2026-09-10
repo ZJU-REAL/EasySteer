@@ -42,7 +42,7 @@ def manager(monkeypatch):
 
 
 @pytest.mark.parametrize("changed", [
-    {"model_path": "other"}, {"gpu_devices": "1"}, {"enforce_eager": False},
+    {"model_path": "other"}, {"gpu_devices": "1"}, {"enforce_eager": True},
     {"enable_chunked_prefill": True}, {"enable_chunked_prefill": False},
     {"enable_prefix_caching": True}, {"enable_prefix_caching": False},
     {"enable_steer_vector": True}, {"dtype": "bfloat16"},

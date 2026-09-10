@@ -120,6 +120,9 @@ class TestCompilationSignature:
         assert self._hash(algorithms=["lm_steer"], graph_max_rank=4) != self._hash(
             algorithms=["lm_steer"], graph_max_rank=8
         )
+        assert self._hash(algorithms=["attention_add", "erase"]) != self._hash(
+            algorithms=["attention_add", "direct", "erase"]
+        )
 
     def test_same_family_and_unused_rank_share_signature(self):
         assert self._hash(algorithms=["erase"]) == self._hash(

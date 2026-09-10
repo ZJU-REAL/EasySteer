@@ -104,12 +104,8 @@ def run_extraction(config):
         update_extraction_status("Loading VLLM model...")
         model_path = config["model_path"]
 
-        # The job backend hosts its own engine: hidden-state capture needs
-        # an in-process LLM handle (the OpenAI server has no capture route),
-        # which is why extraction takes a model path and GPU ids at all.
-        # Capture requires the V2 model runner; bundled Qwen2.5 presets use
-        # it by default.
-        # Eager mode keeps short-lived job engines fast to start.
+        # Capture needs a local engine. Eager avoids compilation for this
+        # single prompt-only extraction pass.
         llm = llm_manager.get_or_create_llm(
             model_path=model_path,
             gpu_devices=gpu_devices,

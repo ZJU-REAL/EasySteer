@@ -3,6 +3,7 @@
 import inspect
 
 from .diffmean import DiffMeanExtractor
+from .iti import ITIExtractor
 from .lat import LATExtractor
 from .linear_probe import LinearProbeExtractor
 from .pca import PCAExtractor
@@ -13,6 +14,7 @@ _EXTRACTORS = {
     "pca": PCAExtractor,
     "lat": LATExtractor,
     "linear_probe": LinearProbeExtractor,
+    "iti": ITIExtractor,
 }
 
 _COMMON_PARAMS = ("all_hidden_states", "positive_indices", "negative_indices")
@@ -59,7 +61,8 @@ def extract_statistical_control_vector(
 
     Args:
         method (str): Method name; one of "diffmean", "pca", "lat",
-            "linear_probe".
+            "linear_probe", "iti". ITI also requires validation captures,
+            validation labels and query head counts.
         all_hidden_states (list | CaptureResult): Nested
             `[sample][layer][token]` hidden states, or a CaptureResult
             from easysteer.hidden_states.

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         TopKCountAccumulator as TopKCountAccumulator,
     )
     from .diffmean import DiffMeanExtractor as DiffMeanExtractor
+    from .iti import ITIExtractor as ITIExtractor
     from .lat import LATExtractor as LATExtractor
     from .linear_probe import LinearProbeExtractor as LinearProbeExtractor
     from .pca import PCAExtractor as PCAExtractor
@@ -62,6 +63,7 @@ _EXPORTS = {
     "extract_token_hiddens": "utils",
     "derive_negative_indices": "utils",
     "DiffMeanExtractor": "diffmean",
+    "ITIExtractor": "iti",
     "PCAExtractor": "pca",
     "LATExtractor": "lat",
     "LinearProbeExtractor": "linear_probe",

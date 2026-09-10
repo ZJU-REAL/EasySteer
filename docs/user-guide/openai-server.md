@@ -75,8 +75,8 @@ README's happy-vector and Alice prompt:
     JSON
     ```
 
-Set `scale` to `0.0` for the baseline comparison. `normalize` defaults to `false`
-in both examples.
+Use `extra_body={"steering": False}` (JSON: `"steering": false`) for the baseline
+comparison. `normalize` defaults to `false` in both examples.
 
 The JSON shape mirrors the Python spec (`vectors` / `conflict`, each vector with
 `source` or `data`, `algorithm`, `scale`, `layers`, `normalize`, `apply`, `params`,
@@ -85,15 +85,16 @@ base64-encode the tensor bytes before sending its wire dictionary as a vector's
 `data` field:
 
 ```python
-import base64
-from easysteer.vectors import from_gguf
+from easysteer.vectors import from_gguf, to_json_payload
 
 payload = from_gguf("vectors/happy_diffmean.gguf")
-wire = payload.to_wire()
-for tensor in wire["tensors"].values():
-    tensor["data"] = base64.b64encode(tensor["data"]).decode("ascii")
+wire = to_json_payload(payload)
 # Use {"data": wire, "algorithm": "direct", "apply": {...}} in vectors.
 ```
+
+The [payload reference](../api-reference/algorithms.md) lists all supported
+native formats and third-party adapters. Startup options and CLI equivalents
+are listed in [engine configuration](../api-reference/engine-configuration.md).
 
 ## Default steering
 

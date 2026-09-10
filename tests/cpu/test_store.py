@@ -18,11 +18,11 @@ from vllm.model_hooks.steering.payloads import (
 )
 
 
-def store(capacity=8, hidden_size=4):
+def store(capacity=8):
     config = types.SimpleNamespace(
         max_steer_vectors=capacity, adapter_dtype=torch.float32
     )
-    return PayloadCache("cpu", config, hidden_size=hidden_size)
+    return PayloadCache("cpu", config)
 
 
 def test_content_reuse_performs_no_file_io():
@@ -44,7 +44,7 @@ def test_content_reuse_performs_no_file_io():
     ReftIntervention(np.ones((8, 2)), np.ones((2, 8)), np.ones(2)),
 ], ids=["linear", "lowrank", "reft"])
 def test_broadcast_payload_materializes_once_across_target_layers(payload):
-    cache = store(capacity=1, hidden_size=8)
+    cache = store(capacity=1)
     wire = payload.to_wire()
     with mock.patch(
         "vllm.model_hooks.steering.payload_cache.materialize", wraps=materialize

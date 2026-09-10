@@ -69,7 +69,7 @@ model_hooks/
   components/             # Model discovery and component output adapters
   steering/
     algorithms/           # Transformations and their registration
-    controllers/          # Hidden-state and router-logit execution
+    controllers/          # Hidden-state, attention-head, and router execution
     graph/                # Eligibility, persistent state and kernels
   capture/                # Capture sessions, selection, storage and serialization
 ```
@@ -110,7 +110,8 @@ caches use payload content and broadcast layer targets. HTTP management routes
 live in `vllm/entrypoints/serve/steering/api_router.py`.
 
 `components/registry.py` supplies shared component descriptors and hook targets;
-`components/discovery.py` locates decoder layers and accessible MoE gates;
+`components/discovery.py` locates decoder layers, attention outputs, and
+accessible MoE gates;
 `components/outputs.py` handles component output layouts. Steering and capture
 consume the same discovered component targets. Standard decoder
 stacks use their global stack indices; pipeline-parallel placeholders retain

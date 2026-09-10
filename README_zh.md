@@ -22,18 +22,12 @@
 <a id="news"></a>
 ## 新闻 🔥
 
-- [2026/09/09] 升级至 vLLM v0.29.0，适配默认 V2 模型运行器，并更新干预、捕获和 Docker 集成。
+- [2026/09/10] 当前版本基于 vLLM v0.29.0（V2 模型运行器），新增注意力头输出捕获（`attention_heads`）、`attention_add` 干预与 [ITI 复现](replications/iti/)。干预、捕获与 Docker 用法见[文档站](https://zju-real.github.io/EasySteer/latest/)。
 - [2026/08/22] [EasySteer 论文](https://arxiv.org/abs/2509.25175)被 EMNLP 2026 System Demonstrations 接收 🎉
-- [2026/08/03] 迁移至 vLLM v0.26.0（V2 模型运行器）：v2 干预 API、重新设计的隐状态捕获（选择子句、行标签、按请求捕获），并上线了[文档站](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
-- [2026/03/31] 初步支持 vLLM v0.17.1，支持服务端级别的干预与 CUDA 图加速
-- [2026/02/16] 我们在 Hugging Face Spaces 上发布了 [轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 供快速体验。完整版功能请参考 [Web 演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)
-- [2026/02/15] 新增 OpenAI 兼容 API，支持通过 HTTP 接口使用干预向量
-- [2026/01/11] 我们已将 EasySteer 适配至 vLLM v0.13.0
-- [2025/10/31] 我们已将 EasySteer 适配至 vLLM v1 引擎
-- [2025/10/10] 我们已适配 VLMs
-- [2025/09/29] 我们发布了论文
-- [2025/09/28] 我们开源了 EasySteer 代码，欢迎试用！
+- [2026/02/15–16] 上线 [Hugging Face 轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 和 [OpenAI 兼容干预 API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)。完整 Web 界面见[演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)。
+- [2025/10/10] 新增视觉语言模型（VLM）支持。
+- [2025/09/28–29] 开源 EasySteer 代码并发布[论文](https://arxiv.org/abs/2509.25175)。
 
 ## 使用 EasySteer 的优秀工作与 PRs
 - [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions
@@ -131,15 +125,23 @@ def happy_steering(scale):
     return SteeringSpec(vectors=[VectorSpec(
         source="vectors/happy_diffmean.gguf",
         scale=scale,
-        layers=list(range(10, 26)),
+        layers=list(range(10, 24)),
         apply=ApplySpec(prompt="all", generation="all"),
     )])
 
-text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
+tokenizer = llm.get_tokenizer()
+prompt = {"prompt_token_ids": tokenizer.apply_chat_template(
+    [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
+    ],
+    tokenize=True,
+    add_generation_prompt=True,
+)}
 sampling_params = SamplingParams(temperature=0.0, max_tokens=128)
 
-baseline = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
-happy = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
+baseline = llm.generate(prompt, steering=False, sampling_params=sampling_params)
+happy = llm.generate(prompt, steering=happy_steering(2.0), sampling_params=sampling_params)
 
 print(baseline[0].outputs[0].text)  # 常规安慰
 print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
@@ -162,14 +164,14 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 
 ## 论文复现
 
-[replications](replications) 目录使用 EasySteer 复现已发表的干预论文 — 带论文标题的完整表格见[复现集](https://zju-real.github.io/EasySteer/latest/replications/)：
+[replications](replications) 目录使用 EasySteer 实现已发表论文的干预方法，各示例的范围见[复现集](https://zju-real.github.io/EasySteer/latest/replications/)：
 
 | 类别 | 复现 |
 |---|---|
 | 推理 | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) |
 | 安全 | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) |
 | 风格 | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) |
-| 知识与真实性 | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) |
+| 知识与真实性 | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) · [ITI](replications/iti/) |
 | 通用与个性化 | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) |
 | MoE | [SteerMoE](replications/steermoe/) |
 

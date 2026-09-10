@@ -37,6 +37,7 @@ class TestExecutionModes:
     def test_table_matches_declared_families(self):
         modes = steering_execution_modes()
         assert modes["direct"] == ("split", "in_graph")
+        assert modes["attention_add"] == ("split", "in_graph")
         assert modes["erase"] == ("split", "in_graph")
         assert modes["replace"] == ("split", "in_graph")
         assert modes["concept_replace"] == ("split", "in_graph")
@@ -136,6 +137,29 @@ class TestGraphMaskStorage:
         for decoder in decoders:
             assert decoder.graph_mask is None
             assert decoder.replace_mask is not None
+
+    def test_attention_uses_its_width_and_only_its_declared_family(self):
+        import torch
+        from vllm.config.steer_vector import SteerVectorConfig
+        from vllm.model_hooks.components.registry import ATTENTION_HEADS
+        from vllm.model_hooks.steering.controllers import HiddenStatesController
+        from vllm.model_hooks.steering.graph.state import SteeringGraphState
+
+        attention, decoder = HiddenStatesController(), HiddenStatesController()
+        attention.component_id, attention._output_width = ATTENTION_HEADS, 12
+        state = SteeringGraphState(
+            SteerVectorConfig(algorithms=["attention_add", "loreft"], max_steer_vectors=2),
+            torch.device("cpu"),
+        )
+        state.enable(8, torch.float32, 4)
+        state.init_tables(SimpleNamespace(controllers={"attention": attention, "decoder": decoder}))
+        assert set(attention.graph_tables) == {"additive"}
+        assert attention.graph_tables["additive"]["V"].shape == (3, 12)
+        assert set(decoder.graph_tables) == {"lowrank"}
+        attention.set_graph_row(1, "attention_add", torch.arange(12.), 2.)
+        torch.testing.assert_close(attention.graph_tables["additive"]["V"][1], torch.arange(12.) * 2)
+        attention.clear_graph_row(1)
+        assert attention.graph_tables["additive"]["V"].count_nonzero() == 0
 
     def test_normalize_has_distinct_identity_and_persistent_row_state(self):
         import torch
@@ -534,7 +558,9 @@ class TestGraphAdmissionAllocation:
 
 class TestRequestInstallationTransaction:
     @pytest.mark.parametrize("mode", ["split", "in_graph"])
-    def test_failed_request_leaves_existing_request_and_capacity_intact(self, mode):
+    def test_failed_request_leaves_existing_request_and_capacity_intact(
+        self, mode, monkeypatch
+    ):
         import torch
         from vllm.config.steer_vector import SteerVectorConfig
         from vllm.model_hooks.steering.controllers import HiddenStatesController
@@ -559,9 +585,15 @@ class TestRequestInstallationTransaction:
             worker.graph_state.init_tables(worker._controller_manager)
         original = _request(data=DirectionVector({0: np.ones(4)}), normalize=True)
         slot = worker.acquire_config("active", original)
-        invalid = _request(data=DirectionVector({0: np.ones(5)}))
-        with pytest.raises(ValueError, match="model hidden size 4"):
-            worker.acquire_config("invalid", invalid)
+        pending = _request(data=DirectionVector({0: np.full(4, 2.)}))
+
+        def fail_materialization(*args, **kwargs):
+            raise RuntimeError("payload materialization failed")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(worker.payload_cache, "get", fail_materialization)
+            with pytest.raises(RuntimeError, match="payload materialization failed"):
+                worker.acquire_config("invalid", pending)
         assert worker.slot_for_request("active") == slot
         assert worker.slot_for_request("invalid") is None
         assert len(worker._config_slots) == 1
@@ -570,8 +602,7 @@ class TestRequestInstallationTransaction:
             assert decoder.normalize_flag[worker.graph_state.row_of(slot)] == 1
         else:
             assert decoder.slot_interventions[slot][0].normalize
-        valid = _request(data=DirectionVector({0: np.full(4, 2.)}))
-        assert worker.acquire_config("second", valid) != slot
+        assert worker.acquire_config("second", pending) != slot
         worker.release_config("active")
         worker.release_config("second")
         assert not worker.slot_clauses()

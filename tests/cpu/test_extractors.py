@@ -13,6 +13,7 @@ import pytest
 
 from easysteer.steer import (
     DiffMeanExtractor,
+    ITIExtractor,
     LATExtractor,
     LinearProbeExtractor,
     MomentsAccumulator,
@@ -358,3 +359,61 @@ class TestLATSingleExtraction:
         )
         assert calls["n"] == 1
         assert sorted(vec.directions) == [0, 1]
+
+
+class TestITIExtraction:
+    @staticmethod
+    def captures():
+        # Head 0 predicts training labels but reverses on validation.
+        train = np.array([
+            [4, 0, 3, 0], [2, 0, 1, 0], [-4, 0, -3, 0], [-2, 0, -1, 0],
+        ])
+        validation = np.array([
+            [-4, 0, 5, 0], [-2, 0, 3, 0], [4, 0, -5, 0], [2, 0, -3, 0],
+        ])
+        return tuple(
+            FakeCapture([[[row]] for row in rows], [10])
+            for rows in (train, validation)
+        )
+
+    def test_validation_ranking_development_scale_and_head_layout(self):
+        train, validation = self.captures()
+        vector = extract_statistical_control_vector(
+            "iti",
+            train,
+            [0, 1],
+            validation_hidden_states=validation,
+            validation_positive_indices=[0, 1],
+            num_heads={10: 2},
+        )
+        assert list(vector.directions) == [10]
+        # std([3, 1, -3, -1, 5, 3, -5, -3]) = sqrt(11).
+        np.testing.assert_allclose(vector.directions[10], [0, 0, np.sqrt(11), 0])
+        assert vector.metadata["selected_head_scores"] == {"10.1": 1.0}
+        assert vector.metadata["normalize"] is False
+        assert vector.metadata["n_positive"] == 2
+        assert vector.metadata["n_validation_positive"] == 2
+
+    def test_invalid_labels_or_head_layout_rejected(self):
+        train, validation = self.captures()
+        options = dict(
+            validation_hidden_states=validation,
+            validation_positive_indices=[0, 1],
+        )
+        with pytest.raises(ValueError, match="disjoint"):
+            ITIExtractor.extract(train, [0, 1], [1, 2], num_heads={10: 2}, **options)
+        with pytest.raises(ValueError, match="width"):
+            ITIExtractor.extract(train, [0, 1], num_heads={10: 3}, **options)
+        with pytest.raises(ValueError, match="top_k"):
+            ITIExtractor.extract(train, [0, 1], num_heads={10: 2}, top_k=3, **options)
+
+    def test_degenerate_selected_direction_rejected(self):
+        constant = FakeCapture([[[np.ones(4)]]] * 4, [10])
+        with pytest.raises(ValueError, match="no nonzero finite ITI direction"):
+            ITIExtractor.extract(
+                constant,
+                [0, 1],
+                validation_hidden_states=constant,
+                validation_positive_indices=[0, 1],
+                num_heads={10: 2},
+            )

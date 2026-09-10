@@ -1,4 +1,4 @@
-# Steering (v2 API)
+# Steering requests
 
 Steering is configured with three objects from `vllm.steer_vectors`:
 
@@ -84,10 +84,10 @@ ApplySpec(prompt_window=(-4, None), generation_window=(0, 4))
 
 | Field | Default | Meaning |
 |---|---|---|
-| `source` | `None` | Path to a vector file in a format EasySteer itself defines (its GGUF export; the `moe_router` JSON). For third-party checkpoint formats use `data` instead. Plain path only — no `"path\|algo"`. |
+| `source` | `None` | EasySteer direction GGUF, a concept-pair directory, or `moe_router` JSON. For third-party checkpoint formats use `data` instead. Plain path only — no `"path\|algo"`. |
 | `data` | `None` | An in-memory payload (see [Steering with your own tensors](#steering-with-your-own-tensors)). Mutually exclusive with `source`. |
-| `algorithm` | `"direct"` | Registry key: `direct`, `linear`, `loreft`, `lm_steer`, `erase`, `replace`, `concept_replace`, `moe_router`. |
-| `scale` | `1.0` | Algorithm-specific scale factor; `direct` adds `scale * vector`. |
+| `algorithm` | `"direct"` | Registry key: `direct`, `attention_add`, `linear`, `loreft`, `lm_steer`, `erase`, `replace`, `concept_replace`, `moe_router`. |
+| `scale` | `1.0` | Algorithm-specific scale factor; `direct` and `attention_add` add `scale * vector`. |
 | `layers` | `None` | Layer indices to apply to; `None` uses the layer IDs in the source or payload. Payloads without layer IDs require an explicit list. |
 | `normalize` | `False` | Rescale the transformed hidden state to its original norm for `direct`, `erase`, `replace`, and `concept_replace`. Other algorithms reject `True`. |
 | `apply` | — | **Required** `ApplySpec`. |
@@ -108,7 +108,7 @@ canonical payload structures:
 
 | Payload | Algorithms | Shape |
 |---|---|---|
-| `DirectionVector({layer: vec})` | `direct`, `erase`, `replace` | one 1-D vector per layer |
+| `DirectionVector({layer: vec})` | `direct`, `attention_add`, `erase`, `replace` | one 1-D vector per layer; `attention_add` uses concatenated query head outputs |
 | `LinearMap(weight, bias=None)` | `linear` | one affine map, applied to each `layers` entry |
 | `LowRankProjector(projector1, projector2)` | `lm_steer` | low-rank update factors, applied to each `layers` entry |
 | `ReftIntervention(rotate_layer, learned_source_weight, learned_source_bias=None, layer=None)` | `loreft` | Uses its recorded `layer`; without one, requires `VectorSpec.layers` |
@@ -196,13 +196,13 @@ early = SteeringSpec(vectors=[
   search is rejected because its prompt/generation selection semantics differ.
 - **CUDA graphs**: `split` supports all algorithms and multi-vector specs, with
   steering between compiled graph segments. `in_graph` requires a single-vector
-  spec whose algorithm has a graph kernel: `direct`, `erase`, `replace`, and
-  `concept_replace` support it; `loreft` and `lm_steer` also require payload rank
-  at most `steer_graph_max_rank` (default 32). `moe_router` supports inline and
+  spec whose algorithm has a graph kernel: `direct`, `attention_add`, `erase`,
+  `replace`, and `concept_replace` support it; `loreft` and `lm_steer` also require
+  payload rank at most `steer_graph_max_rank` (default 32). `moe_router` supports inline and
   file-backed `activate`, `deactivate`, `soft`, and `soft_topk` configurations;
   `soft_random` and `linear` use `split`.
-  Normalization for the four direction algorithms above is supported in both
-  tiers. The default
+  Normalization for `direct`, `erase`, `replace`, and `concept_replace` is supported
+  in both tiers; `attention_add` requires `normalize=False`. The default
   `steer_graph_mode="auto"` evaluates an engine-default spec's actual payloads;
   with a names-only declaration, conditional algorithms select `split`.
   Resolution and admission share the same capability rules, and the engine logs
@@ -212,9 +212,47 @@ early = SteeringSpec(vectors=[
   for explicit graph settings.
 
 The algorithm selects its model component: `moe_router` edits `router_logits`
-at an accessible MoE gate; the other algorithms edit decoder `hidden_states`.
+at an accessible MoE gate; `attention_add` edits `attention_heads` before the
+attention output projection. The other algorithms edit decoder `hidden_states`.
 Steering and capture share layer discovery and hook availability, including
 checks for fused routers whose gate modules are bypassed.
+
+See [graphs, caching, and performance](performance.md) for startup selection,
+capture execution, and tuning. The [algorithm reference](../api-reference/algorithms.md)
+compares payload formats, scale semantics, and graph conditions in one table.
+
+## Attention head intervention
+
+`attention_add` adds a direction to the concatenated attention head outputs,
+after attention aggregation and before the output projection. Declare
+`steer_algorithms=["attention_add"]` when creating the engine. It supports eager,
+`split`, and `in_graph` execution; the default `auto` mode selects `in_graph`
+for a single-vector attention declaration.
+
+```python
+attention = SteeringSpec(vectors=[VectorSpec(
+    source=".runtime/iti/iti.gguf",
+    algorithm="attention_add",
+    scale=3.0,
+    apply=ApplySpec(prompt_positions=[-1], generation="all"),
+)])
+llm.generate(prompts, steering=attention)
+```
+
+Use a standard decoder MHA/GQA model with `tensor_parallel_size=1`.
+MLA, encoder attention, and cross-attention are outside this component's scope.
+Each layer's vector width is `num_heads * head_size`, obtained from the
+[capture layout](hidden-state-capture.md#attention-head-outputs), and need not
+equal the residual hidden size. `num_heads` counts query heads, including for
+GQA. To select heads, leave the other head slices zero in the existing
+`DirectionVector` or GGUF payload. `normalize=True` is rejected.
+
+The [ITI example](extracting-vectors.md#iti-attention-head-directions) learns
+head directions and their scale from TruthfulQA development data. Its
+`ApplySpec` includes the last prompt token so the first answer-token prediction
+is also steered.
+The [attention guide](attention.md) explains the component layout, captures its
+head outputs, and links the complete paper replication.
 
 ## Migrating from v1
 

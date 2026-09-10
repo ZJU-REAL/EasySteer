@@ -30,12 +30,13 @@ def spec_of(vector: VectorSpec) -> SteeringSpec:
 
 class TestPayloadStructures:
     def test_direction_roundtrip_and_hash_determinism(self):
-        dv = DirectionVector({10: np.ones(8), 11: torch.arange(8.0)})
+        dv = DirectionVector({10: np.ones(8), 11: torch.arange(12.0)})
         wire = dv.to_wire()
-        again = DirectionVector({10: np.ones(8), 11: np.arange(8.0)}).to_wire()
+        again = DirectionVector({10: np.ones(8), 11: np.arange(12.0)}).to_wire()
         assert wire["sha256"] == again["sha256"]
         out = materialize(wire, "cpu", torch.float16, None)
         assert set(out) == {10, 11}
+        assert out[10].shape == (8,) and out[11].shape == (12,)
         assert out[10].dtype == torch.float16
         assert out[11][3] == 3
 
@@ -127,33 +128,44 @@ class TestPayloadStructures:
             )
 
     @pytest.mark.parametrize(
-        "payload",
+        "payload,algorithm,width",
         [
-            DirectionVector({0: np.ones(8)}),
-            LinearMap(np.eye(8), np.ones(8)),
-            LowRankProjector(np.ones((8, 2)), np.ones((8, 2))),
-            ReftIntervention(np.ones((8, 2)), np.ones((2, 8)), np.ones(2)),
-            ConceptPair({0: np.ones(8)}, {0: np.zeros(8)}),
+            (DirectionVector({0: np.ones(8)}), "direct", 8),
+            (LinearMap(np.eye(8), np.ones(8)), "linear", 8),
+            (LowRankProjector(np.ones((8, 2)), np.ones((8, 2))), "lm_steer", 8),
+            (ReftIntervention(np.ones((8, 2)), np.ones((2, 8)), np.ones(2)), "loreft", 8),
+            (ConceptPair({0: np.ones(8)}, {0: np.zeros(8)}), "concept_replace", 8),
+            (DirectionVector({0: np.ones(12)}), "attention_add", 12),
         ],
-        ids=["direction", "linear", "lowrank", "reft", "concept_pair"],
+        ids=["direction", "linear", "lowrank", "reft", "concept_pair", "attention"],
     )
-    def test_model_width_checked_before_payload_device_allocation(self, payload):
+    def test_model_width_checked_before_payload_device_allocation(
+        self, payload, algorithm, width
+    ):
         from types import SimpleNamespace
         from unittest.mock import patch
 
+        from vllm.model_hooks.steering.capabilities import algorithm_target
         from vllm.model_hooks.steering.payload_cache import PayloadCache
+        from vllm.model_hooks.steering.validation import validate_request_model
 
         config = SimpleNamespace(max_steer_vectors=1, adapter_dtype=torch.float32)
         wire = payload.to_wire()
+        request = to_engine_request(spec_of(VectorSpec(
+            data=payload, algorithm=algorithm, layers=[0], apply=APPLY,
+        )))
+        component = algorithm_target(algorithm)
         for hidden_size in (4, 16):
-            cache = PayloadCache("cpu", config, hidden_size=hidden_size)
+            cache = PayloadCache("cpu", config)
             with patch(
                 "vllm.model_hooks.steering.payload_cache.materialize",
                 side_effect=AssertionError("allocated invalid payload"),
-            ), pytest.raises(ValueError, match=f"model hidden size {hidden_size}"):
+            ), pytest.raises(ValueError, match=f"(?:hidden size|component width) {hidden_size}"):
+                validate_request_model(request, hidden_size, {component: {0: hidden_size}})
                 cache.get(wire, target_layers=[0])
             assert not cache._entries
-        cache = PayloadCache("cpu", config, hidden_size=8)
+        validate_request_model(request, 8, {component: {0: width}})
+        cache = PayloadCache("cpu", config)
         assert set(cache.get(wire, target_layers=[0])) == {0}
 
     def test_wire_rejects_forged_identity_and_json_roundtrips(self):

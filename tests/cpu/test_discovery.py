@@ -13,6 +13,7 @@ from unittest.mock import Mock
 import pytest
 import torch
 from torch import nn
+from vllm.model_executor.layers.attention.attention import Attention
 from vllm.model_executor.layers.attention_layer_base import AttentionLayerBase
 from vllm.model_executor.layers.fused_moe.runner.moe_runner_interface import (
     MoERunnerInterface,
@@ -27,6 +28,7 @@ from vllm.model_hooks.components.discovery import (
     resolve_moe_gate,
 )
 from vllm.model_hooks.components.registry import (
+    ATTENTION_HEADS,
     COMPONENTS,
     HIDDEN_STATES,
     ROUTER_LOGITS,
@@ -38,6 +40,7 @@ from vllm.model_hooks.steering.capabilities import (
     algorithm_target,
 )
 from vllm.model_hooks.steering.controllers.manager import ControllerManager
+from vllm.v1.attention.backend import AttentionType
 
 
 class TinyAttention(nn.Module, AttentionLayerBase):
@@ -46,6 +49,17 @@ class TinyAttention(nn.Module, AttentionLayerBase):
 
     def get_kv_cache_spec(self, vllm_config):
         return None
+
+
+def attention_module(attn_type=AttentionType.DECODER):
+    attention = Attention.__new__(Attention)
+    nn.Module.__init__(attention)
+    attention.attn_type = attn_type
+    attention.num_heads = 4
+    attention.num_kv_heads = 2
+    attention.head_size = 2
+    attention.head_size_v = 3
+    return attention
 
 
 class TinyMamba(nn.Module, MambaBase):
@@ -238,6 +252,98 @@ def test_capture_and_steering_share_discovered_indices(monkeypatch):
         session.detach()
 
 
+def test_attention_capture_preserves_query_head_layout_and_global_layer(monkeypatch):
+    """GQA outputs use query heads and value width, even when hidden size differs."""
+    attention = attention_module()
+    attention.query_quant = None
+    attention.use_direct_call = True
+    attention.attn_backend = SimpleNamespace(forward_includes_kv_cache_update=True)
+    attention.layer_name = "custom.attention"
+
+    class Block(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.aggregation = attention
+
+        def forward(self, x):
+            return self.aggregation(x, x[:, :4], x[:, :6])
+
+    def aggregate(query, key, value, output, *args, **kwargs):
+        output.copy_(torch.arange(output.numel()).reshape(output.shape))
+
+    monkeypatch.setattr(
+        "vllm.model_executor.layers.attention.attention.unified_attention_with_output",
+        aggregate,
+    )
+    model = Stack([Block()])
+    model.start_layer, model.end_layer = 7, 8
+    components = discover_components(model)
+    target, = components[ATTENTION_HEADS]
+    assert (target.layer_id, target.width, target.num_heads, target.head_size) == (
+        7, 12, 4, 3,
+    )
+    session = CaptureSession()
+    session.attach(model, components)
+    layout = {"width": 12, "num_heads": 4, "head_size": 3}
+    try:
+        assert session.stream_status(ATTENTION_HEADS)["layouts"] == {7: layout}
+        with pytest.raises(ValueError, match="Unsupported attention head capture"):
+            session.enable_stream(ATTENTION_HEADS, layers=[0])
+        session.enable_stream(ATTENTION_HEADS, layers=[7], budget_rows=2)
+        store = session._streams[ATTENTION_HEADS]
+        request_index = store.req_index("sample")
+        labels = torch.tensor(
+            [[request_index, 0, 10], [request_index, 1, 11]], dtype=torch.int32,
+        )
+        monkeypatch.setattr(
+            "vllm.model_hooks.capture.session.prepare_rows",
+            lambda *args: (args[0], labels),
+        )
+        model(torch.zeros(2, 8))
+        raw = session.fetch_stream(ATTENTION_HEADS)
+        from vllm.capture import deserialize_captured
+
+        rows, labels = deserialize_captured(raw)
+        assert raw[7]["layout"] == layout
+        torch.testing.assert_close(rows[7], torch.arange(24.).reshape(2, 12))
+        assert labels[7].req_ids == ["sample", "sample"]
+    finally:
+        session.detach()
+
+
+@pytest.mark.parametrize("kind", ["encoder", "encoder_only", "encoder_decoder", "mla"])
+def test_attention_heads_excludes_non_decoder_and_latent_attention(kind):
+    decoder = Decoder()
+    decoder.attention = attention_module(
+        AttentionType.DECODER if kind == "mla" else AttentionType(kind)
+    )
+    if kind == "mla":
+        decoder.kv_lora_rank = 4
+    model = Stack([decoder])
+    components = discover_components(model)
+    assert components[ATTENTION_HEADS] == ()
+    session = CaptureSession()
+    session.attach(model, components)
+    try:
+        with pytest.raises(ValueError, match="No supported decoder attention"):
+            session.enable_stream(ATTENTION_HEADS)
+    finally:
+        session.detach()
+
+
+@pytest.mark.parametrize("shared", [False, True])
+def test_ambiguous_attention_preserves_other_component_availability(shared):
+    first, second = Decoder(), Decoder()
+    first.attention = attention_module()
+    if shared:
+        second.attention = first.attention
+    else:
+        first.another_attention = attention_module()
+    components = discover_components(Stack([first, second]))
+    assert components[ATTENTION_HEADS] == ()
+    assert [target.layer_id for target in components[HIDDEN_STATES]] == [0, 1]
+
+
 def test_supported_decoder_output_preserves_residual():
     hidden, residual = torch.ones(2, 4), torch.full((2, 4), 2.0)
     split = outputs.split_decoder_output((hidden, residual))
@@ -298,10 +404,12 @@ def test_component_adapters_preserve_residual_and_gate_bias_semantics():
     assert gate.write_output(*parts, original) is original
 
 
-@pytest.mark.parametrize("component_id", [HIDDEN_STATES, ROUTER_LOGITS])
+@pytest.mark.parametrize(
+    "component_id", [HIDDEN_STATES, ROUTER_LOGITS, ATTENTION_HEADS]
+)
 def test_component_output_adapter_remains_fullgraph_traceable(component_id):
     def transform(values, extra):
-        output = (values, extra)
+        output = values if component_id == ATTENTION_HEADS else (values, extra)
         adapter = COMPONENTS[component_id].adapter
         parts = adapter.read_output(output)
         return adapter.write_output(parts[0] + 3, *parts[1:], output)
@@ -309,8 +417,11 @@ def test_component_output_adapter_remains_fullgraph_traceable(component_id):
     values, extra = torch.ones(2, 4), torch.full((2, 4), 2.0)
     compiled = torch.compile(transform, backend="eager", fullgraph=True)
     actual = compiled(values, extra)
-    assert torch.equal(actual[0], values + 3)
-    assert actual[1] is extra
+    if component_id == ATTENTION_HEADS:
+        assert torch.equal(actual, values + 3)
+    else:
+        assert torch.equal(actual[0], values + 3)
+        assert actual[1] is extra
 
 
 def test_component_availability_excludes_bypassed_fused_gate():
@@ -381,12 +492,16 @@ def test_worker_hooks_only_declared_components_without_changing_capture(
     try:
         assert {c.component_id for c in manager.controllers.values()} == expected
         for kind, targets in components.items():
-            assert len(targets) == 1
-            assert len(targets[0].module._forward_hooks) == int(kind in expected)
+            if targets:
+                assert len(targets) == 1
+                assert len(targets[0].module._forward_hooks) == int(kind in expected)
         session = CaptureSession()
         session.attach(model, components)
         try:
-            assert all(session._hooked_layers[kind] == {0} for kind in components)
+            assert all(
+                session._hooked_layers[kind] == {target.layer_id for target in targets}
+                for kind, targets in components.items()
+            )
         finally:
             session.detach()
     finally:

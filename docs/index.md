@@ -1,67 +1,85 @@
 # EasySteer
 
-**A unified framework for high-performance and extensible LLM steering, built on vLLM.**
+**Capture representations, build interventions, and steer LLM inference with vLLM.**
 
-EasySteer applies *steering vectors* — directions in a model's hidden-state space — during
-inference to shift model behavior without changing model weights. It extends vLLM's V1
-engine so that steering runs at serving speed, with continuous batching, prefix caching,
-and CUDA-graph support.
+EasySteer changes intermediate model activations during inference while keeping
+model weights fixed. It supports decoder hidden states, attention head outputs,
+and MoE router logits through a shared request API. The current engine is based
+on vLLM **0.29.0**, with V2 GPU model-runner integration, continuous batching,
+prefix caching, and CUDA graph support.
 
 [Get started](getting-started/installation.md){ .md-button .md-button--primary }
 [Paper (arXiv:2509.25175)](https://arxiv.org/abs/2509.25175){ .md-button }
 
-## Why EasySteer
+## Start with your task
 
-- **High performance** — the paper reports 10.8–22.3× speedups over the compared
-  steering frameworks. Rerun benchmarks for the current engine and hardware.
-- **One spec, every backend** — the same `SteeringSpec` runs under eager, split, and
-  in-graph CUDA-graph execution; declare your algorithms at launch and the engine
-  picks the fastest tier that serves them, rejecting anything undeclared explicitly.
-- **Fine-grained control** — token-level, position-specific, phase-aware
-  (prompt vs. generation), and multi-vector steering.
-- **Modular algorithms** — direct addition, linear maps, LoReFT, LM-Steer,
-  projection-based erase, replacement, and MoE router steering; new algorithms
-  extend `BaseSteerVectorAlgorithm`.
-- **Full research loop** — capture hidden states, extract vectors (DiffMean, PCA, LAT,
-  linear probe, SAE), train interventions (ReFT), and serve them, all in one repo.
+| I want to… | Start here |
+|---|---|
+| Try a bundled steering vector | [Installation](getting-started/installation.md) → [Quickstart](getting-started/quickstart.md) |
+| Control layers, tokens, and multiple interventions | [Steering requests](user-guide/steering.md) |
+| Capture model activations and learn a direction | [Capture](user-guide/hidden-state-capture.md) → [Extracting vectors](user-guide/extracting-vectors.md) |
+| Intervene on attention heads | [Attention and ITI](user-guide/attention.md) |
+| Train a ReFT intervention | [ReFT training](user-guide/reft-training.md) |
+| Deploy an API or demo | [OpenAI server](user-guide/openai-server.md) → [Web demos](user-guide/web-demo.md) |
+| Choose graph, caching, and capacity settings | [Performance](user-guide/performance.md) · [Engine arguments](api-reference/engine-configuration.md) |
+| Reproduce a paper | [Replications](replications/index.md) |
 
-## The pieces
+## How the pieces fit
 
 | Component | What it is |
 |---|---|
-| `vllm-steer/` | Fork of vLLM with the steering engine (`vllm.steer_vectors`) and hidden-state capture |
-| `easysteer.hidden_states` | Capture hidden states / MoE router logits from a running vLLM engine |
+| `vllm-steer/` | vLLM fork exposing `vllm.steer_vectors` and `vllm.capture` |
+| `easysteer.hidden_states` | Capture labelled hidden states, attention head outputs, and MoE router logits |
 | `easysteer.steer` | Extract steering vectors from captured hidden states (analysis-based) |
+| `easysteer.vectors` | Convert files or extraction results into common inference payloads |
 | `easysteer.reft` | Train parameterized interventions on frozen models (learning-based) |
-| `frontend/` | Web UI for interactive steering experiments |
+| `frontend/`, `hf-space/` | Full research frontend and lightweight hosted demo |
 | `replications/` | Notebook reproductions of published steering papers |
 
-## A 30-second look
+## A steering request
 
 ```python
 from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-# Declare the steering algorithms this engine will serve; the engine
-# derives the right CUDA-graph integration from the declaration.
-llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", enable_steer_vector=True,
-          steer_algorithms=["direct"])
+llm = LLM(
+    model="Qwen/Qwen2.5-1.5B-Instruct",
+    enable_steer_vector=True,
+    steer_algorithms=["direct"],
+)
 
 spec = SteeringSpec(vectors=[VectorSpec(
     source="vectors/happy_diffmean.gguf",
     scale=2.0,
-    layers=list(range(10, 26)),
+    layers=list(range(10, 24)),
     apply=ApplySpec(prompt="all", generation="all"),
 )])
 
-prompt = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
-out = llm.generate(prompt,
-                   steering=spec,
-                   sampling_params=SamplingParams(temperature=0.0, max_tokens=128))
+messages = [
+    {"role": "system", "content": ""},
+    {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
+]
+prompt = {"prompt_token_ids": llm.get_tokenizer().apply_chat_template(
+    messages, tokenize=True, add_generation_prompt=True,
+)}
+outputs = llm.generate(
+    prompt,
+    steering=spec,
+    sampling_params=SamplingParams(temperature=0.0, max_tokens=128),
+)
+print(outputs[0].outputs[0].text)
 ```
 
-See the [Quickstart](getting-started/quickstart.md) for the full example, and the
-[Steering guide](user-guide/steering.md) for the complete spec language.
+Run from the repository root after installation. The
+[quickstart](getting-started/quickstart.md) adds the baseline comparison.
+The same spec works through the HTTP API; execution mode is selected from the
+engine's declared workload. For accepted formats and graph conditions, use the
+[algorithm reference](api-reference/algorithms.md).
+
+The [EasySteer paper](https://arxiv.org/abs/2509.25175) reports 10.8–22.3×
+speedups over its compared steering frameworks. Use the
+[performance guide](user-guide/performance.md) to evaluate the current engine
+on your model and hardware.
 
 ## Citation
 
@@ -73,8 +91,3 @@ See the [Quickstart](getting-started/quickstart.md) for the full example, and th
   year={2025}
 }
 ```
-
-!!! note "Responsible use"
-    Steering is dual-use. EasySteer is a research tool for model safety and
-    controllability; behavioral modifications must be disclosed to end users and comply
-    with applicable guidelines and law.

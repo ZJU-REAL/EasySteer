@@ -391,6 +391,8 @@ def test_preload_distinguishes_input_and_worker_errors(
         side_effect=ValueError("worker could not materialize payload")
     )
     engine = SimpleNamespace(input_processor=processor, collective_rpc=rpc)
+    engine._ensure_steering_model_info = AsyncMock()
+    algorithm = "direct" if problem == "shape" else "moe_router"
     error = ValueError if problem == "worker" else VLLMClientError
     message = {
         "missing_source": "not found",
@@ -400,10 +402,10 @@ def test_preload_distinguishes_input_and_worker_errors(
     with pytest.raises(error, match=message):
         if async_engine:
             asyncio.run(
-                AsyncLLM.preload_steer_vectors(engine, [str(path)], "moe_router")
+                AsyncLLM.preload_steer_vectors(engine, [str(path)], algorithm)
             )
         else:
-            LLMEngine.preload_steer_vectors(engine, [str(path)], "moe_router")
+            LLMEngine.preload_steer_vectors(engine, [str(path)], algorithm)
     assert rpc.call_count == (1 if problem == "worker" else 0)
     assert not processor._steer_preloaded_paths
 
@@ -412,7 +414,7 @@ def test_preload_distinguishes_input_and_worker_errors(
 def test_disabled_steering_preload_rejects_before_source_io_or_rpc(
     processor, monkeypatch, async_engine
 ):
-    from unittest.mock import Mock
+    from unittest.mock import AsyncMock, Mock
 
     from vllm.v1.engine.async_llm import AsyncLLM
     from vllm.v1.engine.llm_engine import LLMEngine
@@ -424,6 +426,7 @@ def test_disabled_steering_preload_rejects_before_source_io_or_rpc(
     )
     rpc = Mock(side_effect=AssertionError("worker must not receive RPC"))
     engine = SimpleNamespace(input_processor=processor, collective_rpc=rpc)
+    engine._ensure_steering_model_info = AsyncMock()
     with pytest.raises(VLLMClientError, match="SteerVector is not enabled"):
         if async_engine:
             asyncio.run(AsyncLLM.preload_steer_vectors(engine, ["unused.gguf"]))
@@ -431,6 +434,36 @@ def test_disabled_steering_preload_rejects_before_source_io_or_rpc(
             LLMEngine.preload_steer_vectors(engine, ["unused.gguf"])
     resolve.assert_not_called()
     rpc.assert_not_called()
+
+
+def test_attention_requests_and_preloads_use_each_layers_output_width(
+    processor, monkeypatch
+):
+    processor.vllm_config.steer_vector_config.algorithms = ["attention_add"]
+    processor._steering_model_info["attention_heads"] = {1: 6, 2: 8}
+    for width in (6, 4):
+        payload = DirectionVector({1: np.ones(width), 2: np.ones(8)})
+        request = to_engine_request(SteeringSpec(vectors=[VectorSpec(
+            data=payload, algorithm="attention_add", apply=ApplySpec(generation="all"),
+        )]))
+        monkeypatch.setattr(
+            "vllm.model_hooks.steering.loading.resolve_vector_payload",
+            lambda *args, **kwargs: payload.to_wire(),
+        )
+        if width == 6:
+            processor._validate_steer_vector(request)
+            assert processor.prepare_steering_preload(
+                ["heads.gguf"], "attention_add", None
+            ) == [payload.to_wire()]
+        else:
+            for operation in (
+                lambda: processor._validate_steer_vector(request),
+                lambda: processor.prepare_steering_preload(
+                    ["heads.gguf"], "attention_add", None
+                ),
+            ):
+                with pytest.raises(VLLMClientError, match="component width 6 at layer 1"):
+                    operation()
 
 
 def _beam_result():

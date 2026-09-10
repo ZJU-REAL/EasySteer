@@ -50,7 +50,8 @@ def test_result_rejects_missing_or_incomplete_row_labels(invalid):
         CaptureResult(layers, meta, [SimpleNamespace(request_id="a")])
 
 
-def test_capture_helper_preserves_prompts_and_forwards_steering():
+@pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
+def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
     """The engine plans cache reads; the helper must not re-key prompts."""
     from easysteer.hidden_states import capture
 
@@ -70,7 +71,7 @@ def test_capture_helper_preserves_prompts_and_forwards_steering():
         generate=generate, llm_engine=SimpleNamespace(collective_rpc=rpc)
     )
     steering = object()
-    result = capture(llm, prompts, steering=steering, temperature=0.25)
+    result = capture(llm, prompts, stream=stream, steering=steering, temperature=0.25)
     assert seen["inputs"] is prompts
     assert prompts == [{"prompt_token_ids": [10, 11], "cache_salt": "caller-salt"}]
     assert seen["steering"] is steering
@@ -78,6 +79,24 @@ def test_capture_helper_preserves_prompts_and_forwards_steering():
     assert calls == ["start_capture", "fetch_captured", "stop_capture"]
     assert result.labelled and result.sample(0) == {}
     assert result.sample_positions(0) == result.sample_token_ids(0) == []
+
+
+def test_capture_result_retains_head_layout_without_guessing_from_hidden_size():
+    labels = CaptureMeta(
+        req_ids=["sample"], positions=torch.tensor([0]), token_ids=torch.tensor([10]),
+    )
+    rows = torch.arange(12.).reshape(1, 12)
+    layout = {"width": 12, "num_heads": 4, "head_size": 3}
+    result = CaptureResult(
+        {7: rows}, {7: labels}, [SimpleNamespace(request_id="sample")],
+        layouts={7: layout},
+    )
+    assert result.layouts[7] == layout
+    torch.testing.assert_close(result.sample(0)[7], rows)
+    with pytest.raises(ValueError, match="layout does not match"):
+        CaptureResult(
+            {7: rows[:, :8]}, {7: labels}, result.outputs, layouts={7: layout}
+        )
 
 
 def test_capture_cache_policy_tracks_streams_and_request_overrides():

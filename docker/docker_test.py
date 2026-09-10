@@ -36,9 +36,6 @@ def main():
         model=model,
         enable_steer_vector=True,
         steer_algorithms=["direct"],
-        enforce_eager=True,
-        enable_prefix_caching=False,
-        async_scheduling=False,
         tensor_parallel_size=1,
         max_model_len=2048,
     )
@@ -47,10 +44,19 @@ def main():
         max_tokens=128,
         ignore_eos=True,
     )
-    text = (
-        "<|im_start|>user\nAlice's dog has passed away. Please comfort her."
-        "<|im_end|>\n<|im_start|>assistant\n"
-    )
+    prompt = {
+        "prompt_token_ids": llm.get_tokenizer().apply_chat_template(
+            [
+                {"role": "system", "content": ""},
+                {
+                    "role": "user",
+                    "content": "Alice's dog has passed away. Please comfort her.",
+                },
+            ],
+            tokenize=True,
+            add_generation_prompt=True,
+        )
+    }
 
     def generate(scale=None):
         steering = (
@@ -61,14 +67,14 @@ def main():
                     VectorSpec(
                         source=str(vector.resolve()),
                         scale=scale,
-                        layers=list(range(10, 26)),
+                        layers=list(range(10, 24)),
                         apply=ApplySpec(prompt="all", generation="all"),
                     )
                 ]
             )
         )
         return llm.generate(
-            text,
+            prompt,
             steering=steering,
             sampling_params=sampling_params,
             use_tqdm=False,

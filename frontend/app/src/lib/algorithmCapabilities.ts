@@ -7,6 +7,13 @@ export const ALGORITHM_CAPABILITIES = {
     "params": [],
     "target_component": "hidden_states"
   },
+  "attention_add": {
+    "payload_kind": "direction",
+    "source": "gguf",
+    "normalize": false,
+    "params": [],
+    "target_component": "attention_heads"
+  },
   "linear": {
     "payload_kind": "linear",
     "source": "none",

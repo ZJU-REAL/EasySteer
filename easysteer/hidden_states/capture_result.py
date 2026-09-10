@@ -16,6 +16,8 @@ class CaptureResult:
     Attributes:
         layers: {true_layer_id: Tensor(total_rows, dim)} in fetch order.
         outputs: the vLLM RequestOutput list, prompt order.
+        layouts: component dimensions by layer. Attention-head outputs include
+            width, query num_heads, and per-head value-output head_size.
     """
 
     def __init__(
@@ -23,9 +25,14 @@ class CaptureResult:
         layers: dict[int, torch.Tensor],
         meta: dict[int, Any],
         outputs: Any,
+        layouts: dict[int, dict[str, int]] | None = None,
     ):
         self.layers = layers
         self.outputs = outputs
+        self.layouts = layouts or {}
+        for lid, layout in self.layouts.items():
+            if lid not in layers or layers[lid].shape[-1] != layout["width"]:
+                raise ValueError(f"layer {lid}: capture layout does not match rows")
         if not isinstance(meta, dict) or set(meta) != set(layers):
             raise ValueError("capture requires row labels for every captured layer")
         self._meta = meta
@@ -149,7 +156,7 @@ def capture(
             overriding the global selection for that prompt; None
             entries keep the global selection. The helper returns selected rows
             without engine-side reduction.
-        stream: 'hidden_states' or 'router_logits'.
+        stream: 'hidden_states', 'router_logits', or 'attention_heads'.
         steering: SteeringSpec (or per-prompt list), as in LLM.generate().
         **generate_kwargs (Any): forwarded into SamplingParams.
 
@@ -212,4 +219,5 @@ def capture(
     finally:
         rpc("stop_capture", stream)
     tensors, meta = deserialize_captured(raw)
-    return CaptureResult(tensors, meta, outputs)
+    layouts = {lid: info["layout"] for lid, info in raw.items() if "layout" in info}
+    return CaptureResult(tensors, meta, outputs, layouts=layouts)

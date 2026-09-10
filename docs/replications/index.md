@@ -1,7 +1,7 @@
 # Paper replications
 
 The [`replications/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications)
-directory reproduces published steering papers with EasySteer notebooks. The folders
+directory implements published steering methods with EasySteer notebooks. The folders
 contain paper notes, notebooks, and available vector or intervention artifacts.
 Consult each experiment for its required model, data and checkpoint files.
 
@@ -13,6 +13,7 @@ Consult each experiment for its required model, data and checkpoint files.
 | [`creative_writing/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/creative_writing) | Steering LLMs to evaluate and amplify creativity | Style |
 | [`fractreason/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/fractreason) | Fractional reasoning via latent steering vectors for inference-time compute | Reasoning |
 | [`improve_reasoning/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/improve_reasoning) | Representation-engineering vectors that improve reasoning performance | Reasoning |
+| [`iti/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/iti) | Llama-2-7B-Chat attention head steering with a TruthfulQA accuracy comparison and examples | Reality |
 | [`lm_steer/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/lm_steer) | Word embeddings as steers for language models (LM-Steer, GPT-2) | General |
 | [`loreft/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/loreft) | ReFT: train and apply LoReFT representation finetuning | General |
 | [`refusal_direction/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/refusal_direction) | Refusal is mediated by a single direction (DiffMean ablation) | Safety |

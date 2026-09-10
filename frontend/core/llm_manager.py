@@ -65,7 +65,7 @@ class LLMManager:
         model_path: str,
         gpu_devices: str = "0",
         enable_steer_vector: bool = False,
-        enforce_eager: bool = True,
+        enforce_eager: bool = False,
         enable_chunked_prefill: bool = None,
         enable_prefix_caching: bool = None,
         **kwargs,
@@ -76,7 +76,7 @@ class LLMManager:
             model_path: Local model path or Hugging Face model ID.
             gpu_devices: Comma-separated GPU device IDs or UUIDs.
             enable_steer_vector: Enable steering with all supported algorithms.
-            enforce_eager: Skip graph capture for faster startup of job engines.
+            enforce_eager: Disable compilation and CUDA graphs when True.
             enable_chunked_prefill: Override chunked prefill, or use the engine
                 default when None.
             enable_prefix_caching: Override prefix caching, or use the engine

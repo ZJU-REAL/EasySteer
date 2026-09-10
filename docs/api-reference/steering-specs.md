@@ -16,7 +16,7 @@ This page summarizes the fork's API by hand. The docs build analyzes the
 `easysteer` package statically and does not load the vLLM fork; changes to these
 specs should update this summary and the steering guide together.
 
-## The four classes in one breath
+## Spec classes
 
 | Class | Role |
 |---|---|
@@ -26,7 +26,8 @@ specs should update this summary and the steering guide together.
 | `SteeringSpec` | Ordered `vectors` list plus a `conflict` policy (`"priority"` / `"sequential"` / `"error"`). |
 
 The algorithm determines the target component: `moe_router` operates on
-`router_logits`; the other algorithms operate on decoder `hidden_states`.
+`router_logits`, `attention_add` on `attention_heads`, and the remaining
+algorithms on decoder `hidden_states`.
 No separate target field is needed in `VectorSpec`. Steering and capture share
 component discovery and availability checks.
 
@@ -39,12 +40,16 @@ File and in-memory inputs become canonical payloads before execution:
 `DirectionVector`, `LinearMap`, `LowRankProjector`, `ReftIntervention`,
 `ConceptPair`, or `RouterConfig`. Explicit third-party format adapters are
 available through `easysteer.vectors.load(path, format=...)`.
+The [algorithms and payloads](algorithms.md) reference lists formats,
+normalization support, and per-algorithm scale semantics.
 
 Graph eligibility also follows the algorithm and payload. In particular,
 file-backed and inline `moe_router` configurations support `in_graph` for
 `activate`, `deactivate`, `soft`, and `soft_topk`; `soft_random` requires `split`.
 See [engine interactions](../user-guide/steering.md#interaction-with-engine-features)
-for declaration-based auto selection and other payload conditions.
+for declaration-based auto selection and other payload conditions. The
+[engine configuration reference](engine-configuration.md) lists startup
+arguments and their CLI equivalents.
 
 For engine integration, see the
 [steering architecture](https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/design/steer_vectors.md).

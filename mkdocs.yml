@@ -7,9 +7,6 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  # TODO: add logo/favicon (figures/logo.png needs a square crop for favicon)
-  # logo: assets/logo.png
-  # favicon: assets/favicon.ico
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -29,25 +26,34 @@ theme:
     - content.tabs.link
     - navigation.instant
     - navigation.tracking
+    - navigation.path
     - navigation.tabs
     - navigation.sections
     - navigation.indexes
     - navigation.top
+    - navigation.footer
     - search.highlight
+    - search.suggest
     - toc.follow
 
 nav:
   - Home: index.md
   - Getting Started:
-      - getting-started/installation.md
-      - getting-started/quickstart.md
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Troubleshooting: getting-started/troubleshooting.md
   - User Guide:
-      - user-guide/steering.md
-      - user-guide/hidden-state-capture.md
-      - user-guide/extracting-vectors.md
-      - user-guide/reft-training.md
-      - user-guide/openai-server.md
-      - user-guide/web-demo.md
+      - Inference:
+          - Steering requests: user-guide/steering.md
+          - Attention head intervention: user-guide/attention.md
+          - Graphs, caching, and performance: user-guide/performance.md
+      - Extraction and Training:
+          - Hidden-state capture: user-guide/hidden-state-capture.md
+          - Extracting vectors: user-guide/extracting-vectors.md
+          - ReFT training: user-guide/reft-training.md
+      - Serving:
+          - OpenAI-compatible server: user-guide/openai-server.md
+          - Web demos: user-guide/web-demo.md
   - Replications:
       - replications/index.md
   - Developer Guide:
@@ -55,9 +61,11 @@ nav:
       - developer-guide/contributing.md
   - API Reference:
       - api-reference/index.md
+      - Engine configuration: api-reference/engine-configuration.md
+      - Algorithms and payloads: api-reference/algorithms.md
+      - api-reference/steering-specs.md
       - api-reference/steer.md
       - api-reference/hidden-states.md
-      - api-reference/steering-specs.md
 
 plugins:
   - search

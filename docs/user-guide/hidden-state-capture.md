@@ -60,8 +60,8 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 | `dtype` | Engine-side storage dtype: `"float16"`, `"bfloat16"`, `"float32"`, `"float64"`, `"int32"` or `"int64"`. `None` preserves the model output dtype. |
 | `select` | Global `SelectSpec` (or wire dict) choosing which rows to keep. |
 | `per_prompt_selects` | One `SelectSpec` or wire dict per prompt, overriding the global selection (`None` entries keep the global one). The list length must match `prompts`. |
-| `stream` | `"hidden_states"` (default) or `"router_logits"` (MoE). |
-| `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering. |
+| `stream` | `"hidden_states"` (default), `"router_logits"` (MoE), or `"attention_heads"` (before the attention output projection). |
+| `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering; use `False` to disable it even when the engine has a default. |
 | `**generate_kwargs` | Forwarded into `SamplingParams` (e.g. `temperature`). |
 
 ### Select clauses
@@ -99,6 +99,7 @@ result.sample(0)          # {layer_id: Tensor(rows, dim)} for sample 0
 result.sample_positions(0)  # absolute sequence positions of sample 0's rows
 result.sample_token_ids(0)  # input token ids of sample 0's rows
 result.outputs            # the vLLM RequestOutput list, prompt order
+result.layouts            # per-layer component widths and attention head layout
 result.to_nested()        # legacy shape: [sample][layer_pos] tensors
 ```
 
@@ -110,6 +111,34 @@ result.to_nested()        # legacy shape: [sample][layer_pos] tensors
 Pass `stream="router_logits"` to `hs.capture()` on an MoE model to capture per-token
 router logits instead of hidden states (used e.g. by the
 [SteerMoE replication](../replications/index.md)).
+
+## Attention head outputs
+
+`stream="attention_heads"` captures attention aggregation outputs before the
+output projection, with the same selection and per-sample views:
+
+```python
+from vllm.capture import SelectSpec
+
+heads = hs.capture(
+    llm, prompts, layers=[10], stream="attention_heads",
+    select=SelectSpec(prompt_positions=[-1]), steering=False,
+)
+layout = heads.layouts[10]
+head_outputs = heads.sample(0)[10].reshape(
+    -1, layout["num_heads"], layout["head_size"],
+)
+```
+
+The stored tensors remain two-dimensional `(rows, width)`. The layout records
+`width = num_heads * head_size`, where `num_heads` is the query head count and
+`head_size` is the value-output dimension per head. Neither KV head counts nor
+the model's residual hidden size should be used to infer this layout.
+
+This stream supports standard decoder MHA/GQA with `tensor_parallel_size=1`;
+MLA, encoder attention, and cross-attention are not exposed as head outputs.
+It shares capture's graph and prefix-cache policy. These activations feed the
+[ITI extractor](extracting-vectors.md#iti-attention-head-directions).
 
 ## Compatibility wrappers
 
@@ -132,7 +161,7 @@ including `prompt` and `multi_modal_data`; capture preserves their cache salts.
 
 ## Prefix caching
 
-KV blocks do not contain the hidden states or router logits skipped by a prefix
+KV blocks do not contain the intermediate activations skipped by a prefix
 hit. Request admission therefore sets `skip_reading_prefix_cache=True` when
 the effective selection requires those prompt rows. Generation-only selection,
 the last prompt token, and other selections proven unaffected by prefix hits

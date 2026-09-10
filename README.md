@@ -22,18 +22,12 @@
 <a id="news"></a>
 ## News 🔥
 
-- [2026/09/09] Updated to vLLM v0.29.0 with its default V2 model runner; refreshed steering, capture, and Docker integration.
+- [2026/09/10] The current release runs on vLLM v0.29.0 (V2 model runner) and adds attention head output capture (`attention_heads`), `attention_add` steering, and an [ITI replication](replications/iti/). See the [docs](https://zju-real.github.io/EasySteer/latest/) for steering, capture, and Docker guides.
 - [2026/08/22] [EasySteer](https://arxiv.org/abs/2509.25175) has been accepted to EMNLP 2026 System Demonstrations 🎉
-- [2026/08/03] Migrated to vLLM v0.26.0 (V2 model runner): v2 steering API, redesigned hidden-state capture (select clauses, labeled rows, per-request capture), and our new [documentation site](https://zju-real.github.io/EasySteer/latest/)
 - [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
-- [2026/03/31] Initial support for vLLM v0.17.1, with server-level steering and CUDA graph support
-- [2026/02/16] We've launched an [Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) on Hugging Face Spaces for quick test. For the full-featured version, please refer to the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/).
-- [2026/02/15] We've added OpenAI-compatible API support for steering vectors
-- [2026/01/11] We’ve adapted EasySteer for vLLM v0.13.0
-- [2025/10/31] We’ve adapted EasySteer for vLLM v1 engine.
-- [2025/10/10] We’ve adapted EasySteer for the VLMs.
-- [2025/09/29] We’ve released our paper.
-- [2025/09/28] We’ve open-sourced the code of EasySteer  — feel free to try it out!
+- [2026/02/15–16] Launched the [Hugging Face Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) and [OpenAI-compatible steering API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/). See the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) for the full interface.
+- [2025/10/10] Added support for vision-language models (VLMs).
+- [2025/09/28–29] Open-sourced EasySteer and released the [paper](https://arxiv.org/abs/2509.25175).
 
 ## Awesome Work with EasySteer & PRs
 - [2026/02/04] Internalizing LLM Reasoning via Discovery and Replay of Latent Actions
@@ -132,15 +126,23 @@ def happy_steering(scale):
     return SteeringSpec(vectors=[VectorSpec(
         source="vectors/happy_diffmean.gguf",
         scale=scale,
-        layers=list(range(10, 26)),
+        layers=list(range(10, 24)),
         apply=ApplySpec(prompt="all", generation="all"),
     )])
 
-text = "<|im_start|>user\nAlice's dog has passed away. Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
+tokenizer = llm.get_tokenizer()
+prompt = {"prompt_token_ids": tokenizer.apply_chat_template(
+    [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
+    ],
+    tokenize=True,
+    add_generation_prompt=True,
+)}
 sampling_params = SamplingParams(temperature=0.0, max_tokens=128)
 
-baseline = llm.generate(text, steering=happy_steering(0.0), sampling_params=sampling_params)
-happy = llm.generate(text, steering=happy_steering(2.0), sampling_params=sampling_params)
+baseline = llm.generate(prompt, steering=False, sampling_params=sampling_params)
+happy = llm.generate(prompt, steering=happy_steering(2.0), sampling_params=sampling_params)
 
 print(baseline[0].outputs[0].text)  # ordinary condolences
 print(happy[0].outputs[0].text)     # conspicuously upbeat
@@ -163,14 +165,14 @@ We welcome paper replications, new steering algorithms, and support for addition
 
 ## Paper Replications
 
-The [replications](replications) folder reproduces published steering papers with EasySteer — full table with paper titles in the [replication gallery](https://zju-real.github.io/EasySteer/latest/replications/):
+The [replications](replications) folder implements published steering methods with EasySteer. See the [replication gallery](https://zju-real.github.io/EasySteer/latest/replications/) for each example's scope:
 
 | Category | Replications |
 |---|---|
 | Reasoning | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) |
 | Safety | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) |
 | Style | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) |
-| Knowledge & Reality | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) |
+| Knowledge & Reality | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) · [ITI](replications/iti/) |
 | General & Personalization | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) |
 | MoE | [SteerMoE](replications/steermoe/) |
 
