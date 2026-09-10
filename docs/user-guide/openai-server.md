@@ -10,12 +10,15 @@ relative `vectors/` paths:
 ```bash
 vllm serve Qwen/Qwen2.5-1.5B-Instruct \
   --enable-steer-vector --steer-algorithms direct \
-  --port 8017 --enforce-eager
+  --port 8017
 ```
 
-The example uses eager execution. Omit `--enforce-eager` to use the graph mode
-selected from the declared algorithms. Multi-vector requests also require
-`--steer-multi-vector`; see the [steering guide](steering.md).
+The default graph mode is selected from the declared algorithms: this
+single-vector `direct` server uses `in_graph`. Multi-vector requests also
+require `--steer-multi-vector`, which selects `split` while retaining CUDA
+graphs. See the [steering guide](steering.md). Use `--enforce-eager` when
+debugging or when avoiding compilation startup cost is more useful than
+graph acceleration.
 
 ## Per-request steering
 

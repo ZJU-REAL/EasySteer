@@ -5,7 +5,8 @@ import json
 import sys
 from copy import deepcopy
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock
 
 import httpx
 import pytest
@@ -145,6 +146,14 @@ def test_api_ui_and_bundled_payload(monkeypatch):
         assert len(requests) == 2
         assert requests[0]["steering"] is False
         assert requests[1]["steering"] == reft
+        assert (
+            requests[0]["messages"]
+            == requests[1]["messages"]
+            == [
+                {"role": "system", "content": ""},
+                {"role": "user", "content": "Who are you?"},
+            ]
+        )
 
         requests.clear()
         multi = app.load_steering_spec(
@@ -170,6 +179,42 @@ def test_api_ui_and_bundled_payload(monkeypatch):
             vector["source"].startswith("/remote/hf-space/")
             for vector in multi["vectors"]
         )
+
+    tokenizer = Mock()
+    tokenizer.apply_chat_template.return_value = [101, 202, 303]
+    model = Mock()
+    model.get_tokenizer.return_value = tokenizer
+    model.generate.return_value = [
+        SimpleNamespace(outputs=[SimpleNamespace(text="mock reply")])
+    ]
+    llm = Mock(return_value=model)
+    monkeypatch.setitem(
+        sys.modules, "vllm", SimpleNamespace(LLM=llm, SamplingParams=dict)
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "vllm.steer_vectors",
+        SimpleNamespace(SteeringSpec=SimpleNamespace(model_validate=lambda spec: spec)),
+    )
+    monkeypatch.setenv("DEMO_MODE", "gpu")
+    gpu_app = load_module("space_gpu_app", SPACE / "app.py")
+    assert gpu_app.generate_multi(
+        "refusal_direction", "Who are you?", progress=lambda *args, **kwargs: None
+    ) == ("mock reply", "mock reply")
+    tokenizer.apply_chat_template.assert_called_once_with(
+        requests[0]["messages"], tokenize=True, add_generation_prompt=True
+    )
+    assert "enforce_eager" not in llm.call_args.kwargs
+    assert "enable_chunked_prefill" not in llm.call_args.kwargs
+    assert model.generate.call_count == 2
+    baseline, steered = model.generate.call_args_list
+    assert baseline.args == steered.args == ({"prompt_token_ids": [101, 202, 303]},)
+    assert baseline.kwargs["steering"] is False
+    assert steered.kwargs["steering"] == gpu_app.load_steering_spec(
+        gpu_app.MULTI_CONFIGS["refusal_direction"],
+        gpu_app._resolve_path,
+        app_dir=gpu_app.APP_DIR,
+    )
 
 
 @pytest.mark.parametrize(

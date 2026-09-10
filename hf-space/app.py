@@ -100,19 +100,12 @@ def load_model():
                 )
             ),
             steer_multi_vector=True,
-            enforce_eager=True,
-            enable_chunked_prefill=False,
             gpu_memory_utilization=0.8,
             max_model_len=2048,
             tensor_parallel_size=1,
         )
         print("✅ Model loaded successfully!")
     return llm_instance
-
-
-def format_prompt(instruction: str) -> str:
-    """Format instruction with Qwen2.5 chat template."""
-    return f"<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n"
 
 
 def _resolve_path(relative_path: str) -> str:
@@ -122,21 +115,18 @@ def _resolve_path(relative_path: str) -> str:
     return relative_path if USE_API else os.path.join(APP_DIR, relative_path)
 
 
-def _api_generate(prompt: str, config, spec_wire) -> str:
+def _api_generate(messages, config, spec_wire) -> str:
     """Call the remote vLLM server with an explicit spec or False for baseline."""
     sampling = config["sampling"]
-    extra_body = {"repetition_penalty": sampling["repetition_penalty"]}
-    if spec_wire is not None:
-        extra_body["steering"] = spec_wire
     response = _api_client.chat.completions.create(
         model=API_MODEL_NAME,
-        messages=[
-            {"role": "system", "content": ""},
-            {"role": "user", "content": prompt},
-        ],
+        messages=messages,
         max_tokens=sampling["max_tokens"],
         temperature=sampling["temperature"],
-        extra_body=extra_body,
+        extra_body={
+            "repetition_penalty": sampling["repetition_penalty"],
+            "steering": spec_wire,
+        },
     )
     return response.choices[0].message.content
 
@@ -149,18 +139,26 @@ def _generate_comparison(
         config = (MULTI_CONFIGS if multi_vector else SINGLE_CONFIGS)[config_name]
         if not multi_vector and config_name in _SCALE_LOCKED_SINGLE:
             scale = config["steering"]["vectors"][0]["scale"]
+        messages = [
+            {"role": "system", "content": ""},
+            {"role": "user", "content": prompt},
+        ]
 
         if USE_API:
             progress(0.2, desc="Calling API (baseline)...")
-            baseline_text = _api_generate(prompt, config, False)
+            baseline_text = _api_generate(messages, config, False)
         else:
             progress(0, desc="Loading model...")
             llm = load_model()
-            formatted_prompt = format_prompt(prompt)
+            tokenized_prompt = {
+                "prompt_token_ids": llm.get_tokenizer().apply_chat_template(
+                    messages, tokenize=True, add_generation_prompt=True
+                )
+            }
             sampling_params = SamplingParams(**config["sampling"])
             progress(0.3, desc="Generating baseline...")
             baseline_out = llm.generate(
-                formatted_prompt, steering=False, sampling_params=sampling_params
+                tokenized_prompt, steering=False, sampling_params=sampling_params
             )
             baseline_text = baseline_out[0].outputs[0].text
 
@@ -174,7 +172,7 @@ def _generate_comparison(
                 if multi_vector
                 else "Calling API (steered)...",
             )
-            steered_text = _api_generate(prompt, config, spec_wire)
+            steered_text = _api_generate(messages, config, spec_wire)
         else:
             progress(
                 0.6,
@@ -183,7 +181,7 @@ def _generate_comparison(
                 else "Generating steered output...",
             )
             steered_out = llm.generate(
-                formatted_prompt,
+                tokenized_prompt,
                 steering=SteeringSpec.model_validate(spec_wire),
                 sampling_params=sampling_params,
             )

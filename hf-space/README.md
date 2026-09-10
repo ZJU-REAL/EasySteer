@@ -35,7 +35,10 @@ model. Direct Python launches default to the same mode.
 
 Run a vllm-steer server using Qwen2.5-1.5B-Instruct and declare the algorithms
 needed by these presets, for example `--enable-steer-vector
---steer-algorithms direct,loreft --steer-multi-vector --enforce-eager`.
+--steer-algorithms direct,loreft --steer-multi-vector`. The default
+`--steer-graph-mode auto` selects `split` for this declaration, allowing CUDA
+graphs with multi-vector steering. Graph execution and chunked prefill are
+controlled by the API server's startup settings.
 See the [server guide](https://github.com/ZJU-REAL/EasySteer/blob/main/docs/user-guide/openai-server.md) for installation
 and full startup examples. Copy the GGUF files in `vectors/` to that server;
 `VLLM_VECTOR_BASE_PATH` prefixes their paths in requests. The bundled GGUF
@@ -135,5 +138,9 @@ docker run --rm --gpus all -p 7860:7860 \
 The build sets `DEMO_MODE=gpu`. Use a model ID or mount a local model directory
 and set `EASYSTEER_MODEL` to its container path. The bundled presets expect
 Qwen2.5-1.5B-Instruct; changing only the model name does not adapt the vectors.
-GPU mode runs an eager local engine and uses the same exported payloads when
-present.
+GPU mode uses the engine defaults for graph execution and chunked prefill;
+`steer_graph_mode="auto"` selects `split` for the bundled algorithm declaration.
+It uses the same exported payloads when present. Both modes send the same
+empty system message and user instruction. Local inference applies the model's
+chat template directly to token IDs before calling `generate`, so the prompt
+is not tokenized a second time.
