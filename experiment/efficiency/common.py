@@ -8,26 +8,44 @@ output tokens per second.
 
 import json
 import os
+from argparse import ArgumentTypeError
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = Path(__file__).resolve().parent
 MODEL = os.environ.get("EASYSTEER_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B")
 SEAL_VECTOR = os.environ.get(
     "EASYSTEER_VECTOR",
-    os.path.join(HERE, "..", "..", "replications", "seal", "execution_avg_vector.gguf"),
+    str(HERE.parent.parent / "replications/seal/execution_avg_vector.gguf"),
 )
 N_SEQUENTIAL = 10
 
 
-def load_examples(n):
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number <= 0:
+        raise ArgumentTypeError("must be positive")
+    return number
+
+
+def nonnegative_int(value: str) -> int:
+    number = int(value)
+    if number < 0:
+        raise ArgumentTypeError("must be nonnegative")
+    return number
+
+
+def load_examples(n: int) -> list[str]:
     """First `n` MATH training prompts in the R1 reasoning format."""
     with open(
         os.environ.get(
             "EASYSTEER_BENCH_DATA",
-            os.path.join(HERE, "..", "math", "math_train_1000.json"),
+            str(HERE.parent / "math/math_train_1000.json"),
         ),
         encoding="utf-8",
     ) as f:
         problems = json.load(f)
+    if not isinstance(problems, list) or not all(isinstance(p, str) for p in problems):
+        raise ValueError("benchmark data must be a JSON list of problem strings")
     if n > len(problems):
         raise ValueError(f"requested {n} problems, only {len(problems)} available")
     return [
@@ -37,9 +55,68 @@ def load_examples(n):
     ]
 
 
-def report(total_output_tokens, elapsed, n_requests, ftl_s=None):
-    """Paper metrics: FTL (ms), TPS (tok/s), TTLT (s)."""
-    if ftl_s is not None:
-        print(f"FTL:  {ftl_s * 1000:.2f} ms")
+def build_engine(
+    tier: str, max_steer: int | None = None, *, multi_vector: bool = False
+):
+    """Use the same model and batching policy for all vLLM comparisons."""
+    from vllm import LLM
+
+    llm = LLM(
+        model=MODEL,
+        dtype="bfloat16",
+        enable_steer_vector=True,
+        steer_algorithms=["direct"],
+        steer_multi_vector=multi_vector,
+        max_steer_vectors=max_steer,
+        enforce_eager=tier == "eager",
+        steer_graph_mode="auto" if tier == "eager" else tier,
+        enable_prefix_caching=False,
+        enable_chunked_prefill=False,
+    )
+    config = llm.llm_engine.vllm_config
+    print(
+        f"ENGINE dtype={config.model_config.dtype} "
+        f"steer_graph_mode={config.steer_vector_config.graph_mode} "
+        f"cudagraph_mode={config.compilation_config.cudagraph_mode}",
+        flush=True,
+    )
+    return llm
+
+
+def distinct_spec(index: int, layers: list[int], source: str = SEAL_VECTOR):
+    """A zero-scale configuration with a distinct selection fingerprint."""
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+
+    return SteeringSpec(
+        vectors=[
+            VectorSpec(
+                source=source,
+                scale=0.0,
+                layers=layers,
+                apply=ApplySpec(
+                    prompt="all", generation="all", exclude_prompt_positions=[index]
+                ),
+            )
+        ]
+    )
+
+
+def warmup(llm, prompts, steering=None) -> None:
+    """Exercise prefill, decode and the selected payloads outside the timer."""
+    from vllm import SamplingParams
+
+    llm.generate(
+        prompts,
+        SamplingParams(temperature=0, max_tokens=8, ignore_eos=True),
+        steering=steering,
+        use_tqdm=False,
+    )
+
+
+def report(total_output_tokens, elapsed, n_requests, one_token_s=None):
+    """Report aggregate throughput and amortized time per submitted request."""
+    if one_token_s is not None:
+        print(f"One-token call: {one_token_s * 1000:.2f} ms")
+    print(f"Elapsed: {elapsed:.4f} s; output tokens: {total_output_tokens}")
     print(f"TPS:  {total_output_tokens / elapsed:.2f} tok/s")
     print(f"TTLT: {elapsed / n_requests:.4f} s")

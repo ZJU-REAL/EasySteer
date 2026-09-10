@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Mixed steering configurations in one batch: accuracy cost and scaling.
+"""Mixed steering configurations in one batch: intervention overhead and scaling.
 
 A batch of N requests is split across K distinct steering
 configurations (K=0 means the unsteered baseline; K=1 is every request
@@ -8,10 +8,8 @@ zero-scale vector with a distinct fingerprint to measure steering
 overhead: per-request routing, slot
 assignment, and per-token row tables.
 
---max-steer sweeps max_steer_vectors to show how the slot capacity
-scales: it sizes the in-graph family tables (and the slot pool in
-split mode), so raising it trades memory for concurrent-config
-capacity. K distinct configs need K slots in flight.
+--max-steer fixes the slot capacity for the K sweep. Use
+bench_capacity_sweep.py to vary capacity for an unchanged workload.
 
 For eager batches <= 16, the script also reports how many outputs match
 the unsteered control. This is an observation alongside throughput.
@@ -25,27 +23,18 @@ import os
 import shutil
 import tempfile
 import time
+from contextlib import nullcontext
 
-from common import MODEL, SEAL_VECTOR, load_examples, report
-from vllm import LLM, SamplingParams
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
-
-
-def distinct_spec(i, layers, source=SEAL_VECTOR):
-    """Config #i: zero scale with a distinct fingerprint (an exclude position or a
-    distinct source path in --distinct-paths mode)."""
-    return SteeringSpec(
-        vectors=[
-            VectorSpec(
-                source=source,
-                scale=0.0,
-                layers=layers,
-                apply=ApplySpec(
-                    prompt="all", generation="all", exclude_prompt_positions=[i]
-                ),
-            )
-        ]
-    )
+from common import (
+    SEAL_VECTOR,
+    build_engine,
+    distinct_spec,
+    load_examples,
+    nonnegative_int,
+    positive_int,
+    report,
+    warmup,
+)
 
 
 def materialize_paths(n, tmpdir):
@@ -63,21 +52,21 @@ def materialize_paths(n, tmpdir):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--batch", type=positive_int, default=32)
     parser.add_argument(
         "--configs",
-        type=int,
+        type=nonnegative_int,
         nargs="+",
         default=[0, 1, 2, 4, 8],
         help="K values: distinct configs per batch (0 = unsteered baseline)",
     )
     parser.add_argument(
         "--max-steer",
-        type=int,
+        type=positive_int,
         default=8,
         help="max_steer_vectors (slot capacity; K <= this)",
     )
-    parser.add_argument("--max-tokens", type=int, default=128)
+    parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument(
         "--distinct-paths",
         action="store_true",
@@ -86,7 +75,7 @@ def main():
         "pass measures warm reuse)",
     )
     parser.add_argument(
-        "--layers", type=int, default=28, help="steered layer count per config"
+        "--layers", type=positive_int, default=28, help="steered layer count per config"
     )
     parser.add_argument(
         "--cudagraph",
@@ -97,38 +86,38 @@ def main():
 
     layers = list(range(args.layers))
     ks = sorted(set(args.configs))
-    assert all(k <= args.max_steer for k in ks), (
-        "K distinct configs need K steering slots: raise --max-steer"
-    )
+    if max(ks) > min(args.max_steer, args.batch):
+        parser.error("K must not exceed --max-steer or --batch")
 
-    llm = LLM(
-        model=MODEL,
-        enable_steer_vector=True,
-        steer_algorithms=["direct"],
-        max_steer_vectors=args.max_steer,
-        enforce_eager=not args.cudagraph,
-        enable_prefix_caching=False,
-        enable_chunked_prefill=False,
-    )
+    from vllm import SamplingParams
+
+    llm = build_engine("in_graph" if args.cudagraph else "eager", args.max_steer)
     params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
 
-    tmpdir = None
-    if args.distinct_paths:
-        tmpdir = tempfile.mkdtemp(prefix="bench_steer_vecs_")
-        paths = materialize_paths(max(ks) or 1, tmpdir)
-        specs = [distinct_spec(i, layers, source=paths[i]) for i in range(max(ks) or 1)]
-    else:
-        specs = [distinct_spec(i, layers) for i in range(max(ks) or 1)]
-
-    try:
+    temporary = (
+        tempfile.TemporaryDirectory(prefix="bench_steer_vecs_")
+        if args.distinct_paths
+        else nullcontext(None)
+    )
+    with temporary as tmpdir:
         baseline_text = None
         for k in ks:
             if k == 0:
                 steering = None
             else:
+                if tmpdir is not None:
+                    # Each K starts with genuinely new paths; earlier rows must
+                    # not populate the payload cache for a later cold row.
+                    directory = os.path.join(tmpdir, f"k_{k}")
+                    os.mkdir(directory)
+                    paths = materialize_paths(k, directory)
+                    specs = [distinct_spec(i, layers, paths[i]) for i in range(k)]
+                else:
+                    specs = [distinct_spec(i, layers) for i in range(k)]
                 # Round-robin the K configs across the batch.
                 steering = [specs[i % k] for i in range(args.batch)]
+            warmup(llm, prompts, None if args.distinct_paths else steering)
             passes = ("cold", "warm") if args.distinct_paths and k else ("",)
             for tag in passes:
                 start = time.perf_counter()
@@ -150,9 +139,6 @@ def main():
                 label = f"K={k:5d}" + (f" {tag:4s}" if tag else "     ")
                 print(f"{label} | ", end="")
                 report(total, elapsed, args.batch)
-    finally:
-        if tmpdir is not None:
-            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

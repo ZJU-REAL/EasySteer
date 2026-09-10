@@ -18,9 +18,8 @@ baseline: the spread of the K=0 rows is the cost of the execution mode
 itself; the decay over K within one row group is the cost of
 distinct-configuration steering.
 
-Outputs are not compared across tiers: compiled and eager execution are
-not numerically identical (and vLLM is not batch-deterministic at these
-batch shapes). Routing correctness is covered by the e2e suites.
+Fixed output lengths keep token counts comparable across execution modes.
+Routing correctness is covered by the e2e suites.
 """
 
 import argparse
@@ -29,28 +28,16 @@ import subprocess
 import sys
 import time
 
-from bench_multi_config import distinct_spec
-from common import MODEL, load_examples
+from common import (
+    build_engine,
+    distinct_spec,
+    load_examples,
+    nonnegative_int,
+    positive_int,
+    warmup,
+)
 
 MODES = ("eager", "split", "in_graph")
-
-
-def build_engine(mode, max_steer):
-    from vllm import LLM
-
-    kwargs = {
-        "model": MODEL,
-        "enable_steer_vector": True,
-        "steer_algorithms": ["direct"],
-        "max_steer_vectors": max_steer,
-        "enable_prefix_caching": False,
-        "enable_chunked_prefill": False,
-    }
-    if mode == "eager":
-        kwargs["enforce_eager"] = True
-    else:
-        kwargs["steer_graph_mode"] = mode
-    return LLM(**kwargs)
 
 
 def run_mode(args):
@@ -63,15 +50,9 @@ def run_mode(args):
     ks = sorted(set(args.configs))
     specs = [distinct_spec(i, layers) for i in range(max(ks) or 1)]
 
-    # One untimed pass so compile/capture warmup never lands in a row.
-    llm.generate(
-        prompts,
-        SamplingParams(temperature=0, max_tokens=8, ignore_eos=True),
-        use_tqdm=False,
-    )
-
     for k in ks:
         steering = None if k == 0 else [specs[i % k] for i in range(args.batch)]
+        warmup(llm, prompts, steering)
         start = time.perf_counter()
         outs = llm.generate(prompts, params, steering=steering, use_tqdm=False)
         elapsed = time.perf_counter() - start
@@ -79,30 +60,31 @@ def run_mode(args):
         print(
             f"RESULT mode={args.mode:8s} K={k:5d} "
             f"TPS={total / elapsed:9.2f} tok/s "
-            f"TTLT={elapsed / args.batch:.4f} s",
+            f"TTLT={elapsed / args.batch:.4f} s "
+            f"elapsed={elapsed:.4f} s tokens={total}",
             flush=True,
         )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", type=int, default=64)
+    parser.add_argument("--batch", type=positive_int, default=64)
     parser.add_argument(
         "--configs",
-        type=int,
+        type=nonnegative_int,
         nargs="+",
         default=[0, 1, 8, 32],
         help="K values: distinct configs per batch (0 = unsteered baseline)",
     )
     parser.add_argument(
         "--max-steer",
-        type=int,
+        type=positive_int,
         default=32,
         help="max_steer_vectors, identical for every tier (K <= this)",
     )
-    parser.add_argument("--max-tokens", type=int, default=128)
+    parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument(
-        "--layers", type=int, default=28, help="steered layer count per config"
+        "--layers", type=positive_int, default=28, help="steered layer count per config"
     )
     parser.add_argument(
         "--modes",
@@ -117,9 +99,8 @@ def main():
     args = parser.parse_args()
 
     ks = sorted(set(args.configs))
-    assert all(k <= args.max_steer for k in ks), (
-        "K distinct configs need K steering slots: raise --max-steer"
-    )
+    if max(ks) > min(args.max_steer, args.batch):
+        parser.error("K must not exceed --max-steer or --batch")
 
     if args.mode:
         run_mode(args)
