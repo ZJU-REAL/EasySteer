@@ -1340,11 +1340,14 @@
 relative <code>vectors/</code> paths:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>vllm<span class="w"> </span>serve<span class="w"> </span>Qwen/Qwen2.5-1.5B-Instruct<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--enable-steer-vector<span class="w"> </span>--steer-algorithms<span class="w"> </span>direct<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">8017</span><span class="w"> </span>--enforce-eager
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">8017</span>
 </code></pre></div>
-<p>The example uses eager execution. Omit <code>--enforce-eager</code> to use the graph mode
-selected from the declared algorithms. Multi-vector requests also require
-<code>--steer-multi-vector</code>; see the <a href="../steering/">steering guide</a>.</p>
+<p>The default graph mode is selected from the declared algorithms: this
+single-vector <code>direct</code> server uses <code>in_graph</code>. Multi-vector requests also
+require <code>--steer-multi-vector</code>, which selects <code>split</code> while retaining CUDA
+graphs. See the <a href="../steering/">steering guide</a>. Use <code>--enforce-eager</code> when
+debugging or when avoiding compilation startup cost is more useful than
+graph acceleration.</p>
 <h2 id="per-request-steering">Per-request steering<a class="headerlink" href="#per-request-steering" title="Permanent link">&para;</a></h2>
 <p>Pass the <code>SteeringSpec</code> as JSON in the <code>steering</code> field, using <code>extra_body</code> with
 the OpenAI SDK or sending the field directly with <code>curl</code>. Both examples use the
