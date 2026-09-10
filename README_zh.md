@@ -167,15 +167,24 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 
 [replications](replications) 目录使用 EasySteer 实现已发表论文的干预方法，各示例的范围见[复现集](https://zju-real.github.io/EasySteer/latest/replications/)：
 
-| 类别 | 复现 | 干预位置 |
+| 方法 | 类别 | 干预位置 |
 |---|---|---|
-| 推理 | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) | 残差流 |
-| 安全 | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) | 残差流 |
-| 风格 | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) | 残差流 |
-| 知识与真实性 | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) | 残差流 |
-| 真实性 | [ITI](replications/iti/) | 注意力头输出 |
-| 通用与个性化 | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) | 残差流 |
-| MoE | [SteerMoE](replications/steermoe/) | MoE 路由 logits |
+| [Thinking Speed](replications/controlingthinkingspeed/) | 推理 | 残差流 |
+| [Fractional Reasoning](replications/fractreason/) | 推理 | 残差流 |
+| [Improve Reasoning](replications/improve_reasoning/) | 推理 | 残差流 |
+| [SEAL](replications/seal/) | 推理 | 残差流 |
+| [Refusal Direction](replications/refusal_direction/) | 安全 | 残差流 |
+| [CAST](replications/cast/) | 安全 | 残差流 |
+| [Creative Writing](replications/creative_writing/) | 风格 | 残差流 |
+| [Steerable Chatbots](replications/steerable_chatbot/) | 风格 | 残差流 |
+| [SAKE](replications/sake/) | 知识 | 残差流（最后一层） |
+| [SAE Entities](replications/sae_entities/) | 真实性 | 残差流 |
+| [SHARP](replications/sharp/) | 真实性 | 残差流 |
+| [ITI](replications/iti/) | 真实性 | 注意力头输出 |
+| [LM-Steer](replications/lm_steer/) | 通用 | 残差流（最后一层） |
+| [LoReFT](replications/loreft/) | 通用 | 残差流 |
+| [BiPO](replications/bipo/) | 个性化 | 残差流 |
+| [SteerMoE](replications/steermoe/) | MoE | MoE 路由 logits |
 
 干预位置以示例代码的实际实现为准：残差流指解码器层输出，注意力头输出位于输出投影之前。
 

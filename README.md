@@ -168,15 +168,24 @@ We welcome paper replications, new steering algorithms, and support for addition
 
 The [replications](replications) folder implements published steering methods with EasySteer. See the [replication gallery](https://zju-real.github.io/EasySteer/latest/replications/) for each example's scope:
 
-| Category | Replications | Component |
+| Method | Category | Component |
 |---|---|---|
-| Reasoning | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) | Residual stream |
-| Safety | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) | Residual stream |
-| Style | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) | Residual stream |
-| Knowledge & Truthfulness | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) | Residual stream |
-| Truthfulness | [ITI](replications/iti/) | Attention head outputs |
-| General & Personalization | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) | Residual stream |
-| MoE | [SteerMoE](replications/steermoe/) | MoE router logits |
+| [Thinking Speed](replications/controlingthinkingspeed/) | Reasoning | Residual stream |
+| [Fractional Reasoning](replications/fractreason/) | Reasoning | Residual stream |
+| [Improve Reasoning](replications/improve_reasoning/) | Reasoning | Residual stream |
+| [SEAL](replications/seal/) | Reasoning | Residual stream |
+| [Refusal Direction](replications/refusal_direction/) | Safety | Residual stream |
+| [CAST](replications/cast/) | Safety | Residual stream |
+| [Creative Writing](replications/creative_writing/) | Style | Residual stream |
+| [Steerable Chatbots](replications/steerable_chatbot/) | Style | Residual stream |
+| [SAKE](replications/sake/) | Knowledge | Residual stream (final block) |
+| [SAE Entities](replications/sae_entities/) | Truthfulness | Residual stream |
+| [SHARP](replications/sharp/) | Truthfulness | Residual stream |
+| [ITI](replications/iti/) | Truthfulness | Attention head outputs |
+| [LM-Steer](replications/lm_steer/) | General | Residual stream (final block) |
+| [LoReFT](replications/loreft/) | General | Residual stream |
+| [BiPO](replications/bipo/) | Personalization | Residual stream |
+| [SteerMoE](replications/steermoe/) | MoE | MoE router logits |
 
 Components reflect the intervention points in the examples. Residual stream
 denotes decoder block output; attention head outputs are taken before the output projection.
