@@ -3,12 +3,15 @@
 import importlib.util
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
+from types import ModuleType
 
 import httpx
 import pytest
 
 SPACE = Path(__file__).resolve().parents[1]
+ENGINE = SPACE.parent / "vllm-steer/vllm"
 
 
 def load_module(name, path):
@@ -20,6 +23,35 @@ def load_module(name, path):
 
 runtime = load_module("space_runtime", SPACE / "runtime.py")
 exporter = load_module("space_exporter", SPACE / "export_payload.py")
+
+
+@pytest.fixture
+def steering_spec(monkeypatch):
+    """Load the engine's actual public schema without its GPU dependencies."""
+    for name, path in (
+        ("vllm", ENGINE),
+        ("vllm.model_hooks", ENGINE / "model_hooks"),
+        ("vllm.model_hooks.selection", ENGINE / "model_hooks/selection"),
+        ("vllm.model_hooks.steering", ENGINE / "model_hooks/steering"),
+    ):
+        module = ModuleType(name)
+        module.__path__ = [str(path)]
+        monkeypatch.setitem(sys.modules, name, module)
+    for name in (
+        "selection.schema",
+        "selection.spec",
+        "steering.capabilities",
+        "steering.payloads",
+        "steering.input_validation",
+        "steering.api",
+    ):
+        full_name = f"vllm.model_hooks.{name}"
+        path = ENGINE / "model_hooks" / f"{name.replace('.', '/')}.py"
+        spec = importlib.util.spec_from_file_location(full_name, path)
+        module = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, full_name, module)
+        spec.loader.exec_module(module)
+    return sys.modules["vllm.model_hooks.steering.api"].SteeringSpec
 
 
 def test_default_api_mode_requires_configuration():
@@ -63,12 +95,16 @@ def test_api_ui_and_bundled_payload(monkeypatch):
     before = set(sys.modules)
     app = load_module("space_api_app", SPACE / "app.py")
     assert not {"torch", "vllm", "easysteer"} & (set(sys.modules) - before)
-    direct = app.build_single_spec_wire(
-        app.SINGLE_CONFIGS["emotion_direct"], app._vector_source
+    direct = app.load_steering_spec(
+        app.SINGLE_CONFIGS["emotion_direct"],
+        app._resolve_path,
+        app_dir=app.APP_DIR,
     )
     assert direct["vectors"][0]["source"].startswith("/remote/hf-space/")
-    reft = app.build_single_spec_wire(
-        app.SINGLE_CONFIGS["emoji_loreft"], app._vector_source
+    reft = app.load_steering_spec(
+        app.SINGLE_CONFIGS["emoji_loreft"],
+        app._resolve_path,
+        app_dir=app.APP_DIR,
     )
     vector = reft["vectors"][0]
     assert vector["data"]["kind"] == "reft"
@@ -111,8 +147,10 @@ def test_api_ui_and_bundled_payload(monkeypatch):
         assert requests[1]["steering"] == reft
 
         requests.clear()
-        multi = app.build_multi_spec_wire(
-            app.MULTI_CONFIGS["refusal_direction"], app._vector_source
+        multi = app.load_steering_spec(
+            app.MULTI_CONFIGS["refusal_direction"],
+            app._resolve_path,
+            app_dir=app.APP_DIR,
         )
         assert app.generate_multi(
             "refusal_direction", "Who are you?", progress=lambda *args, **kwargs: None
@@ -132,3 +170,30 @@ def test_api_ui_and_bundled_payload(monkeypatch):
             vector["source"].startswith("/remote/hf-space/")
             for vector in multi["vectors"]
         )
+
+
+@pytest.mark.parametrize(
+    "preset",
+    sorted((SPACE / "configs").glob("*/*.json")),
+    ids=lambda path: path.stem,
+)
+def test_bundled_preset_matches_engine_without_mutation(steering_spec, preset):
+    config = json.loads(preset.read_text())
+    original = deepcopy(config)
+    assert isinstance(config["instruction"], str)
+    assert all(type(value) in (int, float) for value in config["sampling"].values())
+    assert all(
+        isinstance(vector["layers"], list) for vector in config["steering"]["vectors"]
+    )
+
+    wire = runtime.load_steering_spec(
+        config, lambda path: str(SPACE / path), app_dir=SPACE
+    )
+    steering_spec.model_validate(wire)
+    overridden = runtime.load_steering_spec(
+        config, lambda path: str(SPACE / path), app_dir=SPACE, scale_override=0
+    )
+    assert overridden["vectors"][0]["scale"] == 0
+    assert overridden["vectors"][1:] == wire["vectors"][1:]
+    steering_spec.model_validate(overridden)
+    assert config == original

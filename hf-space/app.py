@@ -8,10 +8,9 @@ DEMO_MODE=gpu to load the model locally with vLLM.
 import json
 import logging
 import os
-from typing import Any, Dict, Tuple
+from typing import Any
 
-from runtime import ALGORITHM_CAPABILITIES, demo_mode, load_payload
-from steering_config import build_multi_spec_wire, build_single_spec_wire
+from runtime import demo_mode, load_steering_spec
 
 logger = logging.getLogger(__name__)
 
@@ -44,33 +43,21 @@ CONFIGS_DIR = os.path.join(APP_DIR, "configs")
 llm_instance = None
 
 
-def _load_config_dir(subdir: str) -> Dict[str, Any]:
+def _load_config_dir(subdir: str) -> dict[str, Any]:
     """Load JSON presets from one directory in filename order."""
     directory = os.path.join(CONFIGS_DIR, subdir)
     configs = {}
-    if os.path.exists(directory):
-        for filename in sorted(os.listdir(directory)):
-            if filename.endswith(".json"):
-                with open(os.path.join(directory, filename)) as file:
-                    configs[filename[:-5]] = json.load(file)
+    for filename in sorted(os.listdir(directory)):
+        if filename.endswith(".json"):
+            with open(os.path.join(directory, filename)) as file:
+                configs[filename[:-5]] = json.load(file)
     return configs
 
 
-def load_configs() -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Load single-vector and multi-vector presets."""
-    return _load_config_dir("inference"), _load_config_dir("multi_vector")
+SINGLE_CONFIGS = _load_config_dir("inference")
+MULTI_CONFIGS = _load_config_dir("multi_vector")
 
-
-def display_val(val, default="None"):
-    """Substitute the display default for None or an empty string."""
-    if val is None or (isinstance(val, str) and val.strip() == ""):
-        return default
-    return val
-
-
-SINGLE_CONFIGS, MULTI_CONFIGS = load_configs()
-
-SINGLE_CONFIG_DESCRIPTIONS: Dict[str, str] = {
+SINGLE_CONFIG_DESCRIPTIONS: dict[str, str] = {
     "emotion_direct": "Steers the model to respond in a happier, more positive tone — even in contexts where sadness would be expected.",
     "emoji_loreft": (
         "Steers the model to include emojis in output. "
@@ -80,7 +67,7 @@ SINGLE_CONFIG_DESCRIPTIONS: Dict[str, str] = {
     "adult_style": "Steers output to be more aligned with adult interests and preferences.",
     "refuse_control": "Makes the model tend to refuse answering, even for normal and harmless requests.",
 }
-MULTI_CONFIG_DESCRIPTIONS: Dict[str, str] = {
+MULTI_CONFIG_DESCRIPTIONS: dict[str, str] = {
     "refusal_direction": (
         "Makes the model tend to refuse answering even normal requests. "
         "Achieved by applying a different steering vector at each of the "
@@ -88,16 +75,8 @@ MULTI_CONFIG_DESCRIPTIONS: Dict[str, str] = {
     ),
 }
 
-# Configs where the scale slider should NOT be user-adjustable
+# The bundled LoReFT example uses its trained scale.
 _SCALE_LOCKED_SINGLE = {"emoji_loreft"}
-
-
-def _get_sv_description(config_name: str) -> str:
-    return SINGLE_CONFIG_DESCRIPTIONS.get(config_name, "")
-
-
-def _get_mv_description(config_name: str) -> str:
-    return MULTI_CONFIG_DESCRIPTIONS.get(config_name, "")
 
 
 def load_model():
@@ -108,7 +87,18 @@ def load_model():
         llm_instance = LLM(
             model=MODEL_NAME,
             enable_steer_vector=True,
-            steer_algorithms="all",  # the demo serves user-picked algorithms
+            steer_algorithms=",".join(
+                sorted(
+                    {
+                        vector["algorithm"]
+                        for config in (
+                            *SINGLE_CONFIGS.values(),
+                            *MULTI_CONFIGS.values(),
+                        )
+                        for vector in config["steering"]["vectors"]
+                    }
+                )
+            ),
             steer_multi_vector=True,
             enforce_eager=True,
             enable_chunked_prefill=False,
@@ -132,38 +122,10 @@ def _resolve_path(relative_path: str) -> str:
     return relative_path if USE_API else os.path.join(APP_DIR, relative_path)
 
 
-def _vector_source(algorithm: str, path: str, payload_path=None) -> dict:
-    """Engine-owned formats use server paths; other formats use payloads."""
-    if ALGORITHM_CAPABILITIES[algorithm]["source"] != "none":
-        return {"source": _resolve_path(path)}
-    if payload_path:
-        return {"data": load_payload(os.path.join(APP_DIR, payload_path), algorithm)}
-    if USE_API:
-        raise ValueError(
-            f"API preset {algorithm!r} needs payload_path: export its "
-            "checkpoint with export_payload.py in an EasySteer environment"
-        )
-
-    import easysteer.vectors as vec
-
-    adapter = {
-        "linear": vec.from_linear_transport,
-        "lm_steer": vec.from_lm_steer,
-        "loreft": vec.from_pyreft,
-    }[algorithm]
-    payload = adapter(os.path.join(APP_DIR, path))
-    return {"data": payload}
-
-
-def _local_spec(wire):
-    """Materialize a wire dict into a SteeringSpec for llm.generate."""
-    return SteeringSpec.model_validate(wire)
-
-
 def _api_generate(prompt: str, config, spec_wire) -> str:
     """Call the remote vLLM server with an explicit spec or False for baseline."""
     sampling = config["sampling"]
-    extra_body = {"repetition_penalty": float(sampling.get("repetition_penalty", 1.1))}
+    extra_body = {"repetition_penalty": sampling["repetition_penalty"]}
     if spec_wire is not None:
         extra_body["steering"] = spec_wire
     response = _api_client.chat.completions.create(
@@ -172,8 +134,8 @@ def _api_generate(prompt: str, config, spec_wire) -> str:
             {"role": "system", "content": ""},
             {"role": "user", "content": prompt},
         ],
-        max_tokens=int(sampling.get("max_tokens", 128)),
-        temperature=float(sampling.get("temperature", 0.0)),
+        max_tokens=sampling["max_tokens"],
+        temperature=sampling["temperature"],
         extra_body=extra_body,
     )
     return response.choices[0].message.content
@@ -181,12 +143,12 @@ def _api_generate(prompt: str, config, spec_wire) -> str:
 
 def _generate_comparison(
     config_name: str, prompt: str, progress, *, scale=None, multi_vector=False
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Compare baseline and steered output with one preset and sampling config."""
     try:
         config = (MULTI_CONFIGS if multi_vector else SINGLE_CONFIGS)[config_name]
         if not multi_vector and config_name in _SCALE_LOCKED_SINGLE:
-            scale = float(config["steer_vector"].get("scale", 1.0))
+            scale = config["steering"]["vectors"][0]["scale"]
 
         if USE_API:
             progress(0.2, desc="Calling API (baseline)...")
@@ -195,23 +157,15 @@ def _generate_comparison(
             progress(0, desc="Loading model...")
             llm = load_model()
             formatted_prompt = format_prompt(prompt)
-            sampling_params = SamplingParams(
-                temperature=float(config["sampling"].get("temperature", 0.0)),
-                max_tokens=int(config["sampling"].get("max_tokens", 128)),
-                repetition_penalty=float(
-                    config["sampling"].get("repetition_penalty", 1.1)
-                ),
-            )
+            sampling_params = SamplingParams(**config["sampling"])
             progress(0.3, desc="Generating baseline...")
             baseline_out = llm.generate(
                 formatted_prompt, steering=False, sampling_params=sampling_params
             )
             baseline_text = baseline_out[0].outputs[0].text
 
-        spec_wire = (
-            build_multi_spec_wire(config, _vector_source)
-            if multi_vector
-            else build_single_spec_wire(config, _vector_source, scale_override=scale)
+        spec_wire = load_steering_spec(
+            config, _resolve_path, app_dir=APP_DIR, scale_override=scale
         )
         if USE_API:
             progress(
@@ -230,7 +184,7 @@ def _generate_comparison(
             )
             steered_out = llm.generate(
                 formatted_prompt,
-                steering=_local_spec(spec_wire),
+                steering=SteeringSpec.model_validate(spec_wire),
                 sampling_params=sampling_params,
             )
             steered_text = steered_out[0].outputs[0].text
@@ -245,90 +199,148 @@ def _generate_comparison(
 
 def generate_single(
     config_name: str, prompt: str, scale: float, progress=gr.Progress()
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Generate text using a single steering vector."""
     return _generate_comparison(config_name, prompt, progress, scale=scale)
 
 
 def generate_multi(
     config_name: str, prompt: str, progress=gr.Progress()
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Generate text using multiple steering vectors."""
     return _generate_comparison(config_name, prompt, progress, multi_vector=True)
 
 
+SAMPLING_FIELDS = (
+    ("temperature", "Temperature", None),
+    ("max_tokens", "Max Tokens", 0),
+    ("repetition_penalty", "Repetition Penalty", None),
+)
+MAX_VECTORS = max(len(c["steering"]["vectors"]) for c in MULTI_CONFIGS.values())
+
+
+def _sampling_values(config):
+    return [config["sampling"][key] for key, _, _ in SAMPLING_FIELDS]
+
+
+def _sampling_fields(config):
+    with gr.Row():
+        return [
+            gr.Number(
+                value=config["sampling"][key],
+                label=label,
+                precision=precision,
+                interactive=False,
+            )
+            for key, label, precision in SAMPLING_FIELDS
+        ]
+
+
+def _vector_values(vector):
+    return [
+        vector.get("source", vector.get("payload_path", "")),
+        vector.get("algorithm", ""),
+        json.dumps(vector.get("layers", [])),
+        vector.get("apply", {}),
+        vector.get("normalize", False),
+        vector.get("scale", 0.0),
+    ]
+
+
+def _vector_fields(vector, *, adjustable_scale=False):
+    source, algorithm, layers, apply, normalize, scale = _vector_values(vector)
+    with gr.Row():
+        source_field = gr.Textbox(
+            label="Source / Payload File",
+            value=source,
+            interactive=False,
+        )
+        algorithm_field = gr.Textbox(
+            label="Algorithm",
+            value=algorithm,
+            interactive=False,
+        )
+    with gr.Row():
+        layers_field = gr.Textbox(
+            label="Layers", value=layers, lines=2, interactive=False
+        )
+        apply_field = gr.JSON(label="Apply", value=apply, open=True)
+    with gr.Row():
+        normalize_field = gr.Checkbox(
+            label="Normalize",
+            value=normalize,
+            interactive=False,
+            info="Rescale the steered hidden state to its original norm.",
+        )
+        scale_field = gr.Slider(
+            label="Scale",
+            info="Steering strength multiplier",
+            minimum=-3,
+            maximum=3,
+            step=0.1,
+            value=scale,
+            interactive=adjustable_scale,
+        )
+    return [
+        source_field,
+        algorithm_field,
+        layers_field,
+        apply_field,
+        normalize_field,
+        scale_field,
+    ]
+
+
+def _comparison_fields(instruction, *, multi_vector=False):
+    prompt = gr.Textbox(label="Input Instruction", lines=3, value=instruction)
+    generate = gr.Button("🚀 Generate", variant="primary", size="lg")
+    gr.Markdown("### 📊 Results Comparison")
+    with gr.Row():
+        baseline = gr.Textbox(
+            label="🔹 Baseline (No Steering)",
+            lines=8,
+            interactive=False,
+        )
+        steered = gr.Textbox(
+            label="🎨 Steered Output (Multi-Vector)"
+            if multi_vector
+            else "🔸 Steered Output",
+            lines=8,
+            interactive=False,
+        )
+    return prompt, generate, [baseline, steered]
+
+
 def update_sv_ui(config_name):
-    """Update all single-vector UI fields when config changes."""
     config = SINGLE_CONFIGS[config_name]
-    sv = config["steer_vector"]
-    sampling = config["sampling"]
-    scale_val = float(sv.get("scale", 1.0))
-    is_locked = config_name in _SCALE_LOCKED_SINGLE
+    fields = _vector_values(config["steering"]["vectors"][0])
+    fields[-1] = gr.update(
+        value=fields[-1],
+        interactive=config_name not in _SCALE_LOCKED_SINGLE,
+    )
     return (
-        _get_sv_description(config_name),
-        display_val(sampling.get("temperature"), "0.0"),
-        display_val(sampling.get("max_tokens"), "128"),
-        display_val(sampling.get("repetition_penalty"), "1.1"),
-        display_val(sv.get("path")),
-        display_val(sv.get("algorithm"), "direct"),
-        display_val(sv.get("target_layers")),
-        display_val(sv.get("prefill_trigger_tokens")),
-        display_val(sv.get("prefill_trigger_positions")),
-        display_val(sv.get("generate_trigger_tokens")),
-        display_val(str(sv.get("normalize", False))),
-        gr.update(value=scale_val, interactive=not is_locked),
-        display_val(config["model"].get("instruction")),
+        SINGLE_CONFIG_DESCRIPTIONS.get(config_name, ""),
+        *_sampling_values(config),
+        *fields,
+        config["instruction"],
     )
 
 
-# Max number of vector tabs to pre-create (based on all multi-vector configs)
-MAX_VECTORS = max((len(c["vector_configs"]) for c in MULTI_CONFIGS.values()), default=4)
-
-
 def update_mv_ui(config_name):
-    """Build multi-vector field values in Gradio output order.
-
-    Returns:
-        Description, sampling settings, group name and conflict policy,
-        eight fields per vector tab, and the instruction. Unused tabs receive
-        empty display values.
-    """
     config = MULTI_CONFIGS[config_name]
-    sv = config["steer_vector"]
-    sampling = config["sampling"]
-    vecs = config["vector_configs"]
-
-    results = [
-        _get_mv_description(config_name),
-        display_val(sampling.get("temperature"), "0.0"),
-        display_val(sampling.get("max_tokens"), "128"),
-        display_val(sampling.get("repetition_penalty"), "1.1"),
-        display_val(sv.get("name")),
-        display_val(sv.get("conflict_resolution"), "sequential"),
+    vectors = config["steering"]["vectors"]
+    fields = [
+        field
+        for i in range(MAX_VECTORS)
+        for field in _vector_values(vectors[i] if i < len(vectors) else {})
     ]
-
-    for i in range(MAX_VECTORS):
-        if i < len(vecs):
-            v = vecs[i]
-            results.extend(
-                [
-                    display_val(v.get("path")),
-                    display_val(v.get("algorithm"), "direct"),
-                    display_val(v.get("target_layers")),
-                    display_val(v.get("prefill_trigger_tokens")),
-                    display_val(v.get("prefill_trigger_positions")),
-                    display_val(v.get("generate_trigger_tokens")),
-                    display_val(str(v.get("normalize", False))),
-                    float(v.get("scale", 1.0)),
-                ]
-            )
-        else:
-            results.extend(
-                ["None", "None", "None", "None", "None", "None", "None", 0.0]
-            )
-
-    results.append(display_val(config["model"]["instruction"]))
-    return tuple(results)
+    return (
+        MULTI_CONFIG_DESCRIPTIONS.get(config_name, ""),
+        *_sampling_values(config),
+        config["steering"].get("conflict", "priority"),
+        *fields,
+        config["instruction"],
+    )
 
 
 CUSTOM_CSS = """
@@ -376,326 +388,84 @@ with gr.Blocks(theme=gr.themes.Soft(), title="EasySteer Demo", css=CUSTOM_CSS) a
     </div>
     """)
 
-    first_sv_key = (
-        "emotion_direct"
-        if "emotion_direct" in SINGLE_CONFIGS
-        else list(SINGLE_CONFIGS.keys())[0]
-    )
+    first_sv_key = "emotion_direct"
     first_sv = SINGLE_CONFIGS[first_sv_key]
-    first_mv_key = list(MULTI_CONFIGS.keys())[0]
+    first_mv_key = next(iter(MULTI_CONFIGS))
+    first_mv = MULTI_CONFIGS[first_mv_key]
 
     with gr.Tabs():
         with gr.Tab("🎯 Single Vector"):
             sv_config_dropdown = gr.Dropdown(
-                choices=list(SINGLE_CONFIGS.keys()),
+                choices=list(SINGLE_CONFIGS),
                 value=first_sv_key,
                 label="Import Configuration",
                 info="Select a predefined steering configuration",
             )
-            sv_description = gr.Markdown(value=_get_sv_description(first_sv_key))
-
+            sv_description = gr.Markdown(SINGLE_CONFIG_DESCRIPTIONS[first_sv_key])
             gr.Markdown("### 🤖 Sampling Configuration")
-            with gr.Row():
-                sv_temperature = gr.Textbox(
-                    label="Temperature",
-                    info="0 = greedy decoding, higher = more random",
-                    placeholder="e.g. 0.0",
-                    value=display_val(first_sv["sampling"].get("temperature"), "0.0"),
-                    interactive=False,
-                )
-                sv_max_tokens = gr.Textbox(
-                    label="Max Tokens",
-                    info="Maximum number of tokens to generate",
-                    placeholder="e.g. 128",
-                    value=display_val(first_sv["sampling"].get("max_tokens"), "128"),
-                    interactive=False,
-                )
-                sv_rep_penalty = gr.Textbox(
-                    label="Repetition Penalty",
-                    info="Penalize repeated tokens",
-                    placeholder="e.g. 1.1",
-                    value=display_val(
-                        first_sv["sampling"].get("repetition_penalty"), "1.1"
-                    ),
-                    interactive=False,
-                )
-
-            gr.Markdown("### ⚙️ Steer Vector Configuration")
-            with gr.Row():
-                sv_path = gr.Textbox(
-                    label="Vector Path",
-                    info="Path to the steering vector file",
-                    value=display_val(first_sv["steer_vector"].get("path")),
-                    interactive=False,
-                )
-                sv_algorithm = gr.Textbox(
-                    label="Algorithm",
-                    info="Steering algorithm used for this vector",
-                    placeholder="e.g. direct",
-                    value=display_val(
-                        first_sv["steer_vector"].get("algorithm"), "direct"
-                    ),
-                    interactive=False,
-                )
-                sv_target_layers = gr.Textbox(
-                    label="Target Layers",
-                    info="Layer indices, comma-separated",
-                    placeholder="e.g. 10,11,12,...,23",
-                    value=display_val(first_sv["steer_vector"].get("target_layers")),
-                    interactive=False,
-                )
-            with gr.Row():
-                sv_prefill_tokens = gr.Textbox(
-                    label="Prefill Trigger Token IDs",
-                    info="-1 = apply to all tokens",
-                    placeholder="e.g. -1",
-                    value=display_val(
-                        first_sv["steer_vector"].get("prefill_trigger_tokens")
-                    ),
-                    interactive=False,
-                )
-                sv_prefill_positions = gr.Textbox(
-                    label="Prefill Trigger Positions",
-                    info="Supports negative indexing",
-                    placeholder="e.g. -1",
-                    value=display_val(
-                        first_sv["steer_vector"].get("prefill_trigger_positions")
-                    ),
-                    interactive=False,
-                )
-                sv_generate_tokens = gr.Textbox(
-                    label="Generate Trigger Token IDs",
-                    info="-1 = apply to all tokens",
-                    placeholder="e.g. -1",
-                    value=display_val(
-                        first_sv["steer_vector"].get("generate_trigger_tokens")
-                    ),
-                    interactive=False,
-                )
-            with gr.Row():
-                sv_normalize = gr.Textbox(
-                    label="Normalize",
-                    info="Whether to normalize the vector",
-                    value=display_val(
-                        str(first_sv["steer_vector"].get("normalize", False))
-                    ),
-                    interactive=False,
-                )
-                sv_scale = gr.Slider(
-                    label="Scale Factor",
-                    info="Steering strength multiplier (drag to adjust)",
-                    minimum=-3,
-                    maximum=3,
-                    step=0.1,
-                    value=float(first_sv["steer_vector"].get("scale", 1.0)),
-                    interactive=(first_sv_key not in _SCALE_LOCKED_SINGLE),
-                )
-
-            sv_prompt_input = gr.Textbox(
-                label="Input Instruction",
-                lines=3,
-                value=first_sv["model"]["instruction"],
+            sv_sampling = _sampling_fields(first_sv)
+            gr.Markdown("### ⚙️ Steering Configuration")
+            sv_fields = _vector_fields(
+                first_sv["steering"]["vectors"][0],
+                adjustable_scale=first_sv_key not in _SCALE_LOCKED_SINGLE,
             )
-            sv_generate_btn = gr.Button("🚀 Generate", variant="primary", size="lg")
-
-            gr.Markdown("### 📊 Results Comparison")
-            with gr.Row():
-                sv_baseline_output = gr.Textbox(
-                    label="🔹 Baseline (No Steering)", lines=8, interactive=False
-                )
-                sv_steered_output = gr.Textbox(
-                    label="🔸 Steered Output", lines=8, interactive=False
-                )
-
+            sv_prompt, sv_generate, sv_outputs = _comparison_fields(
+                first_sv["instruction"]
+            )
             sv_config_dropdown.change(
                 fn=update_sv_ui,
                 inputs=[sv_config_dropdown],
-                outputs=[
-                    sv_description,
-                    sv_temperature,
-                    sv_max_tokens,
-                    sv_rep_penalty,
-                    sv_path,
-                    sv_algorithm,
-                    sv_target_layers,
-                    sv_prefill_tokens,
-                    sv_prefill_positions,
-                    sv_generate_tokens,
-                    sv_normalize,
-                    sv_scale,
-                    sv_prompt_input,
-                ],
+                outputs=[sv_description, *sv_sampling, *sv_fields, sv_prompt],
             )
-            sv_generate_btn.click(
+            sv_generate.click(
                 fn=generate_single,
-                inputs=[sv_config_dropdown, sv_prompt_input, sv_scale],
-                outputs=[sv_baseline_output, sv_steered_output],
+                inputs=[sv_config_dropdown, sv_prompt, sv_fields[-1]],
+                outputs=sv_outputs,
             )
 
         with gr.Tab("🎨 Multi-Vector"):
-            first_mv = MULTI_CONFIGS[first_mv_key]
-            first_mv_sv = first_mv["steer_vector"]
-            first_mv_vecs = first_mv["vector_configs"]
-
             mv_config_dropdown = gr.Dropdown(
-                choices=list(MULTI_CONFIGS.keys()),
+                choices=list(MULTI_CONFIGS),
                 value=first_mv_key,
                 label="Import Configuration",
                 info="Select a predefined multi-vector configuration",
             )
-            mv_description = gr.Markdown(value=_get_mv_description(first_mv_key))
-
+            mv_description = gr.Markdown(MULTI_CONFIG_DESCRIPTIONS[first_mv_key])
             gr.Markdown("### 🤖 Sampling Configuration")
-            with gr.Row():
-                mv_temperature = gr.Textbox(
-                    label="Temperature",
-                    info="0 = greedy decoding, higher = more random",
-                    value=display_val(first_mv["sampling"].get("temperature"), "0.0"),
-                    interactive=False,
-                )
-                mv_max_tokens = gr.Textbox(
-                    label="Max Tokens",
-                    info="Maximum number of tokens to generate",
-                    value=display_val(first_mv["sampling"].get("max_tokens"), "128"),
-                    interactive=False,
-                )
-                mv_rep_penalty = gr.Textbox(
-                    label="Repetition Penalty",
-                    info="Penalize repeated tokens",
-                    value=display_val(
-                        first_mv["sampling"].get("repetition_penalty"), "1.1"
-                    ),
-                    interactive=False,
-                )
-
-            gr.Markdown("### ⚙️ Steer Vector Configuration")
-            with gr.Row():
-                mv_sv_name = gr.Textbox(
-                    label="Steer Vector Name",
-                    info="Identifier name for this steering vector group",
-                    value=display_val(first_mv_sv.get("name")),
-                    interactive=False,
-                )
-                mv_conflict_resolution = gr.Textbox(
-                    label="Conflict Resolution",
-                    info="How to combine multiple vectors",
-                    value=display_val(
-                        first_mv_sv.get("conflict_resolution"), "sequential"
-                    ),
-                    interactive=False,
-                )
-
-            gr.Markdown("### 🎯 Vector Configurations")
-            mv_vec_fields = []  # flat list per vector: [path, algo, layers, pf_tokens, pf_positions, gen_tokens, normalize, scale]
-            with gr.Tabs():
-                for vi in range(MAX_VECTORS):
-                    v_data = first_mv_vecs[vi] if vi < len(first_mv_vecs) else {}
-                    with gr.Tab(f"Vector {vi + 1}"):
-                        with gr.Row():
-                            f_path = gr.Textbox(
-                                label="Vector Path",
-                                info="Path to the steering vector file",
-                                value=display_val(v_data.get("path")),
-                                interactive=False,
-                            )
-                            f_algo = gr.Textbox(
-                                label="Algorithm",
-                                info="Steering algorithm used for this vector",
-                                value=display_val(v_data.get("algorithm"), "direct"),
-                                interactive=False,
-                            )
-                            f_layers = gr.Textbox(
-                                label="Target Layers",
-                                info="Layer indices, comma-separated",
-                                value=display_val(v_data.get("target_layers")),
-                                interactive=False,
-                            )
-                        with gr.Row():
-                            f_pf_tokens = gr.Textbox(
-                                label="Prefill Trigger Token IDs",
-                                info="-1 = apply to all tokens",
-                                value=display_val(v_data.get("prefill_trigger_tokens")),
-                                interactive=False,
-                            )
-                            f_pf_positions = gr.Textbox(
-                                label="Prefill Trigger Positions",
-                                info="Supports negative indexing",
-                                value=display_val(
-                                    v_data.get("prefill_trigger_positions")
-                                ),
-                                interactive=False,
-                            )
-                            f_gen_tokens = gr.Textbox(
-                                label="Generate Trigger Token IDs",
-                                info="-1 = apply to all tokens",
-                                value=display_val(
-                                    v_data.get("generate_trigger_tokens")
-                                ),
-                                interactive=False,
-                            )
-                        with gr.Row():
-                            f_normalize = gr.Textbox(
-                                label="Normalize",
-                                info="Whether to normalize the vector",
-                                value=display_val(str(v_data.get("normalize", False))),
-                                interactive=False,
-                            )
-                            f_scale = gr.Slider(
-                                label="Scale Factor",
-                                info="Steering strength multiplier",
-                                minimum=-3,
-                                maximum=3,
-                                step=0.1,
-                                value=float(v_data.get("scale", 1.0)),
-                                interactive=False,
-                            )
-                        mv_vec_fields.extend(
-                            [
-                                f_path,
-                                f_algo,
-                                f_layers,
-                                f_pf_tokens,
-                                f_pf_positions,
-                                f_gen_tokens,
-                                f_normalize,
-                                f_scale,
-                            ]
-                        )
-
-            mv_prompt_input = gr.Textbox(
-                label="Input Instruction",
-                lines=3,
-                value=first_mv["model"]["instruction"],
+            mv_sampling = _sampling_fields(first_mv)
+            gr.Markdown("### ⚙️ Steering Configuration")
+            mv_conflict = gr.Textbox(
+                label="Conflict",
+                info="How to combine vectors at the same position",
+                value=first_mv["steering"].get("conflict", "priority"),
+                interactive=False,
             )
-            mv_generate_btn = gr.Button("🚀 Generate", variant="primary", size="lg")
-
-            gr.Markdown("### 📊 Results Comparison")
-            with gr.Row():
-                mv_baseline_output = gr.Textbox(
-                    label="🔹 Baseline (No Steering)", lines=8, interactive=False
-                )
-                mv_steered_output = gr.Textbox(
-                    label="🎨 Steered Output (Multi-Vector)", lines=8, interactive=False
-                )
-
+            mv_fields = []
+            with gr.Tabs():
+                for i in range(MAX_VECTORS):
+                    vectors = first_mv["steering"]["vectors"]
+                    vector = vectors[i] if i < len(vectors) else {}
+                    with gr.Tab(f"Vector {i + 1}"):
+                        mv_fields.extend(_vector_fields(vector))
+            mv_prompt, mv_generate, mv_outputs = _comparison_fields(
+                first_mv["instruction"],
+                multi_vector=True,
+            )
             mv_config_dropdown.change(
                 fn=update_mv_ui,
                 inputs=[mv_config_dropdown],
                 outputs=[
                     mv_description,
-                    mv_temperature,
-                    mv_max_tokens,
-                    mv_rep_penalty,
-                    mv_sv_name,
-                    mv_conflict_resolution,
-                    *mv_vec_fields,
-                    mv_prompt_input,
+                    *mv_sampling,
+                    mv_conflict,
+                    *mv_fields,
+                    mv_prompt,
                 ],
             )
-            mv_generate_btn.click(
+            mv_generate.click(
                 fn=generate_multi,
-                inputs=[mv_config_dropdown, mv_prompt_input],
-                outputs=[mv_baseline_output, mv_steered_output],
+                inputs=[mv_config_dropdown, mv_prompt],
+                outputs=mv_outputs,
             )
 
     gr.Markdown("---\n*Powered by [EasySteer](https://github.com/ZJU-REAL/EasySteer)*")
@@ -714,11 +484,8 @@ if __name__ == "__main__":
     else:
         print(f"\n🖥️  Running in GPU mode (DEMO_MODE={_demo_mode})")
         print("📦 Pre-loading model...")
-        try:
-            load_model()
-            print(f"✅ Model loaded: {MODEL_NAME}")
-        except Exception as e:
-            print(f"⚠️  Model pre-loading failed: {e}")
+        load_model()
+        print(f"✅ Model loaded: {MODEL_NAME}")
 
     print("\n🌐 Launching Gradio interface...")
     demo.queue(max_size=20).launch(

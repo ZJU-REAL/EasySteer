@@ -11,7 +11,7 @@ ARG MODE
 WORKDIR /app
 COPY requirements.txt ./
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
-COPY app.py runtime.py steering_config.py algorithm_capabilities.json ./
+COPY app.py runtime.py algorithm_capabilities.json ./
 COPY configs/ configs/
 COPY vectors/ vectors/
 COPY results/ results/
