@@ -3724,21 +3724,26 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-83">83</a></span>
-<span class="normal"><a href="#__codelineno-0-84">84</a></span>
-<span class="normal"><a href="#__codelineno-0-85">85</a></span>
-<span class="normal"><a href="#__codelineno-0-86">86</a></span>
-<span class="normal"><a href="#__codelineno-0-87">87</a></span>
-<span class="normal"><a href="#__codelineno-0-88">88</a></span>
-<span class="normal"><a href="#__codelineno-0-89">89</a></span>
-<span class="normal"><a href="#__codelineno-0-90">90</a></span>
-<span class="normal"><a href="#__codelineno-0-91">91</a></span>
-<span class="normal"><a href="#__codelineno-0-92">92</a></span>
-<span class="normal"><a href="#__codelineno-0-93">93</a></span>
-<span class="normal"><a href="#__codelineno-0-94">94</a></span>
-<span class="normal"><a href="#__codelineno-0-95">95</a></span>
-<span class="normal"><a href="#__codelineno-0-96">96</a></span>
-<span class="normal"><a href="#__codelineno-0-97">97</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-83" name="__codelineno-0-83"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-83"> 83</a></span>
+<span class="normal"><a href="#__codelineno-0-84"> 84</a></span>
+<span class="normal"><a href="#__codelineno-0-85"> 85</a></span>
+<span class="normal"><a href="#__codelineno-0-86"> 86</a></span>
+<span class="normal"><a href="#__codelineno-0-87"> 87</a></span>
+<span class="normal"><a href="#__codelineno-0-88"> 88</a></span>
+<span class="normal"><a href="#__codelineno-0-89"> 89</a></span>
+<span class="normal"><a href="#__codelineno-0-90"> 90</a></span>
+<span class="normal"><a href="#__codelineno-0-91"> 91</a></span>
+<span class="normal"><a href="#__codelineno-0-92"> 92</a></span>
+<span class="normal"><a href="#__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-83" name="__codelineno-0-83"></a><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <a id="__codelineno-0-84" name="__codelineno-0-84"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">StreamStore</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">)</span>
 <a id="__codelineno-0-85" name="__codelineno-0-85"></a>    <span class="c1"># Engine-internal request id -&gt; {stream: SelectSpec wire dict}.</span>
 <a id="__codelineno-0-86" name="__codelineno-0-86"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_request_selects</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -3746,13 +3751,18 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <a id="__codelineno-0-88" name="__codelineno-0-88"></a>    <span class="c1"># started later must check rows that were already skipped.</span>
 <a id="__codelineno-0-89" name="__codelineno-0-89"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_cache_hits</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 <a id="__codelineno-0-90" name="__codelineno-0-90"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_unsupported_requests</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-<a id="__codelineno-0-91" name="__codelineno-0-91"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-92" name="__codelineno-0-92"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">COMPONENTS</span><span class="p">}</span>
-<a id="__codelineno-0-93" name="__codelineno-0-93"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-94" name="__codelineno-0-94"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">False</span>
-<a id="__codelineno-0-95" name="__codelineno-0-95"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="p">:</span> <span class="n">CaptureGraphState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_graph_replays</span> <span class="o">=</span> <span class="mi">0</span>
-<a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_eager_capture_forwards</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-0-91" name="__codelineno-0-91"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-92" name="__codelineno-0-92"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-93" name="__codelineno-0-93"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-94" name="__codelineno-0-94"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_components</span><span class="p">:</span> <span class="n">ModelComponents</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">,</span> <span class="p">())</span>
+<a id="__codelineno-0-95" name="__codelineno-0-95"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_available_layers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-96" name="__codelineno-0-96"></a>        <span class="n">name</span><span class="p">:</span> <span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">COMPONENTS</span>
+<a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="p">}</span>
+<a id="__codelineno-0-98" name="__codelineno-0-98"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-99" name="__codelineno-0-99"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-0-100" name="__codelineno-0-100"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="p">:</span> <span class="n">CaptureGraphState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-101" name="__codelineno-0-101"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_graph_replays</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-0-102" name="__codelineno-0-102"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_eager_capture_forwards</span> <span class="o">=</span> <span class="mi">0</span>
 </code></pre></div></td></tr></table></div>
                   </details>
 
@@ -3785,12 +3795,7 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-203">203</a></span>
-<span class="normal"><a href="#__codelineno-0-204">204</a></span>
-<span class="normal"><a href="#__codelineno-0-205">205</a></span>
-<span class="normal"><a href="#__codelineno-0-206">206</a></span>
-<span class="normal"><a href="#__codelineno-0-207">207</a></span>
-<span class="normal"><a href="#__codelineno-0-208">208</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-208">208</a></span>
 <span class="normal"><a href="#__codelineno-0-209">209</a></span>
 <span class="normal"><a href="#__codelineno-0-210">210</a></span>
 <span class="normal"><a href="#__codelineno-0-211">211</a></span>
@@ -3808,48 +3813,25 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <span class="normal"><a href="#__codelineno-0-223">223</a></span>
 <span class="normal"><a href="#__codelineno-0-224">224</a></span>
 <span class="normal"><a href="#__codelineno-0-225">225</a></span>
-<span class="normal"><a href="#__codelineno-0-226">226</a></span>
-<span class="normal"><a href="#__codelineno-0-227">227</a></span>
-<span class="normal"><a href="#__codelineno-0-228">228</a></span>
-<span class="normal"><a href="#__codelineno-0-229">229</a></span>
-<span class="normal"><a href="#__codelineno-0-230">230</a></span>
-<span class="normal"><a href="#__codelineno-0-231">231</a></span>
-<span class="normal"><a href="#__codelineno-0-232">232</a></span>
-<span class="normal"><a href="#__codelineno-0-233">233</a></span>
-<span class="normal"><a href="#__codelineno-0-234">234</a></span>
-<span class="normal"><a href="#__codelineno-0-235">235</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-203" name="__codelineno-0-203"></a><span class="k">def</span><span class="w"> </span><span class="nf">attach</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">components</span><span class="p">:</span> <span class="n">ModelComponents</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-204" name="__codelineno-0-204"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span><span class="p">:</span>
-<a id="__codelineno-0-205" name="__codelineno-0-205"></a>        <span class="k">return</span>
-<a id="__codelineno-0-206" name="__codelineno-0-206"></a>    <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="n">COMPONENTS</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-<a id="__codelineno-0-207" name="__codelineno-0-207"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-208" name="__codelineno-0-208"></a>            <span class="n">target</span><span class="o">.</span><span class="n">layer_id</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-0-209" name="__codelineno-0-209"></a>                <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
-<a id="__codelineno-0-210" name="__codelineno-0-210"></a>                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"width"</span><span class="p">,</span> <span class="s2">"num_heads"</span><span class="p">,</span> <span class="s2">"head_size"</span><span class="p">)</span>
-<a id="__codelineno-0-211" name="__codelineno-0-211"></a>                <span class="k">if</span> <span class="p">(</span><span class="n">value</span> <span class="o">:=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">key</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-<a id="__codelineno-0-212" name="__codelineno-0-212"></a>            <span class="p">}</span>
-<a id="__codelineno-0-213" name="__codelineno-0-213"></a>            <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">components</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
-<a id="__codelineno-0-214" name="__codelineno-0-214"></a>            <span class="k">if</span> <span class="n">target</span><span class="o">.</span><span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-<a id="__codelineno-0-215" name="__codelineno-0-215"></a>        <span class="p">}</span>
-<a id="__codelineno-0-216" name="__codelineno-0-216"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attach_stream_hooks</span><span class="p">(</span>
-<a id="__codelineno-0-217" name="__codelineno-0-217"></a>            <span class="n">components</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">],</span> <span class="n">component</span>
-<a id="__codelineno-0-218" name="__codelineno-0-218"></a>        <span class="p">)</span>
-<a id="__codelineno-0-219" name="__codelineno-0-219"></a>
-<a id="__codelineno-0-220" name="__codelineno-0-220"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">flush_hook</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">output</span><span class="p">):</span>
-<a id="__codelineno-0-221" name="__codelineno-0-221"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">recording</span><span class="p">:</span>
-<a id="__codelineno-0-222" name="__codelineno-0-222"></a>            <span class="k">return</span>
-<a id="__codelineno-0-223" name="__codelineno-0-223"></a>        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
-<a id="__codelineno-0-224" name="__codelineno-0-224"></a>            <span class="n">store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">store</span><span class="o">.</span><span class="n">_pending</span> <span class="k">for</span> <span class="n">store</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
-<a id="__codelineno-0-225" name="__codelineno-0-225"></a>        <span class="p">):</span>
-<a id="__codelineno-0-226" name="__codelineno-0-226"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_eager_capture_forwards</span> <span class="o">+=</span> <span class="mi">1</span>
-<a id="__codelineno-0-227" name="__codelineno-0-227"></a>        <span class="k">for</span> <span class="n">store</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-<a id="__codelineno-0-228" name="__codelineno-0-228"></a>            <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-229" name="__codelineno-0-229"></a>                <span class="n">store</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-<a id="__codelineno-0-230" name="__codelineno-0-230"></a>
-<a id="__codelineno-0-231" name="__codelineno-0-231"></a>    <span class="c1"># One post-forward flush per step: per-layer hooks only stage</span>
-<a id="__codelineno-0-232" name="__codelineno-0-232"></a>    <span class="c1"># GPU rows; the D2H copies coalesce here (pinned, non-blocking,</span>
-<a id="__codelineno-0-233" name="__codelineno-0-233"></a>    <span class="c1"># single sync).</span>
-<a id="__codelineno-0-234" name="__codelineno-0-234"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span><span class="n">flush_hook</span><span class="p">))</span>
-<a id="__codelineno-0-235" name="__codelineno-0-235"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="normal"><a href="#__codelineno-0-226">226</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-208" name="__codelineno-0-208"></a><span class="k">def</span><span class="w"> </span><span class="nf">attach</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">components</span><span class="p">:</span> <span class="n">ModelComponents</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-209" name="__codelineno-0-209"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span><span class="p">:</span>
+<a id="__codelineno-0-210" name="__codelineno-0-210"></a>        <span class="k">return</span>
+<a id="__codelineno-0-211" name="__codelineno-0-211"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_model</span> <span class="o">=</span> <span class="n">model</span>
+<a id="__codelineno-0-212" name="__codelineno-0-212"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_components</span> <span class="o">=</span> <span class="n">components</span>
+<a id="__codelineno-0-213" name="__codelineno-0-213"></a>    <span class="k">for</span> <span class="n">component</span> <span class="ow">in</span> <span class="n">COMPONENTS</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<a id="__codelineno-0-214" name="__codelineno-0-214"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-215" name="__codelineno-0-215"></a>            <span class="n">target</span><span class="o">.</span><span class="n">layer_id</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-0-216" name="__codelineno-0-216"></a>                <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
+<a id="__codelineno-0-217" name="__codelineno-0-217"></a>                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"width"</span><span class="p">,</span> <span class="s2">"num_heads"</span><span class="p">,</span> <span class="s2">"head_size"</span><span class="p">)</span>
+<a id="__codelineno-0-218" name="__codelineno-0-218"></a>                <span class="k">if</span> <span class="p">(</span><span class="n">value</span> <span class="o">:=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">key</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-0-219" name="__codelineno-0-219"></a>            <span class="p">}</span>
+<a id="__codelineno-0-220" name="__codelineno-0-220"></a>            <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">components</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+<a id="__codelineno-0-221" name="__codelineno-0-221"></a>            <span class="k">if</span> <span class="n">target</span><span class="o">.</span><span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-0-222" name="__codelineno-0-222"></a>        <span class="p">}</span>
+<a id="__codelineno-0-223" name="__codelineno-0-223"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_available_layers</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-224" name="__codelineno-0-224"></a>            <span class="n">target</span><span class="o">.</span><span class="n">layer_id</span> <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">components</span><span class="p">[</span><span class="n">component</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+<a id="__codelineno-0-225" name="__codelineno-0-225"></a>        <span class="p">}</span>
+<a id="__codelineno-0-226" name="__codelineno-0-226"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">True</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3872,11 +3854,7 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-288">288</a></span>
-<span class="normal"><a href="#__codelineno-0-289">289</a></span>
-<span class="normal"><a href="#__codelineno-0-290">290</a></span>
-<span class="normal"><a href="#__codelineno-0-291">291</a></span>
-<span class="normal"><a href="#__codelineno-0-292">292</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-292">292</a></span>
 <span class="normal"><a href="#__codelineno-0-293">293</a></span>
 <span class="normal"><a href="#__codelineno-0-294">294</a></span>
 <span class="normal"><a href="#__codelineno-0-295">295</a></span>
@@ -3884,19 +3862,25 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <span class="normal"><a href="#__codelineno-0-297">297</a></span>
 <span class="normal"><a href="#__codelineno-0-298">298</a></span>
 <span class="normal"><a href="#__codelineno-0-299">299</a></span>
-<span class="normal"><a href="#__codelineno-0-300">300</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-288" name="__codelineno-0-288"></a><span class="k">def</span><span class="w"> </span><span class="nf">detach</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-289" name="__codelineno-0-289"></a>    <span class="k">for</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="p">:</span>
-<a id="__codelineno-0-290" name="__codelineno-0-290"></a>        <span class="n">handle</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
-<a id="__codelineno-0-291" name="__codelineno-0-291"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-292" name="__codelineno-0-292"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">False</span>
-<a id="__codelineno-0-293" name="__codelineno-0-293"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">release_graph</span><span class="p">()</span>
-<a id="__codelineno-0-294" name="__codelineno-0-294"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">)</span>
-<a id="__codelineno-0-295" name="__codelineno-0-295"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_request_selects</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-296" name="__codelineno-0-296"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_cache_hits</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-297" name="__codelineno-0-297"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_unsupported_requests</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-298" name="__codelineno-0-298"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-299" name="__codelineno-0-299"></a>    <span class="k">for</span> <span class="n">layers</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-<a id="__codelineno-0-300" name="__codelineno-0-300"></a>        <span class="n">layers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<span class="normal"><a href="#__codelineno-0-300">300</a></span>
+<span class="normal"><a href="#__codelineno-0-301">301</a></span>
+<span class="normal"><a href="#__codelineno-0-302">302</a></span>
+<span class="normal"><a href="#__codelineno-0-303">303</a></span>
+<span class="normal"><a href="#__codelineno-0-304">304</a></span>
+<span class="normal"><a href="#__codelineno-0-305">305</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="k">def</span><span class="w"> </span><span class="nf">detach</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-293" name="__codelineno-0-293"></a>    <span class="k">for</span> <span class="n">stream</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span>
+<a id="__codelineno-0-294" name="__codelineno-0-294"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">disable_stream</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+<a id="__codelineno-0-295" name="__codelineno-0-295"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-0-296" name="__codelineno-0-296"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_model</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-297" name="__codelineno-0-297"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_components</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">,</span> <span class="p">())</span>
+<a id="__codelineno-0-298" name="__codelineno-0-298"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">release_graph</span><span class="p">()</span>
+<a id="__codelineno-0-299" name="__codelineno-0-299"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">COMPONENTS</span><span class="p">)</span>
+<a id="__codelineno-0-300" name="__codelineno-0-300"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_request_selects</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<a id="__codelineno-0-301" name="__codelineno-0-301"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_cache_hits</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<a id="__codelineno-0-302" name="__codelineno-0-302"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_unsupported_requests</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<a id="__codelineno-0-303" name="__codelineno-0-303"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<a id="__codelineno-0-304" name="__codelineno-0-304"></a>    <span class="k">for</span> <span class="n">layers</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_layers</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<a id="__codelineno-0-305" name="__codelineno-0-305"></a>        <span class="n">layers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3919,12 +3903,7 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-418">418</a></span>
-<span class="normal"><a href="#__codelineno-0-419">419</a></span>
-<span class="normal"><a href="#__codelineno-0-420">420</a></span>
-<span class="normal"><a href="#__codelineno-0-421">421</a></span>
-<span class="normal"><a href="#__codelineno-0-422">422</a></span>
-<span class="normal"><a href="#__codelineno-0-423">423</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-423">423</a></span>
 <span class="normal"><a href="#__codelineno-0-424">424</a></span>
 <span class="normal"><a href="#__codelineno-0-425">425</a></span>
 <span class="normal"><a href="#__codelineno-0-426">426</a></span>
@@ -3942,30 +3921,47 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <span class="normal"><a href="#__codelineno-0-438">438</a></span>
 <span class="normal"><a href="#__codelineno-0-439">439</a></span>
 <span class="normal"><a href="#__codelineno-0-440">440</a></span>
-<span class="normal"><a href="#__codelineno-0-441">441</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="k">def</span><span class="w"> </span><span class="nf">enable_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">config_kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-419" name="__codelineno-0-419"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown capture stream: </span><span class="si">{</span><span class="n">stream</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span><span class="p">:</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a>        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a>            <span class="s2">"Capture hooks are not attached to this model; "</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a>            <span class="s2">"attachment happens once at model load."</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a>        <span class="p">)</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a>    <span class="n">config</span> <span class="o">=</span> <span class="n">StreamConfig</span><span class="p">(</span><span class="o">**</span><span class="n">config_kwargs</span><span class="p">)</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="o">==</span> <span class="n">ATTENTION_HEADS</span><span class="p">:</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a>        <span class="n">available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">available</span><span class="p">:</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No supported decoder attention head outputs found"</span><span class="p">)</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">layers</span> <span class="o">-</span> <span class="n">available</span><span class="p">:</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-433" name="__codelineno-0-433"></a>                <span class="s2">"Unsupported attention head capture layers: "</span>
-<a id="__codelineno-0-434" name="__codelineno-0-434"></a>                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">layers</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">available</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-<a id="__codelineno-0-435" name="__codelineno-0-435"></a>            <span class="p">)</span>
-<a id="__codelineno-0-436" name="__codelineno-0-436"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="p">[</span><span class="n">stream</span><span class="p">]:</span>
-<a id="__codelineno-0-437" name="__codelineno-0-437"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-<a id="__codelineno-0-438" name="__codelineno-0-438"></a>            <span class="s2">"Enabling </span><span class="si">%s</span><span class="s2"> capture but no usable component hooks were found."</span><span class="p">,</span>
-<a id="__codelineno-0-439" name="__codelineno-0-439"></a>            <span class="n">stream</span><span class="p">,</span>
-<a id="__codelineno-0-440" name="__codelineno-0-440"></a>        <span class="p">)</span>
-<a id="__codelineno-0-441" name="__codelineno-0-441"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span> <span class="o">=</span> <span class="n">StreamStore</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-441">441</a></span>
+<span class="normal"><a href="#__codelineno-0-442">442</a></span>
+<span class="normal"><a href="#__codelineno-0-443">443</a></span>
+<span class="normal"><a href="#__codelineno-0-444">444</a></span>
+<span class="normal"><a href="#__codelineno-0-445">445</a></span>
+<span class="normal"><a href="#__codelineno-0-446">446</a></span>
+<span class="normal"><a href="#__codelineno-0-447">447</a></span>
+<span class="normal"><a href="#__codelineno-0-448">448</a></span>
+<span class="normal"><a href="#__codelineno-0-449">449</a></span>
+<span class="normal"><a href="#__codelineno-0-450">450</a></span>
+<span class="normal"><a href="#__codelineno-0-451">451</a></span>
+<span class="normal"><a href="#__codelineno-0-452">452</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="k">def</span><span class="w"> </span><span class="nf">enable_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">config_kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown capture stream: </span><span class="si">{</span><span class="n">stream</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attached</span><span class="p">:</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a>        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a>            <span class="s2">"Capture components are not attached to this model; "</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a>            <span class="s2">"discovery happens once at model load."</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a>        <span class="p">)</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>    <span class="n">config</span> <span class="o">=</span> <span class="n">StreamConfig</span><span class="p">(</span><span class="o">**</span><span class="n">config_kwargs</span><span class="p">)</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="o">==</span> <span class="n">ATTENTION_HEADS</span><span class="p">:</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>        <span class="n">available</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_layers</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span>
+<a id="__codelineno-0-434" name="__codelineno-0-434"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">available</span><span class="p">:</span>
+<a id="__codelineno-0-435" name="__codelineno-0-435"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No supported decoder attention head outputs found"</span><span class="p">)</span>
+<a id="__codelineno-0-436" name="__codelineno-0-436"></a>        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">layers</span> <span class="o">-</span> <span class="n">available</span><span class="p">:</span>
+<a id="__codelineno-0-437" name="__codelineno-0-437"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-438" name="__codelineno-0-438"></a>                <span class="s2">"Unsupported attention head capture layers: "</span>
+<a id="__codelineno-0-439" name="__codelineno-0-439"></a>                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">layers</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">available</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-0-440" name="__codelineno-0-440"></a>            <span class="p">)</span>
+<a id="__codelineno-0-441" name="__codelineno-0-441"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_available_layers</span><span class="p">[</span><span class="n">stream</span><span class="p">]:</span>
+<a id="__codelineno-0-442" name="__codelineno-0-442"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-0-443" name="__codelineno-0-443"></a>            <span class="s2">"Enabling </span><span class="si">%s</span><span class="s2"> capture but no usable components were found."</span><span class="p">,</span>
+<a id="__codelineno-0-444" name="__codelineno-0-444"></a>            <span class="n">stream</span><span class="p">,</span>
+<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="p">)</span>
+<a id="__codelineno-0-446" name="__codelineno-0-446"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">disable_stream</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+<a id="__codelineno-0-447" name="__codelineno-0-447"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span> <span class="o">=</span> <span class="n">StreamStore</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-0-448" name="__codelineno-0-448"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_attach_stream_hooks</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_components</span><span class="p">[</span><span class="n">stream</span><span class="p">],</span> <span class="n">COMPONENTS</span><span class="p">[</span><span class="n">stream</span><span class="p">])</span>
+<a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-450" name="__codelineno-0-450"></a>        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-0-451" name="__codelineno-0-451"></a>        <span class="c1"># Stage per layer, then coalesce transfers once after the model forward.</span>
+<a id="__codelineno-0-452" name="__codelineno-0-452"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">register_forward_hook</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_flush_hook</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3988,11 +3984,21 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-443">443</a></span>
-<span class="normal"><a href="#__codelineno-0-444">444</a></span>
-<span class="normal"><a href="#__codelineno-0-445">445</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="k">def</span><span class="w"> </span><span class="nf">disable_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-444" name="__codelineno-0-444"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span>
-<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-454">454</a></span>
+<span class="normal"><a href="#__codelineno-0-455">455</a></span>
+<span class="normal"><a href="#__codelineno-0-456">456</a></span>
+<span class="normal"><a href="#__codelineno-0-457">457</a></span>
+<span class="normal"><a href="#__codelineno-0-458">458</a></span>
+<span class="normal"><a href="#__codelineno-0-459">459</a></span>
+<span class="normal"><a href="#__codelineno-0-460">460</a></span>
+<span class="normal"><a href="#__codelineno-0-461">461</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="k">def</span><span class="w"> </span><span class="nf">disable_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a>    <span class="k">if</span> <span class="n">stream</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">:</span>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="p">[</span><span class="n">stream</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a>        <span class="k">for</span> <span class="n">handle</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">()):</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a>            <span class="n">handle</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<a id="__codelineno-0-459" name="__codelineno-0-459"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">any_enabled</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-460" name="__codelineno-0-460"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_flush_handle</span> <span class="o">=</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4015,23 +4021,7 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-447">447</a></span>
-<span class="normal"><a href="#__codelineno-0-448">448</a></span>
-<span class="normal"><a href="#__codelineno-0-449">449</a></span>
-<span class="normal"><a href="#__codelineno-0-450">450</a></span>
-<span class="normal"><a href="#__codelineno-0-451">451</a></span>
-<span class="normal"><a href="#__codelineno-0-452">452</a></span>
-<span class="normal"><a href="#__codelineno-0-453">453</a></span>
-<span class="normal"><a href="#__codelineno-0-454">454</a></span>
-<span class="normal"><a href="#__codelineno-0-455">455</a></span>
-<span class="normal"><a href="#__codelineno-0-456">456</a></span>
-<span class="normal"><a href="#__codelineno-0-457">457</a></span>
-<span class="normal"><a href="#__codelineno-0-458">458</a></span>
-<span class="normal"><a href="#__codelineno-0-459">459</a></span>
-<span class="normal"><a href="#__codelineno-0-460">460</a></span>
-<span class="normal"><a href="#__codelineno-0-461">461</a></span>
-<span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-463">463</a></span>
 <span class="normal"><a href="#__codelineno-0-464">464</a></span>
 <span class="normal"><a href="#__codelineno-0-465">465</a></span>
 <span class="normal"><a href="#__codelineno-0-466">466</a></span>
@@ -4040,32 +4030,48 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <span class="normal"><a href="#__codelineno-0-469">469</a></span>
 <span class="normal"><a href="#__codelineno-0-470">470</a></span>
 <span class="normal"><a href="#__codelineno-0-471">471</a></span>
-<span class="normal"><a href="#__codelineno-0-472">472</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-447" name="__codelineno-0-447"></a><span class="k">def</span><span class="w"> </span><span class="nf">fetch_stream</span><span class="p">(</span>
-<a id="__codelineno-0-448" name="__codelineno-0-448"></a>    <span class="bp">self</span><span class="p">,</span>
-<a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-0-450" name="__codelineno-0-450"></a>    <span class="n">clear</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-451" name="__codelineno-0-451"></a>    <span class="n">layers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="n">req_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a>        <span class="k">return</span> <span class="p">{}</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>    <span class="n">store</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>  <span class="c1"># capture any rows staged since the last step</span>
-<a id="__codelineno-0-458" name="__codelineno-0-458"></a>    <span class="k">if</span> <span class="n">req_ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-459" name="__codelineno-0-459"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a>            <span class="n">layers</span><span class="o">=</span><span class="n">layers</span><span class="p">,</span> <span class="n">req_ids</span><span class="o">=</span><span class="n">req_ids</span><span class="p">,</span> <span class="n">clear_selected</span><span class="o">=</span><span class="n">clear</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>        <span class="p">)</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span><span class="n">layers</span><span class="o">=</span><span class="n">layers</span><span class="p">)</span>
-<a id="__codelineno-0-464" name="__codelineno-0-464"></a>        <span class="k">if</span> <span class="n">clear</span><span class="p">:</span>
-<a id="__codelineno-0-465" name="__codelineno-0-465"></a>            <span class="k">if</span> <span class="n">layers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-466" name="__codelineno-0-466"></a>                <span class="n">store</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-<a id="__codelineno-0-467" name="__codelineno-0-467"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-468" name="__codelineno-0-468"></a>                <span class="n">store</span><span class="o">.</span><span class="n">drop_layers</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-<a id="__codelineno-0-469" name="__codelineno-0-469"></a>    <span class="k">for</span> <span class="n">layer</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<a id="__codelineno-0-470" name="__codelineno-0-470"></a>        <span class="k">if</span> <span class="n">layout</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">layer</span><span class="p">):</span>
-<a id="__codelineno-0-471" name="__codelineno-0-471"></a>            <span class="n">info</span><span class="p">[</span><span class="s2">"layout"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layout</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<a id="__codelineno-0-472" name="__codelineno-0-472"></a>    <span class="k">return</span> <span class="n">result</span>
+<span class="normal"><a href="#__codelineno-0-472">472</a></span>
+<span class="normal"><a href="#__codelineno-0-473">473</a></span>
+<span class="normal"><a href="#__codelineno-0-474">474</a></span>
+<span class="normal"><a href="#__codelineno-0-475">475</a></span>
+<span class="normal"><a href="#__codelineno-0-476">476</a></span>
+<span class="normal"><a href="#__codelineno-0-477">477</a></span>
+<span class="normal"><a href="#__codelineno-0-478">478</a></span>
+<span class="normal"><a href="#__codelineno-0-479">479</a></span>
+<span class="normal"><a href="#__codelineno-0-480">480</a></span>
+<span class="normal"><a href="#__codelineno-0-481">481</a></span>
+<span class="normal"><a href="#__codelineno-0-482">482</a></span>
+<span class="normal"><a href="#__codelineno-0-483">483</a></span>
+<span class="normal"><a href="#__codelineno-0-484">484</a></span>
+<span class="normal"><a href="#__codelineno-0-485">485</a></span>
+<span class="normal"><a href="#__codelineno-0-486">486</a></span>
+<span class="normal"><a href="#__codelineno-0-487">487</a></span>
+<span class="normal"><a href="#__codelineno-0-488">488</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="k">def</span><span class="w"> </span><span class="nf">fetch_stream</span><span class="p">(</span>
+<a id="__codelineno-0-464" name="__codelineno-0-464"></a>    <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-465" name="__codelineno-0-465"></a>    <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-466" name="__codelineno-0-466"></a>    <span class="n">clear</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-467" name="__codelineno-0-467"></a>    <span class="n">layers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-468" name="__codelineno-0-468"></a>    <span class="n">req_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-469" name="__codelineno-0-469"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<a id="__codelineno-0-470" name="__codelineno-0-470"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+<a id="__codelineno-0-471" name="__codelineno-0-471"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-472" name="__codelineno-0-472"></a>        <span class="k">return</span> <span class="p">{}</span>
+<a id="__codelineno-0-473" name="__codelineno-0-473"></a>    <span class="n">store</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>  <span class="c1"># capture any rows staged since the last step</span>
+<a id="__codelineno-0-474" name="__codelineno-0-474"></a>    <span class="k">if</span> <span class="n">req_ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-475" name="__codelineno-0-475"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span>
+<a id="__codelineno-0-476" name="__codelineno-0-476"></a>            <span class="n">layers</span><span class="o">=</span><span class="n">layers</span><span class="p">,</span> <span class="n">req_ids</span><span class="o">=</span><span class="n">req_ids</span><span class="p">,</span> <span class="n">clear_selected</span><span class="o">=</span><span class="n">clear</span>
+<a id="__codelineno-0-477" name="__codelineno-0-477"></a>        <span class="p">)</span>
+<a id="__codelineno-0-478" name="__codelineno-0-478"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-479" name="__codelineno-0-479"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span><span class="n">layers</span><span class="o">=</span><span class="n">layers</span><span class="p">)</span>
+<a id="__codelineno-0-480" name="__codelineno-0-480"></a>        <span class="k">if</span> <span class="n">clear</span><span class="p">:</span>
+<a id="__codelineno-0-481" name="__codelineno-0-481"></a>            <span class="k">if</span> <span class="n">layers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-482" name="__codelineno-0-482"></a>                <span class="n">store</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+<a id="__codelineno-0-483" name="__codelineno-0-483"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-484" name="__codelineno-0-484"></a>                <span class="n">store</span><span class="o">.</span><span class="n">drop_layers</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+<a id="__codelineno-0-485" name="__codelineno-0-485"></a>    <span class="k">for</span> <span class="n">layer</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-0-486" name="__codelineno-0-486"></a>        <span class="k">if</span> <span class="n">layout</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">layer</span><span class="p">):</span>
+<a id="__codelineno-0-487" name="__codelineno-0-487"></a>            <span class="n">info</span><span class="p">[</span><span class="s2">"layout"</span><span class="p">]</span> <span class="o">=</span> <span class="n">layout</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<a id="__codelineno-0-488" name="__codelineno-0-488"></a>    <span class="k">return</span> <span class="n">result</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4088,13 +4094,13 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-474">474</a></span>
-<span class="normal"><a href="#__codelineno-0-475">475</a></span>
-<span class="normal"><a href="#__codelineno-0-476">476</a></span>
-<span class="normal"><a href="#__codelineno-0-477">477</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-474" name="__codelineno-0-474"></a><span class="k">def</span><span class="w"> </span><span class="nf">clear_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-475" name="__codelineno-0-475"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
-<a id="__codelineno-0-476" name="__codelineno-0-476"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-477" name="__codelineno-0-477"></a>        <span class="n">store</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-490">490</a></span>
+<span class="normal"><a href="#__codelineno-0-491">491</a></span>
+<span class="normal"><a href="#__codelineno-0-492">492</a></span>
+<span class="normal"><a href="#__codelineno-0-493">493</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-490" name="__codelineno-0-490"></a><span class="k">def</span><span class="w"> </span><span class="nf">clear_stream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-491" name="__codelineno-0-491"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+<a id="__codelineno-0-492" name="__codelineno-0-492"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-493" name="__codelineno-0-493"></a>        <span class="n">store</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4117,23 +4123,7 @@ The high-level helper also coordinates prefix-cache read policy before admission
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>vllm-steer/vllm/model_hooks/capture/session.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-479">479</a></span>
-<span class="normal"><a href="#__codelineno-0-480">480</a></span>
-<span class="normal"><a href="#__codelineno-0-481">481</a></span>
-<span class="normal"><a href="#__codelineno-0-482">482</a></span>
-<span class="normal"><a href="#__codelineno-0-483">483</a></span>
-<span class="normal"><a href="#__codelineno-0-484">484</a></span>
-<span class="normal"><a href="#__codelineno-0-485">485</a></span>
-<span class="normal"><a href="#__codelineno-0-486">486</a></span>
-<span class="normal"><a href="#__codelineno-0-487">487</a></span>
-<span class="normal"><a href="#__codelineno-0-488">488</a></span>
-<span class="normal"><a href="#__codelineno-0-489">489</a></span>
-<span class="normal"><a href="#__codelineno-0-490">490</a></span>
-<span class="normal"><a href="#__codelineno-0-491">491</a></span>
-<span class="normal"><a href="#__codelineno-0-492">492</a></span>
-<span class="normal"><a href="#__codelineno-0-493">493</a></span>
-<span class="normal"><a href="#__codelineno-0-494">494</a></span>
-<span class="normal"><a href="#__codelineno-0-495">495</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-495">495</a></span>
 <span class="normal"><a href="#__codelineno-0-496">496</a></span>
 <span class="normal"><a href="#__codelineno-0-497">497</a></span>
 <span class="normal"><a href="#__codelineno-0-498">498</a></span>
@@ -4149,39 +4139,55 @@ The high-level helper also coordinates prefix-cache read policy before admission
 <span class="normal"><a href="#__codelineno-0-508">508</a></span>
 <span class="normal"><a href="#__codelineno-0-509">509</a></span>
 <span class="normal"><a href="#__codelineno-0-510">510</a></span>
-<span class="normal"><a href="#__codelineno-0-511">511</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-479" name="__codelineno-0-479"></a><span class="k">def</span><span class="w"> </span><span class="nf">stream_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-480" name="__codelineno-0-480"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
-<a id="__codelineno-0-481" name="__codelineno-0-481"></a>    <span class="n">hooked</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hooked_layers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">()))</span>
-<a id="__codelineno-0-482" name="__codelineno-0-482"></a>    <span class="n">execution</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-483" name="__codelineno-0-483"></a>        <span class="s2">"layouts"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">{}),</span>
-<a id="__codelineno-0-484" name="__codelineno-0-484"></a>        <span class="s2">"graph_ready"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">ready</span><span class="p">,</span>
-<a id="__codelineno-0-485" name="__codelineno-0-485"></a>        <span class="s2">"graph_buffer_bytes"</span><span class="p">:</span> <span class="mi">0</span>
-<a id="__codelineno-0-486" name="__codelineno-0-486"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="kc">None</span>
-<a id="__codelineno-0-487" name="__codelineno-0-487"></a>        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">buffer_bytes</span><span class="p">,</span>
-<a id="__codelineno-0-488" name="__codelineno-0-488"></a>        <span class="s2">"graph_allocation_bytes"</span><span class="p">:</span> <span class="mi">0</span>
-<a id="__codelineno-0-489" name="__codelineno-0-489"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="kc">None</span>
-<a id="__codelineno-0-490" name="__codelineno-0-490"></a>        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">allocation_bytes</span><span class="p">,</span>
-<a id="__codelineno-0-491" name="__codelineno-0-491"></a>        <span class="c1"># Session-lifetime counters survive stop; a single inactive graph</span>
-<a id="__codelineno-0-492" name="__codelineno-0-492"></a>        <span class="c1"># variant stays cached for repeated capture() calls.</span>
-<a id="__codelineno-0-493" name="__codelineno-0-493"></a>        <span class="s2">"graph_replays"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph_replays</span><span class="p">,</span>
-<a id="__codelineno-0-494" name="__codelineno-0-494"></a>        <span class="s2">"eager_capture_forwards"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eager_capture_forwards</span><span class="p">,</span>
-<a id="__codelineno-0-495" name="__codelineno-0-495"></a>    <span class="p">}</span>
-<a id="__codelineno-0-496" name="__codelineno-0-496"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-497" name="__codelineno-0-497"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"hooked_layers"</span><span class="p">:</span> <span class="n">hooked</span><span class="p">,</span> <span class="o">**</span><span class="n">execution</span><span class="p">}</span>
-<a id="__codelineno-0-498" name="__codelineno-0-498"></a>    <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-0-499" name="__codelineno-0-499"></a>        <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-500" name="__codelineno-0-500"></a>        <span class="s2">"hooked_layers"</span><span class="p">:</span> <span class="n">hooked</span><span class="p">,</span>
-<a id="__codelineno-0-501" name="__codelineno-0-501"></a>        <span class="s2">"layers_captured"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">store</span><span class="o">.</span><span class="n">chunks</span><span class="p">),</span>
-<a id="__codelineno-0-502" name="__codelineno-0-502"></a>        <span class="s2">"tokens_stored"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">tokens_stored</span><span class="p">,</span>
-<a id="__codelineno-0-503" name="__codelineno-0-503"></a>        <span class="s2">"tokens_dropped"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">tokens_dropped</span><span class="p">,</span>
-<a id="__codelineno-0-504" name="__codelineno-0-504"></a>        <span class="s2">"storage_bytes"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">storage_bytes</span><span class="p">,</span>
-<a id="__codelineno-0-505" name="__codelineno-0-505"></a>        <span class="s2">"budget_bytes"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">budget_bytes</span><span class="p">,</span>
-<a id="__codelineno-0-506" name="__codelineno-0-506"></a>        <span class="s2">"reduce"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">reduce</span><span class="p">,</span>
-<a id="__codelineno-0-507" name="__codelineno-0-507"></a>        <span class="s2">"select"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">select</span><span class="p">,</span>
-<a id="__codelineno-0-508" name="__codelineno-0-508"></a>        <span class="s2">"meta_complete"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-509" name="__codelineno-0-509"></a>        <span class="s2">"cache_elided_reqs"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">store</span><span class="o">.</span><span class="n">elided_reqs</span><span class="p">),</span>
-<a id="__codelineno-0-510" name="__codelineno-0-510"></a>        <span class="o">**</span><span class="n">execution</span><span class="p">,</span>
+<span class="normal"><a href="#__codelineno-0-511">511</a></span>
+<span class="normal"><a href="#__codelineno-0-512">512</a></span>
+<span class="normal"><a href="#__codelineno-0-513">513</a></span>
+<span class="normal"><a href="#__codelineno-0-514">514</a></span>
+<span class="normal"><a href="#__codelineno-0-515">515</a></span>
+<span class="normal"><a href="#__codelineno-0-516">516</a></span>
+<span class="normal"><a href="#__codelineno-0-517">517</a></span>
+<span class="normal"><a href="#__codelineno-0-518">518</a></span>
+<span class="normal"><a href="#__codelineno-0-519">519</a></span>
+<span class="normal"><a href="#__codelineno-0-520">520</a></span>
+<span class="normal"><a href="#__codelineno-0-521">521</a></span>
+<span class="normal"><a href="#__codelineno-0-522">522</a></span>
+<span class="normal"><a href="#__codelineno-0-523">523</a></span>
+<span class="normal"><a href="#__codelineno-0-524">524</a></span>
+<span class="normal"><a href="#__codelineno-0-525">525</a></span>
+<span class="normal"><a href="#__codelineno-0-526">526</a></span>
+<span class="normal"><a href="#__codelineno-0-527">527</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-495" name="__codelineno-0-495"></a><span class="k">def</span><span class="w"> </span><span class="nf">stream_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-496" name="__codelineno-0-496"></a>    <span class="n">store</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streams</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+<a id="__codelineno-0-497" name="__codelineno-0-497"></a>    <span class="n">hooked</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hook_handles</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">()))</span>
+<a id="__codelineno-0-498" name="__codelineno-0-498"></a>    <span class="n">execution</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-499" name="__codelineno-0-499"></a>        <span class="s2">"layouts"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layouts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="p">{}),</span>
+<a id="__codelineno-0-500" name="__codelineno-0-500"></a>        <span class="s2">"graph_ready"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">ready</span><span class="p">,</span>
+<a id="__codelineno-0-501" name="__codelineno-0-501"></a>        <span class="s2">"graph_buffer_bytes"</span><span class="p">:</span> <span class="mi">0</span>
+<a id="__codelineno-0-502" name="__codelineno-0-502"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="kc">None</span>
+<a id="__codelineno-0-503" name="__codelineno-0-503"></a>        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">buffer_bytes</span><span class="p">,</span>
+<a id="__codelineno-0-504" name="__codelineno-0-504"></a>        <span class="s2">"graph_allocation_bytes"</span><span class="p">:</span> <span class="mi">0</span>
+<a id="__codelineno-0-505" name="__codelineno-0-505"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span> <span class="ow">is</span> <span class="kc">None</span>
+<a id="__codelineno-0-506" name="__codelineno-0-506"></a>        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_state</span><span class="o">.</span><span class="n">allocation_bytes</span><span class="p">,</span>
+<a id="__codelineno-0-507" name="__codelineno-0-507"></a>        <span class="c1"># Session-lifetime counters survive stop; a single inactive graph</span>
+<a id="__codelineno-0-508" name="__codelineno-0-508"></a>        <span class="c1"># variant stays cached for repeated capture() calls.</span>
+<a id="__codelineno-0-509" name="__codelineno-0-509"></a>        <span class="s2">"graph_replays"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph_replays</span><span class="p">,</span>
+<a id="__codelineno-0-510" name="__codelineno-0-510"></a>        <span class="s2">"eager_capture_forwards"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eager_capture_forwards</span><span class="p">,</span>
 <a id="__codelineno-0-511" name="__codelineno-0-511"></a>    <span class="p">}</span>
+<a id="__codelineno-0-512" name="__codelineno-0-512"></a>    <span class="k">if</span> <span class="n">store</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-513" name="__codelineno-0-513"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"hooked_layers"</span><span class="p">:</span> <span class="n">hooked</span><span class="p">,</span> <span class="o">**</span><span class="n">execution</span><span class="p">}</span>
+<a id="__codelineno-0-514" name="__codelineno-0-514"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-0-515" name="__codelineno-0-515"></a>        <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-516" name="__codelineno-0-516"></a>        <span class="s2">"hooked_layers"</span><span class="p">:</span> <span class="n">hooked</span><span class="p">,</span>
+<a id="__codelineno-0-517" name="__codelineno-0-517"></a>        <span class="s2">"layers_captured"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">store</span><span class="o">.</span><span class="n">chunks</span><span class="p">),</span>
+<a id="__codelineno-0-518" name="__codelineno-0-518"></a>        <span class="s2">"tokens_stored"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">tokens_stored</span><span class="p">,</span>
+<a id="__codelineno-0-519" name="__codelineno-0-519"></a>        <span class="s2">"tokens_dropped"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">tokens_dropped</span><span class="p">,</span>
+<a id="__codelineno-0-520" name="__codelineno-0-520"></a>        <span class="s2">"storage_bytes"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">storage_bytes</span><span class="p">,</span>
+<a id="__codelineno-0-521" name="__codelineno-0-521"></a>        <span class="s2">"budget_bytes"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">budget_bytes</span><span class="p">,</span>
+<a id="__codelineno-0-522" name="__codelineno-0-522"></a>        <span class="s2">"reduce"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">reduce</span><span class="p">,</span>
+<a id="__codelineno-0-523" name="__codelineno-0-523"></a>        <span class="s2">"select"</span><span class="p">:</span> <span class="n">store</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">select</span><span class="p">,</span>
+<a id="__codelineno-0-524" name="__codelineno-0-524"></a>        <span class="s2">"meta_complete"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-525" name="__codelineno-0-525"></a>        <span class="s2">"cache_elided_reqs"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">store</span><span class="o">.</span><span class="n">elided_reqs</span><span class="p">),</span>
+<a id="__codelineno-0-526" name="__codelineno-0-526"></a>        <span class="o">**</span><span class="n">execution</span><span class="p">,</span>
+<a id="__codelineno-0-527" name="__codelineno-0-527"></a>    <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
