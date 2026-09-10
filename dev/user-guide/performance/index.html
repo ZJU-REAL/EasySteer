@@ -10,25 +10,31 @@
       
       
       
+        <link rel="canonical" href="https://zju-real.github.io/EasySteer/dev/user-guide/performance/">
       
+      
+        <link rel="prev" href="../attention/">
+      
+      
+        <link rel="next" href="../hidden-state-capture/">
       
       
         
       
       
-      <link rel="icon" href="/EasySteer/dev/assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>EasySteer</title>
+        <title>Graphs, caching, and performance - EasySteer</title>
       
     
     
-      <link rel="stylesheet" href="/EasySteer/dev/assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="/EasySteer/dev/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,9 +53,9 @@
       
     
     
-      <link rel="stylesheet" href="/EasySteer/dev/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/EasySteer/dev",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -73,6 +79,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#graphs-caching-and-performance" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -87,7 +98,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/EasySteer/dev/." title="EasySteer" class="md-header__button md-logo" aria-label="EasySteer" data-md-component="logo">
+    <a href="../.." title="EasySteer" class="md-header__button md-logo" aria-label="EasySteer" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -107,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Graphs, caching, and performance
             
           </span>
         </div>
@@ -220,7 +231,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/EasySteer/dev/." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -241,7 +252,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -259,6 +270,8 @@
   
   
   
+    
+  
   
     
     
@@ -266,11 +279,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/EasySteer/dev/user-guide/steering/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../steering/" class="md-tabs__link">
           
   
   
@@ -295,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/replications/" class="md-tabs__link">
+        <a href="../../replications/" class="md-tabs__link">
           
   
   
@@ -317,7 +332,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/developer-guide/testing/" class="md-tabs__link">
+        <a href="../../developer-guide/testing/" class="md-tabs__link">
           
   
   
@@ -339,7 +354,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/api-reference/" class="md-tabs__link">
+        <a href="../../api-reference/" class="md-tabs__link">
           
   
   
@@ -375,7 +390,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/EasySteer/dev/." title="EasySteer" class="md-nav__button md-logo" aria-label="EasySteer" data-md-component="logo">
+    <a href="../.." title="EasySteer" class="md-nav__button md-logo" aria-label="EasySteer" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -405,7 +420,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -492,7 +507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -520,7 +535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -548,7 +563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   
@@ -580,8 +595,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -595,19 +612,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -625,7 +645,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -640,8 +660,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -656,18 +678,21 @@
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
         
           
-          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="">
             
   
   
@@ -685,7 +710,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -703,7 +728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/steering/" class="md-nav__link">
+      <a href="../steering/" class="md-nav__link">
         
   
   
@@ -731,7 +756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/attention/" class="md-nav__link">
+      <a href="../attention/" class="md-nav__link">
         
   
   
@@ -756,10 +781,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/performance/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graphs, caching, and performance
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -775,6 +827,98 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#graph-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Graph modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How auto chooses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prefix-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prefix caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capture-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capture execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-settings-for-a-workload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing settings for a workload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#measuring-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -809,17 +953,20 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
         
           
-          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="">
             
   
   
@@ -855,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/hidden-state-capture/" class="md-nav__link">
+      <a href="../hidden-state-capture/" class="md-nav__link">
         
   
   
@@ -883,7 +1030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/extracting-vectors/" class="md-nav__link">
+      <a href="../extracting-vectors/" class="md-nav__link">
         
   
   
@@ -911,7 +1058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/reft-training/" class="md-nav__link">
+      <a href="../reft-training/" class="md-nav__link">
         
   
   
@@ -959,17 +1106,20 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
         
           
-          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
             
   
   
@@ -1005,7 +1155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/openai-server/" class="md-nav__link">
+      <a href="../openai-server/" class="md-nav__link">
         
   
   
@@ -1033,7 +1183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/web-demo/" class="md-nav__link">
+      <a href="../web-demo/" class="md-nav__link">
         
   
   
@@ -1099,7 +1249,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/EasySteer/dev/replications/" class="md-nav__link ">
+            <a href="../../replications/" class="md-nav__link ">
               
   
   
@@ -1203,7 +1353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/developer-guide/testing/" class="md-nav__link">
+      <a href="../../developer-guide/testing/" class="md-nav__link">
         
   
   
@@ -1231,7 +1381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/developer-guide/contributing/" class="md-nav__link">
+      <a href="../../developer-guide/contributing/" class="md-nav__link">
         
   
   
@@ -1299,7 +1449,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/EasySteer/dev/api-reference/" class="md-nav__link ">
+            <a href="../../api-reference/" class="md-nav__link ">
               
   
   
@@ -1343,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/engine-configuration/" class="md-nav__link">
+      <a href="../../api-reference/engine-configuration/" class="md-nav__link">
         
   
   
@@ -1371,7 +1521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/algorithms/" class="md-nav__link">
+      <a href="../../api-reference/algorithms/" class="md-nav__link">
         
   
   
@@ -1399,7 +1549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/steering-specs/" class="md-nav__link">
+      <a href="../../api-reference/steering-specs/" class="md-nav__link">
         
   
   
@@ -1427,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/steer/" class="md-nav__link">
+      <a href="../../api-reference/steer/" class="md-nav__link">
         
   
   
@@ -1455,7 +1605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/hidden-states/" class="md-nav__link">
+      <a href="../../api-reference/hidden-states/" class="md-nav__link">
         
   
   
@@ -1500,6 +1650,88 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#graph-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Graph modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-auto-chooses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How auto chooses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prefix-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prefix caching
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capture-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capture execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-settings-for-a-workload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing settings for a workload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#measuring-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1517,11 +1749,221 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../steering/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../steering/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Inference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+    <a href="https://github.com/ZJU-REAL/EasySteer/edit/main/docs/user-guide/performance.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="graphs-caching-and-performance">Graphs, caching, and performance<a class="headerlink" href="#graphs-caching-and-performance" title="Permanent link">&para;</a></h1>
+<p>Start with the engine defaults and declare the algorithms your requests need.
+EasySteer selects how steering integrates with compiled execution. Prefix
+caching and chunked prefill remain available without extra steering flags.</p>
+<h2 id="graph-modes">Graph modes<a class="headerlink" href="#graph-modes" title="Permanent link">&para;</a></h2>
+<p>EasySteer's <code>steer_graph_mode</code> and vLLM's CUDA graph mode describe different
+parts of execution:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Steering execution</th>
+<th>When to use it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>steer_graph_mode="auto"</code></td>
+<td>Resolves to one of the next two modes at startup.</td>
+<td>Default for new applications. The startup log includes the reason.</td>
+</tr>
+<tr>
+<td><code>steer_graph_mode="in_graph"</code></td>
+<td>Steering kernels read persistent payload/selection buffers inside compiled execution.</td>
+<td>Single-vector requests whose algorithms and payloads meet the graph conditions.</td>
+</tr>
+<tr>
+<td><code>steer_graph_mode="split"</code></td>
+<td>The model runs in compiled segments, with steering between them.</td>
+<td>Multi-vector requests, <code>linear</code>, or payloads outside the in-graph conditions.</td>
+</tr>
+<tr>
+<td><code>enforce_eager=True</code></td>
+<td>Model and steering execute without CUDA graph capture.</td>
+<td>Debugging or short jobs where compilation startup dominates total work.</td>
+</tr>
+</tbody>
+</table>
+<p><code>split</code> retains graph acceleration for model segments. <code>in_graph</code> keeps steering
+eligible for full CUDA graphs, but the actual vLLM graph mode also depends on the
+model, attention backend, and other engine features. Check the engine's CUDA
+graph logs as well as the steering-mode log. See the upstream
+<a href="https://docs.vllm.ai/en/latest/design/cuda_graphs/">CUDA graph design</a> for the
+model execution modes.</p>
+<p>An explicit <code>in_graph</code> request is checked rather than silently downgraded. It
+cannot be combined with <code>enforce_eager=True</code>. Changing vectors, scales, or token
+selection updates persistent buffers; it does not require restarting the model.</p>
+<h3 id="how-auto-chooses">How auto chooses<a class="headerlink" href="#how-auto-chooses" title="Permanent link">&para;</a></h3>
+<p>With compilation enabled, auto first checks a concrete startup default if one
+is supplied. A single-vector default that fits the graph buffers selects
+<code>in_graph</code>; a multi-vector default or unsupported payload selects <code>split</code>.
+Later requests must fit the mode selected at startup.</p>
+<p>Without a startup default, auto uses the declaration:</p>
+<ol>
+<li>A declaration allowing multiple vectors selects <code>split</code>.</li>
+<li>Single-vector declarations of <code>direct</code>, <code>attention_add</code>, <code>erase</code>, <code>replace</code>,
+   and <code>concept_replace</code> select <code>in_graph</code>.</li>
+<li>LoReFT and LM-Steer require a rank bound; MoE routing requires a supported
+   routing mode. Names alone do not establish these payload conditions, so
+   these declarations select <code>split</code>.</li>
+<li><code>linear</code> has no in-graph kernel and selects <code>split</code>.</li>
+</ol>
+<p>An engine that must accept a bounded conditional workload can explicitly select
+<code>in_graph</code>; request admission then enforces its conditions. The
+<a href="../../api-reference/algorithms/">algorithm table</a> lists these conditions and
+normalization support. Normalization does not require eager mode for algorithms
+that support it.</p>
+<h2 id="prefix-caching">Prefix caching<a class="headerlink" href="#prefix-caching" title="Permanent link">&para;</a></h2>
+<p>For generation, KV-cache keys include the effective steering configuration.
+Identical prompts and steering configurations can reuse cached blocks. A
+baseline request with <code>steering=False</code> and a steered request use separate keys.
+Updating a default preserves cache entries for previous configurations.</p>
+<p>Capture needs activations that KV blocks do not store. When selected prompt rows
+would be skipped by a prefix hit, admission bypasses cache <strong>reads for that
+request</strong>. Cache writes remain enabled. Last-prompt-token and generation-only
+selections can reuse prefix blocks when their selected rows are still computed.
+Capture uses no random cache salt. See the complete
+<a href="../hidden-state-capture/#prefix-caching">capture cache policy</a>.</p>
+<p>Chunked prefill uses the same selection semantics. Negative prompt positions
+resolve against the full prompt length, so <code>prompt_positions=[-1]</code> consistently
+selects its last token across chunks. Disabling chunked prefill or prefix caching
+globally is unnecessary for ordinary steering and capture.</p>
+<h2 id="capture-execution">Capture execution<a class="headerlink" href="#capture-execution" title="Permanent link">&para;</a></h2>
+<p>Capture has a separate graph containing the selected component/layer taps.
+Eligible FULL-graph batches reuse it across capture calls. Changing row
+selectors or storage dtype does not require a new graph; changing the component
+or layer set replaces the cached capture graph.</p>
+<p>This graph path requires one GPU worker, no LoRA or speculative decoding, and
+steering disabled or using <code>in_graph</code>. Other batches with selected rows use
+eager capture. A step with no selected rows follows normal model execution.
+The <a href="../hidden-state-capture/#engine-requirements">capture guide</a> describes these
+requirements; an eager capture step does not mean ordinary generation has lost
+its graphs.</p>
+<p>Capture only the layers and rows needed for analysis. For one representation per
+prompt, use <code>SelectSpec(prompt_positions=[-1])</code> and <code>max_tokens=1</code>. This reduces
+activation storage and transfer as well as avoiding unnecessary decode steps.</p>
+<h2 id="choosing-settings-for-a-workload">Choosing settings for a workload<a class="headerlink" href="#choosing-settings-for-a-workload" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>A persistent demo or server:</strong> keep the model loaded and use graph defaults.
+  Declare only the algorithms the service accepts. Preload frequently used
+  payloads when request latency matters.</li>
+<li><strong>Repeated evaluations:</strong> load the model once, batch prompts, and reuse it
+  for baseline and steered requests. Keep the paper's prompt and selection
+  protocol when reproducing results.</li>
+<li><strong>A small, one-off capture job:</strong> eager mode can finish sooner if graph
+  compilation costs more than the inference it would save. Keep the choice
+  explicit at that job rather than making it the shared model-loader default.</li>
+</ul>
+<h2 id="measuring-performance">Measuring performance<a class="headerlink" href="#measuring-performance" title="Permanent link">&para;</a></h2>
+<p>Separate initialization from request execution. The first engine start can
+include model loading, kernel compilation, and CUDA graph capture. Warm the
+execution path before comparing steady-state latency or throughput.</p>
+<p>For comparable requests, record prompt-token counts, generated-token counts,
+sampling settings, batch size, graph mode, and whether prefix-cache hits are
+included. <code>max_tokens</code> is an upper bound; generated answers may end earlier.
+Temperature zero is useful for reducing output-length variation in a timing
+comparison, but the actual token counts are the quantities to report.</p>
+<p>The repository's
+<a href="https://github.com/ZJU-REAL/EasySteer/blob/main/tests/bench_eager_vs_cudagraphs.py"><code>bench_eager_vs_cudagraphs.py</code></a>
+compares execution modes. Use a workload representative of your application;
+the paper's reported speedups describe its own models, hardware, and baselines.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1541,6 +1983,44 @@
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../attention/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Attention head intervention">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Attention head intervention
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../hidden-state-capture/" class="md-footer__link md-footer__link--next" aria-label="Next: Hidden-state capture">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Hidden-state capture
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1595,10 +2075,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/EasySteer/dev", "features": ["content.action.edit", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.path", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "/EasySteer/dev/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.path", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="/EasySteer/dev/assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

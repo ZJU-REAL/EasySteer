@@ -9,6 +9,14 @@
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/api-reference/algorithms/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/api-reference/engine-configuration/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
          <loc>https://zju-real.github.io/EasySteer/dev/api-reference/hidden-states/</loc>
          <lastmod>2026-09-10</lastmod>
     </url>
@@ -37,7 +45,15 @@
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/getting-started/troubleshooting/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
          <loc>https://zju-real.github.io/EasySteer/dev/replications/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/user-guide/attention/</loc>
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>
@@ -50,6 +66,10 @@
     </url>
     <url>
          <loc>https://zju-real.github.io/EasySteer/dev/user-guide/openai-server/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/user-guide/performance/</loc>
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>

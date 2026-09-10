@@ -10,25 +10,31 @@
       
       
       
+        <link rel="canonical" href="https://zju-real.github.io/EasySteer/dev/user-guide/attention/">
       
+      
+        <link rel="prev" href="../steering/">
+      
+      
+        <link rel="next" href="../performance/">
       
       
         
       
       
-      <link rel="icon" href="/EasySteer/dev/assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>EasySteer</title>
+        <title>Attention head intervention - EasySteer</title>
       
     
     
-      <link rel="stylesheet" href="/EasySteer/dev/assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="/EasySteer/dev/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,9 +53,9 @@
       
     
     
-      <link rel="stylesheet" href="/EasySteer/dev/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/EasySteer/dev",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -73,6 +79,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#attention-head-intervention" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -87,7 +98,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/EasySteer/dev/." title="EasySteer" class="md-header__button md-logo" aria-label="EasySteer" data-md-component="logo">
+    <a href="../.." title="EasySteer" class="md-header__button md-logo" aria-label="EasySteer" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -107,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Attention head intervention
             
           </span>
         </div>
@@ -220,7 +231,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/EasySteer/dev/." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -241,7 +252,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/getting-started/installation/" class="md-tabs__link">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
           
   
   
@@ -259,6 +270,8 @@
   
   
   
+    
+  
   
     
     
@@ -266,11 +279,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/EasySteer/dev/user-guide/steering/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../steering/" class="md-tabs__link">
           
   
   
@@ -295,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/replications/" class="md-tabs__link">
+        <a href="../../replications/" class="md-tabs__link">
           
   
   
@@ -317,7 +332,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/developer-guide/testing/" class="md-tabs__link">
+        <a href="../../developer-guide/testing/" class="md-tabs__link">
           
   
   
@@ -339,7 +354,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/EasySteer/dev/api-reference/" class="md-tabs__link">
+        <a href="../../api-reference/" class="md-tabs__link">
           
   
   
@@ -375,7 +390,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/EasySteer/dev/." title="EasySteer" class="md-nav__button md-logo" aria-label="EasySteer" data-md-component="logo">
+    <a href="../.." title="EasySteer" class="md-nav__button md-logo" aria-label="EasySteer" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -405,7 +420,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -492,7 +507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -520,7 +535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -548,7 +563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/getting-started/troubleshooting/" class="md-nav__link">
+      <a href="../../getting-started/troubleshooting/" class="md-nav__link">
         
   
   
@@ -580,8 +595,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -595,19 +612,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -625,7 +645,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -640,8 +660,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -656,18 +678,21 @@
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
         
           
-          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="">
             
   
   
@@ -685,7 +710,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -703,7 +728,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/steering/" class="md-nav__link">
+      <a href="../steering/" class="md-nav__link">
         
   
   
@@ -728,10 +753,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/attention/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Attention head intervention
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -747,6 +799,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported component
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capture-the-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capture the representation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apply-selected-head-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Apply selected head directions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iti-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ITI example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -759,7 +875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/performance/" class="md-nav__link">
+      <a href="../performance/" class="md-nav__link">
         
   
   
@@ -809,17 +925,20 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
         
           
-          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="">
             
   
   
@@ -855,7 +974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/hidden-state-capture/" class="md-nav__link">
+      <a href="../hidden-state-capture/" class="md-nav__link">
         
   
   
@@ -883,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/extracting-vectors/" class="md-nav__link">
+      <a href="../extracting-vectors/" class="md-nav__link">
         
   
   
@@ -911,7 +1030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/reft-training/" class="md-nav__link">
+      <a href="../reft-training/" class="md-nav__link">
         
   
   
@@ -959,17 +1078,20 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
         
           
-          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
             
   
   
@@ -1005,7 +1127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/openai-server/" class="md-nav__link">
+      <a href="../openai-server/" class="md-nav__link">
         
   
   
@@ -1033,7 +1155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/user-guide/web-demo/" class="md-nav__link">
+      <a href="../web-demo/" class="md-nav__link">
         
   
   
@@ -1099,7 +1221,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/EasySteer/dev/replications/" class="md-nav__link ">
+            <a href="../../replications/" class="md-nav__link ">
               
   
   
@@ -1203,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/developer-guide/testing/" class="md-nav__link">
+      <a href="../../developer-guide/testing/" class="md-nav__link">
         
   
   
@@ -1231,7 +1353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/developer-guide/contributing/" class="md-nav__link">
+      <a href="../../developer-guide/contributing/" class="md-nav__link">
         
   
   
@@ -1299,7 +1421,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="/EasySteer/dev/api-reference/" class="md-nav__link ">
+            <a href="../../api-reference/" class="md-nav__link ">
               
   
   
@@ -1343,7 +1465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/engine-configuration/" class="md-nav__link">
+      <a href="../../api-reference/engine-configuration/" class="md-nav__link">
         
   
   
@@ -1371,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/algorithms/" class="md-nav__link">
+      <a href="../../api-reference/algorithms/" class="md-nav__link">
         
   
   
@@ -1399,7 +1521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/steering-specs/" class="md-nav__link">
+      <a href="../../api-reference/steering-specs/" class="md-nav__link">
         
   
   
@@ -1427,7 +1549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/steer/" class="md-nav__link">
+      <a href="../../api-reference/steer/" class="md-nav__link">
         
   
   
@@ -1455,7 +1577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/EasySteer/dev/api-reference/hidden-states/" class="md-nav__link">
+      <a href="../../api-reference/hidden-states/" class="md-nav__link">
         
   
   
@@ -1500,6 +1622,60 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-component" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported component
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capture-the-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capture the representation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apply-selected-head-directions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Apply selected head directions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iti-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ITI example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1517,11 +1693,184 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../steering/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../steering/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Inference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+    <a href="https://github.com/ZJU-REAL/EasySteer/edit/main/docs/user-guide/attention.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="attention-head-intervention">Attention head intervention<a class="headerlink" href="#attention-head-intervention" title="Permanent link">&para;</a></h1>
+<p><code>attention_add</code> adds a direction to attention head outputs after attention
+aggregation and before the output projection. This is the intervention point
+used by <a href="https://proceedings.neurips.cc/paper_files/paper/2023/hash/81b8390039b7302c909cb769f8b6cd93-Abstract-Conference.html">Inference-Time Intervention (ITI)</a>.
+It changes the representation passed to the output projection; it does not edit
+attention scores, attention probabilities, or stored keys and values directly.</p>
+<h2 id="supported-component">Supported component<a class="headerlink" href="#supported-component" title="Permanent link">&para;</a></h2>
+<p>Use standard decoder MHA or GQA with <code>tensor_parallel_size=1</code>. MLA, encoder
+attention, and cross-attention are outside this component's current scope.
+The engine discovers attention modules from the model itself and checks that
+the hook target is available.</p>
+<p>For a layer with <code>H</code> query heads and value-output dimension <code>D</code>, the captured
+and steered tensor has shape <code>(rows, H * D)</code>. This width need not equal the
+residual hidden size. GQA still uses the <strong>query</strong> head count at this point,
+not the number of KV heads.</p>
+<h2 id="capture-the-representation">Capture the representation<a class="headerlink" href="#capture-the-representation" title="Permanent link">&para;</a></h2>
+<p>The same capture API and selectors work for attention heads:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">easysteer.hidden_states</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">hs</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">tensor_parallel_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">enable_steer_vector</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">steer_algorithms</span><span class="o">=</span><span class="p">[</span><span class="s2">"attention_add"</span><span class="p">],</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">prompts</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"The capital of France is"</span><span class="p">]</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">heads</span> <span class="o">=</span> <span class="n">hs</span><span class="o">.</span><span class="n">capture</span><span class="p">(</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">llm</span><span class="p">,</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">prompts</span><span class="p">,</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">],</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">stream</span><span class="o">=</span><span class="s2">"attention_heads"</span><span class="p">,</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">max_tokens</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">steering</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">)</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">layout</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">layouts</span><span class="p">[</span><span class="mi">10</span><span class="p">]</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">last_token_heads</span> <span class="o">=</span> <span class="n">heads</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">0</span><span class="p">)[</span><span class="mi">10</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"num_heads"</span><span class="p">],</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"head_size"</span><span class="p">],</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="p">)</span>
+</code></pre></div>
+<p>This raw completion prompt illustrates the component layout. For chat
+applications, render the model's chat template as in the
+<a href="../../getting-started/quickstart/">quickstart</a>. For a paper replication, keep
+the paper's prompt format.</p>
+<h2 id="apply-selected-head-directions">Apply selected head directions<a class="headerlink" href="#apply-selected-head-directions" title="Permanent link">&para;</a></h2>
+<p>Use a concatenated <code>DirectionVector</code> or an EasySteer direction GGUF. Leave
+unselected head slices zero. The same per-request <code>ApplySpec</code>, prefix caching,
+and graph rules apply:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># This file must contain attention directions for the model loaded above.</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">attention</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">"vectors/my_attention_direction.gguf"</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"attention_add"</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">normalize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">)])</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">prompts</span><span class="p">,</span> <span class="n">steering</span><span class="o">=</span><span class="n">attention</span><span class="p">)</span>
+</code></pre></div>
+<p>The last prompt position computes the first answer-token prediction; including
+it is useful when steering a whole answer. <code>generation="all"</code> covers subsequent
+decode forward passes. To steer all prompt processing as well, use
+<code>ApplySpec(prompt="all", generation="all")</code>.</p>
+<p><code>attention_add</code> supports eager, <code>split</code>, and <code>in_graph</code>; a single-vector
+declaration selects <code>in_graph</code> under the default <code>auto</code> mode. Normalization is
+not supported, so keep <code>normalize=False</code>.</p>
+<h2 id="iti-example">ITI example<a class="headerlink" href="#iti-example" title="Permanent link">&para;</a></h2>
+<p>The <a href="https://github.com/ZJU-REAL/EasySteer/blob/main/replications/iti/iti.ipynb">ITI notebook</a>
+uses Llama-2-7B-Chat, the authors' QA prompt, 48 selected heads, and intervention
+strength 15. It loads a supplied direction, evaluates one fixed TruthfulQA set,
+and displays baseline/steered accuracy and generated examples as executed
+notebook outputs.</p>
+<p>To learn directions from your own data, use
+<a href="../extracting-vectors/#iti-attention-head-directions"><code>ITIExtractor</code></a>. It fits
+per-head probes on training captures, selects heads by validation accuracy, and
+returns the scaled head directions in the common control-vector format.
+Choose held-out data by question before collecting answer representations.</p>
+<p>The bundled replication direction uses the official implementation's separate
+GEN calibration bank for the projection standard deviation. The general
+extractor uses the provided training and validation captures. Both use
+<code>attention_add</code> for inference; the extraction guide describes the distinction.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1541,6 +1890,44 @@
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../steering/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Steering requests">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Steering requests
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../performance/" class="md-footer__link md-footer__link--next" aria-label="Next: Graphs, caching, and performance">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Graphs, caching, and performance
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1595,10 +1982,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/EasySteer/dev", "features": ["content.action.edit", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.path", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "/EasySteer/dev/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.path", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="/EasySteer/dev/assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
