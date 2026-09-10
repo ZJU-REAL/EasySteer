@@ -1297,6 +1297,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1425,6 +1431,90 @@
     
   
     Steering specs (vllm.steer_vectors)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="payloads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Payload classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="algorithm-extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithm extension API
   
 
     
@@ -1604,15 +1694,20 @@ formats, and signatures.</p>
   ITI, SAE), the <code>StatisticalControlVector</code> container, and payload adapters.</li>
 <li><a href="hidden-states/"><code>easysteer.hidden_states</code></a> — <code>capture()</code> / <code>CaptureResult</code> and the
   legacy extraction helpers.</li>
-<li><a href="steering-specs/">Steering specs</a> — hand-written summary of <code>SteeringSpec</code> /
-  <code>VectorSpec</code> / <code>ApplySpec</code> / <code>SelectSpec</code>; the
-  <a href="../user-guide/steering/">Steering guide</a> is the canonical reference. These
-  classes belong to the vLLM fork and are documented separately from the generated
-  <code>easysteer</code> package reference.</li>
+<li><a href="steering-specs/">Steering specs</a> — generated class and field reference for
+  <code>SteeringSpec</code>, <code>VectorSpec</code>, <code>ApplySpec</code>, and <code>SelectSpec</code>, plus default and
+  preload methods added to <code>LLM</code>.</li>
+<li><a href="payloads/">Payload classes</a> — constructors, tensor shapes, validation,
+  attributes, and wire conversion for all six payload types.</li>
+<li><a href="capture/">Capture API</a> — <code>vllm.capture</code> component constants, row metadata,
+  serialization, and worker stream/session classes.</li>
+<li><a href="algorithm-extension/">Algorithm extension API</a> — transformation and graph
+  contracts, registration, and authoring capabilities.</li>
 </ul>
-<p>The <code>easysteer</code> API pages are generated from source docstrings with static
-analysis. Fork specs and engine options are documented separately so the site
-can build without importing a GPU runtime.</p>
+<p>Class and method references use static analysis of the checked-out EasySteer and
+vLLM-fork sources. Public lazy exports are rendered from their defining modules
+with the public import names in their headings. Building the site does not
+import either package or require a GPU runtime.</p>
 
 
 

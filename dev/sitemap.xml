@@ -9,7 +9,15 @@
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/api-reference/algorithm-extension/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
          <loc>https://zju-real.github.io/EasySteer/dev/api-reference/algorithms/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/api-reference/capture/</loc>
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>
@@ -18,6 +26,10 @@
     </url>
     <url>
          <loc>https://zju-real.github.io/EasySteer/dev/api-reference/hidden-states/</loc>
+         <lastmod>2026-09-10</lastmod>
+    </url>
+    <url>
+         <loc>https://zju-real.github.io/EasySteer/dev/api-reference/payloads/</loc>
          <lastmod>2026-09-10</lastmod>
     </url>
     <url>

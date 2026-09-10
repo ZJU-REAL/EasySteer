@@ -16,7 +16,7 @@
         <link rel="prev" href="../algorithms/">
       
       
-        <link rel="next" href="../steer/">
+        <link rel="next" href="../payloads/">
       
       
         
@@ -1297,6 +1297,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1477,10 +1483,435 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#spec-classes" class="md-nav__link">
+  <a href="#constructing-and-validating-specs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Spec classes
+        Constructing and validating specs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SteeringSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SteeringSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec.vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec.conflict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conflict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VectorSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VectorSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.normalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        params
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        name
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.ApplySpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ApplySpec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelectSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SelectSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.to_wire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_wire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.from_wire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_wire
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engine-facing-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine-facing conversion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.to_engine_request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_engine_request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engine-default-and-preload-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine default and preload methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.set_default_steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_default_steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.get_default_steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_default_steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.preload_steer_vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        preload_steer_vectors
       
     </span>
   </a>
@@ -1491,6 +1922,90 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../payloads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Payload classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithm-extension/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithm extension API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1586,10 +2101,435 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#spec-classes" class="md-nav__link">
+  <a href="#constructing-and-validating-specs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Spec classes
+        Constructing and validating specs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SteeringSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SteeringSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec.vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vectors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.SteeringSpec.conflict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conflict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VectorSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="VectorSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        layers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.normalize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.params" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        params
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.VectorSpec.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        name
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.ApplySpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ApplySpec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelectSpec
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SelectSpec">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.prompt_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        prompt_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.generation_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generation_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_prompt_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_generation_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.to_wire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_wire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_hooks.selection.spec.SelectSpec.from_wire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_wire
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engine-facing-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine-facing conversion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model_hooks.steering.api.to_engine_request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_engine_request
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#engine-default-and-preload-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engine default and preload methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.set_default_steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_default_steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.get_default_steering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_default_steering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm.LLM.preload_steer_vectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        preload_steer_vectors
       
     </span>
   </a>
@@ -1670,68 +2610,2420 @@
 
 
 <h1 id="steering-specs-vllmsteer_vectors">Steering specs (<code>vllm.steer_vectors</code>)<a class="headerlink" href="#steering-specs-vllmsteer_vectors" title="Permanent link">&para;</a></h1>
-<p>The user-facing v2 steering API is exported by
-<a href="https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/vllm/steer_vectors/api.py"><code>vllm-steer/vllm/steer_vectors/api.py</code></a>
-and imported as:</p>
+<p>The classes below are the public authoring API. Their descriptions, field types,
+defaults, and methods are rendered from the fork's source definitions.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SelectSpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
 </code></pre></div>
-<p><strong>The <a href="../../user-guide/steering/">Steering guide</a> is the canonical reference for these
-classes</strong> — every field of <code>SteeringSpec</code>, <code>VectorSpec</code>, <code>ApplySpec</code>, and <code>SelectSpec</code>
-is documented there, with defaults, semantics, and examples.</p>
-<p>This page summarizes the fork's API by hand. The docs build analyzes the
-<code>easysteer</code> package statically and does not load the vLLM fork; changes to these
-specs should update this summary and the steering guide together.</p>
-<h2 id="spec-classes">Spec classes<a class="headerlink" href="#spec-classes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Class</th>
-<th>Role</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>SelectSpec</code></td>
-<td>The shared <em>where-clause</em> language: per-phase <code>prompt</code>/<code>generation</code> <code>"all"</code>, the six phase-scoped include selectors and their <code>exclude_*</code> twins. Also used by <a href="../../user-guide/hidden-state-capture/">hidden-state capture</a>.</td>
+<td><a href="#model_hooks.steering.api.SteeringSpec">SteeringSpec</a></td>
+<td>A complete request configuration: ordered vectors and a conflict policy.</td>
 </tr>
 <tr>
-<td><code>ApplySpec</code></td>
-<td>A <code>SelectSpec</code> subclass: where/when one vector applies.</td>
+<td><a href="#model_hooks.steering.api.VectorSpec">VectorSpec</a></td>
+<td>One payload, algorithm, scale, layer set, and application rule.</td>
 </tr>
 <tr>
-<td><code>VectorSpec</code></td>
-<td>One vector: <code>source</code> or <code>data</code>, <code>algorithm</code>, <code>scale</code>, <code>layers</code>, <code>normalize</code>, <code>apply</code>, <code>params</code>, <code>name</code>.</td>
+<td><a href="#model_hooks.steering.api.ApplySpec">ApplySpec</a></td>
+<td>Token selection for a steering vector.</td>
 </tr>
 <tr>
-<td><code>SteeringSpec</code></td>
-<td>Ordered <code>vectors</code> list plus a <code>conflict</code> policy (<code>"priority"</code> / <code>"sequential"</code> / <code>"error"</code>).</td>
+<td><a href="#model_hooks.selection.spec.SelectSpec">SelectSpec</a></td>
+<td>The same selection language, also exported by <code>vllm.capture</code>.</td>
 </tr>
 </tbody>
 </table>
-<p>The algorithm determines the target component: <code>moe_router</code> operates on
-<code>router_logits</code>, <code>attention_add</code> on <code>attention_heads</code>, and the remaining
-algorithms on decoder <code>hidden_states</code>.
-No separate target field is needed in <code>VectorSpec</code>. Steering and capture share
-component discovery and availability checks.</p>
-<p>Requests resolve <code>steering=None</code> (or omission) to the current default, <code>False</code> to
-no steering, and a spec to a complete override. Python batches can provide these
-choices per prompt. <code>LLM.set_default_steering(spec | None)</code> and
-<code>get_default_steering()</code> manage the default; updates affect only new requests.</p>
-<p>File and in-memory inputs become canonical payloads before execution:
-<code>DirectionVector</code>, <code>LinearMap</code>, <code>LowRankProjector</code>, <code>ReftIntervention</code>,
-<code>ConceptPair</code>, or <code>RouterConfig</code>. Explicit third-party format adapters are
-available through <code>easysteer.vectors.load(path, format=...)</code>.
-The <a href="../algorithms/">algorithms and payloads</a> reference lists formats,
-normalization support, and per-algorithm scale semantics.</p>
-<p>Graph eligibility also follows the algorithm and payload. In particular,
-file-backed and inline <code>moe_router</code> configurations support <code>in_graph</code> for
-<code>activate</code>, <code>deactivate</code>, <code>soft</code>, and <code>soft_topk</code>; <code>soft_random</code> requires <code>split</code>.
-See <a href="../../user-guide/steering/#interaction-with-engine-features">engine interactions</a>
-for declaration-based auto selection and other payload conditions. The
-<a href="../engine-configuration/">engine configuration reference</a> lists startup
-arguments and their CLI equivalents.</p>
-<p>For engine integration, see the
-<a href="https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/design/steer_vectors.md">steering architecture</a>.</p>
+<p>For worked examples and selection semantics, see
+<a href="../../user-guide/steering/">steering requests</a>. The
+<a href="../algorithms/">algorithm reference</a> covers accepted payloads and graph
+conditions; <a href="../engine-configuration/">engine configuration</a> covers startup
+declarations and capacity.</p>
+<h2 id="constructing-and-validating-specs">Constructing and validating specs<a class="headerlink" href="#constructing-and-validating-specs" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">"vectors/happy_diffmean.gguf"</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"direct"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">layers</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">24</span><span class="p">)),</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)])</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">text</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">()</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">restored</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="o">.</span><span class="n">model_validate_json</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+<p>Specs are Pydantic models. Constructors and <code>model_validate(...)</code> validate field
+values and reject unknown keys. <code>model_dump(mode="json")</code> returns a dictionary;
+<code>model_dump_json()</code> returns JSON text; <code>model_validate_json(text)</code> returns a
+validated model. For tensor payloads that must be sent as JSON, use
+<a href="../steer/#easysteer.vectors.to_json_payload"><code>to_json_payload</code></a> before placing
+the payload in <code>VectorSpec.data</code>.</p>
+<p>Pass a complete spec to <code>llm.generate(..., steering=spec)</code>. Omission or <code>None</code>
+inherits the current engine default; <code>False</code> disables steering. Python batches
+can supply one choice per prompt. Defaults and explicit specs are not stacked.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="model_hooks.steering.api.SteeringSpec" class="doc doc-heading">
+            vllm.steer_vectors.SteeringSpec
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-model"><code>pydantic-model</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.SteeringSpec" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+        <p>A complete steering configuration: ordered vectors + conflict policy.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="vectors
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.SteeringSpec.vectors)" href="#model_hooks.steering.api.SteeringSpec.vectors">vectors</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="vllm.steer_vectors.VectorSpec
+
+
+  
+      pydantic-model
+   (model_hooks.steering.api.VectorSpec)" href="#model_hooks.steering.api.VectorSpec">VectorSpec</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The vectors to apply (non-empty; order matters for
+'sequential'/'priority' conflict resolution).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="conflict
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.SteeringSpec.conflict)" href="#model_hooks.steering.api.SteeringSpec.conflict">conflict</a></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;priority&#39;, &#39;sequential&#39;, &#39;error&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>What to do when several vectors target one position:
+'priority' (first wins), 'sequential' (stack), 'error'.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+    
+      <p>Config:</p>
+      <ul>
+          <li><code>extra</code>: <code class="highlight language-python"><span class="n">forbid</span></code></li>
+      </ul>
+
+        <p>Fields:</p>
+        <ul>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="vectors
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.SteeringSpec.vectors)" href="#model_hooks.steering.api.SteeringSpec.vectors">vectors</a></code>
+                (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="vllm.steer_vectors.VectorSpec
+
+
+  
+      pydantic-model
+   (model_hooks.steering.api.VectorSpec)" href="#model_hooks.steering.api.VectorSpec">VectorSpec</a>]</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="conflict
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.SteeringSpec.conflict)" href="#model_hooks.steering.api.SteeringSpec.conflict">conflict</a></code>
+                (<code><span title="typing.Literal">Literal</span>[&#39;priority&#39;, &#39;sequential&#39;, &#39;error&#39;]</code>)
+            </li>
+        </ul>
+
+        <p>Validators:</p>
+        <ul>
+            <li>
+              <code><span title="model_hooks.steering.api.SteeringSpec._validate">_validate</span></code>
+            </li>
+        </ul>
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>vllm-steer/vllm/model_hooks/steering/api.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#__codelineno-0-129">129</a></span>
+<span class="normal"><a href="#__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#__codelineno-0-131">131</a></span>
+<span class="normal"><a href="#__codelineno-0-132">132</a></span>
+<span class="normal"><a href="#__codelineno-0-133">133</a></span>
+<span class="normal"><a href="#__codelineno-0-134">134</a></span>
+<span class="normal"><a href="#__codelineno-0-135">135</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="k">class</span><span class="w"> </span><span class="nc">SteeringSpec</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="w">    </span><span class="sd">"""A complete steering configuration: ordered vectors + conflict policy.</span>
+<a id="__codelineno-0-111" name="__codelineno-0-111"></a>
+<a id="__codelineno-0-112" name="__codelineno-0-112"></a><span class="sd">    Attributes:</span>
+<a id="__codelineno-0-113" name="__codelineno-0-113"></a><span class="sd">        vectors: The vectors to apply (non-empty; order matters for</span>
+<a id="__codelineno-0-114" name="__codelineno-0-114"></a><span class="sd">            'sequential'/'priority' conflict resolution).</span>
+<a id="__codelineno-0-115" name="__codelineno-0-115"></a><span class="sd">        conflict: What to do when several vectors target one position:</span>
+<a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="sd">            'priority' (first wins), 'sequential' (stack), 'error'.</span>
+<a id="__codelineno-0-117" name="__codelineno-0-117"></a><span class="sd">    """</span>
+<a id="__codelineno-0-118" name="__codelineno-0-118"></a>
+<a id="__codelineno-0-119" name="__codelineno-0-119"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-0-120" name="__codelineno-0-120"></a>
+<a id="__codelineno-0-121" name="__codelineno-0-121"></a>    <span class="n">vectors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">]</span>
+<a id="__codelineno-0-122" name="__codelineno-0-122"></a>    <span class="n">conflict</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"priority"</span><span class="p">,</span> <span class="s2">"sequential"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"priority"</span>
+<a id="__codelineno-0-123" name="__codelineno-0-123"></a>
+<a id="__codelineno-0-124" name="__codelineno-0-124"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"after"</span><span class="p">)</span>
+<a id="__codelineno-0-125" name="__codelineno-0-125"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SteeringSpec"</span><span class="p">:</span>
+<a id="__codelineno-0-126" name="__codelineno-0-126"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">vectors</span><span class="p">:</span>
+<a id="__codelineno-0-127" name="__codelineno-0-127"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"vectors must be non-empty"</span><span class="p">)</span>
+<a id="__codelineno-0-128" name="__codelineno-0-128"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vectors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
+<a id="__codelineno-0-129" name="__codelineno-0-129"></a>            <span class="n">v</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">==</span> <span class="s2">"moe_router"</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">vectors</span>
+<a id="__codelineno-0-130" name="__codelineno-0-130"></a>        <span class="p">):</span>
+<a id="__codelineno-0-131" name="__codelineno-0-131"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-132" name="__codelineno-0-132"></a>                <span class="s2">"moe_router is not supported in multi-vector specs yet; "</span>
+<a id="__codelineno-0-133" name="__codelineno-0-133"></a>                <span class="s2">"use a single-vector spec"</span>
+<a id="__codelineno-0-134" name="__codelineno-0-134"></a>            <span class="p">)</span>
+<a id="__codelineno-0-135" name="__codelineno-0-135"></a>        <span class="k">return</span> <span class="bp">self</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.SteeringSpec.vectors" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">vectors</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.SteeringSpec.vectors" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">vectors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.SteeringSpec.conflict" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">conflict</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.SteeringSpec.conflict" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">conflict</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'priority'</span><span class="p">,</span> <span class="s1">'sequential'</span><span class="p">,</span> <span class="s1">'error'</span><span class="p">]</span> <span class="o">=</span> <span class="s1">'priority'</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="model_hooks.steering.api.VectorSpec" class="doc doc-heading">
+            vllm.steer_vectors.VectorSpec
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-model"><code>pydantic-model</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+        <p>One steering vector and how it applies.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="source
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.source)" href="#model_hooks.steering.api.VectorSpec.source">source</a></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to a vector file in a format EasySteer itself
+defines (its GGUF export; moe_router JSON). For third-party
+checkpoint formats, load the file yourself (or use an
+<code>easysteer.vectors</code> adapter) and pass <code>data</code> instead.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="data
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.data)" href="#model_hooks.steering.api.VectorSpec.data">data</a></code></td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An in-memory payload (<code>vllm.model_hooks.steering.payloads</code>, or
+its wire dict) — the canonical way to steer with tensors
+you constructed or loaded yourself. Mutually exclusive with
+source.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="algorithm
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.algorithm)" href="#model_hooks.steering.api.VectorSpec.algorithm">algorithm</a></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Steering algorithm name (registry key).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="scale
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.scale)" href="#model_hooks.steering.api.VectorSpec.scale">scale</a></code></td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scale factor.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="layers
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.layers)" href="#model_hooks.steering.api.VectorSpec.layers">layers</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Layer indices to apply to; None lets the source decide.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="normalize
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.normalize)" href="#model_hooks.steering.api.VectorSpec.normalize">normalize</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Rescale the transformed hidden state to its original norm
+for direct, erase, replace, and concept_replace. Other algorithms
+reject True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="apply
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.apply)" href="#model_hooks.steering.api.VectorSpec.apply">apply</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="vllm.steer_vectors.ApplySpec (model_hooks.steering.api.ApplySpec)" href="#model_hooks.steering.api.ApplySpec">ApplySpec</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Where/when the vector applies (required).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="params
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.params)" href="#model_hooks.steering.api.VectorSpec.params">params</a></code></td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Algorithm-specific parameters; validated per algorithm,
+unknown keys are rejected.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="name
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.name)" href="#model_hooks.steering.api.VectorSpec.name">name</a></code></td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional request label; used as the engine-side request
+name when set (a generated id otherwise).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+    
+      <p>Config:</p>
+      <ul>
+          <li><code>extra</code>: <code class="highlight language-python"><span class="n">forbid</span></code></li>
+      </ul>
+
+        <p>Fields:</p>
+        <ul>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="source
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.source)" href="#model_hooks.steering.api.VectorSpec.source">source</a></code>
+                (<code><span title="str">str</span> | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="data
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.data)" href="#model_hooks.steering.api.VectorSpec.data">data</a></code>
+                (<code><span title="typing.Any">Any</span></code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="algorithm
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.algorithm)" href="#model_hooks.steering.api.VectorSpec.algorithm">algorithm</a></code>
+                (<code><span title="str">str</span></code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="scale
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.scale)" href="#model_hooks.steering.api.VectorSpec.scale">scale</a></code>
+                (<code><span title="float">float</span></code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="layers
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.layers)" href="#model_hooks.steering.api.VectorSpec.layers">layers</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="normalize
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.normalize)" href="#model_hooks.steering.api.VectorSpec.normalize">normalize</a></code>
+                (<code><span title="bool">bool</span></code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="apply
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.apply)" href="#model_hooks.steering.api.VectorSpec.apply">apply</a></code>
+                (<code><a class="autorefs autorefs-internal" title="vllm.steer_vectors.ApplySpec (model_hooks.steering.api.ApplySpec)" href="#model_hooks.steering.api.ApplySpec">ApplySpec</a></code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="params
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.params)" href="#model_hooks.steering.api.VectorSpec.params">params</a></code>
+                (<code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="name
+
+
+  
+      pydantic-field
+   (model_hooks.steering.api.VectorSpec.name)" href="#model_hooks.steering.api.VectorSpec.name">name</a></code>
+                (<code><span title="str">str</span> | None</code>)
+            </li>
+        </ul>
+
+        <p>Validators:</p>
+        <ul>
+            <li>
+              <code><span title="model_hooks.steering.api.VectorSpec._validate">_validate</span></code>
+            </li>
+        </ul>
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>vllm-steer/vllm/model_hooks/steering/api.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-59"> 59</a></span>
+<span class="normal"><a href="#__codelineno-0-60"> 60</a></span>
+<span class="normal"><a href="#__codelineno-0-61"> 61</a></span>
+<span class="normal"><a href="#__codelineno-0-62"> 62</a></span>
+<span class="normal"><a href="#__codelineno-0-63"> 63</a></span>
+<span class="normal"><a href="#__codelineno-0-64"> 64</a></span>
+<span class="normal"><a href="#__codelineno-0-65"> 65</a></span>
+<span class="normal"><a href="#__codelineno-0-66"> 66</a></span>
+<span class="normal"><a href="#__codelineno-0-67"> 67</a></span>
+<span class="normal"><a href="#__codelineno-0-68"> 68</a></span>
+<span class="normal"><a href="#__codelineno-0-69"> 69</a></span>
+<span class="normal"><a href="#__codelineno-0-70"> 70</a></span>
+<span class="normal"><a href="#__codelineno-0-71"> 71</a></span>
+<span class="normal"><a href="#__codelineno-0-72"> 72</a></span>
+<span class="normal"><a href="#__codelineno-0-73"> 73</a></span>
+<span class="normal"><a href="#__codelineno-0-74"> 74</a></span>
+<span class="normal"><a href="#__codelineno-0-75"> 75</a></span>
+<span class="normal"><a href="#__codelineno-0-76"> 76</a></span>
+<span class="normal"><a href="#__codelineno-0-77"> 77</a></span>
+<span class="normal"><a href="#__codelineno-0-78"> 78</a></span>
+<span class="normal"><a href="#__codelineno-0-79"> 79</a></span>
+<span class="normal"><a href="#__codelineno-0-80"> 80</a></span>
+<span class="normal"><a href="#__codelineno-0-81"> 81</a></span>
+<span class="normal"><a href="#__codelineno-0-82"> 82</a></span>
+<span class="normal"><a href="#__codelineno-0-83"> 83</a></span>
+<span class="normal"><a href="#__codelineno-0-84"> 84</a></span>
+<span class="normal"><a href="#__codelineno-0-85"> 85</a></span>
+<span class="normal"><a href="#__codelineno-0-86"> 86</a></span>
+<span class="normal"><a href="#__codelineno-0-87"> 87</a></span>
+<span class="normal"><a href="#__codelineno-0-88"> 88</a></span>
+<span class="normal"><a href="#__codelineno-0-89"> 89</a></span>
+<span class="normal"><a href="#__codelineno-0-90"> 90</a></span>
+<span class="normal"><a href="#__codelineno-0-91"> 91</a></span>
+<span class="normal"><a href="#__codelineno-0-92"> 92</a></span>
+<span class="normal"><a href="#__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span>
+<span class="normal"><a href="#__codelineno-0-106">106</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-59" name="__codelineno-0-59"></a><span class="k">class</span><span class="w"> </span><span class="nc">VectorSpec</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a><span class="w">    </span><span class="sd">"""One steering vector and how it applies.</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a><span class="sd">    Attributes:</span>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a><span class="sd">        source: Path to a vector file in a format EasySteer itself</span>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a><span class="sd">            defines (its GGUF export; moe_router JSON). For third-party</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a><span class="sd">            checkpoint formats, load the file yourself (or use an</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a><span class="sd">            `easysteer.vectors` adapter) and pass `data` instead.</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a><span class="sd">        data: An in-memory payload (`vllm.model_hooks.steering.payloads`, or</span>
+<a id="__codelineno-0-68" name="__codelineno-0-68"></a><span class="sd">            its wire dict) — the canonical way to steer with tensors</span>
+<a id="__codelineno-0-69" name="__codelineno-0-69"></a><span class="sd">            you constructed or loaded yourself. Mutually exclusive with</span>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a><span class="sd">            source.</span>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a><span class="sd">        algorithm: Steering algorithm name (registry key).</span>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a><span class="sd">        scale: Scale factor.</span>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="sd">        layers: Layer indices to apply to; None lets the source decide.</span>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a><span class="sd">        normalize: Rescale the transformed hidden state to its original norm</span>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a><span class="sd">            for direct, erase, replace, and concept_replace. Other algorithms</span>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a><span class="sd">            reject True.</span>
+<a id="__codelineno-0-77" name="__codelineno-0-77"></a><span class="sd">        apply: Where/when the vector applies (required).</span>
+<a id="__codelineno-0-78" name="__codelineno-0-78"></a><span class="sd">        params: Algorithm-specific parameters; validated per algorithm,</span>
+<a id="__codelineno-0-79" name="__codelineno-0-79"></a><span class="sd">            unknown keys are rejected.</span>
+<a id="__codelineno-0-80" name="__codelineno-0-80"></a><span class="sd">        name: Optional request label; used as the engine-side request</span>
+<a id="__codelineno-0-81" name="__codelineno-0-81"></a><span class="sd">            name when set (a generated id otherwise).</span>
+<a id="__codelineno-0-82" name="__codelineno-0-82"></a><span class="sd">    """</span>
+<a id="__codelineno-0-83" name="__codelineno-0-83"></a>
+<a id="__codelineno-0-84" name="__codelineno-0-84"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-0-85" name="__codelineno-0-85"></a>
+<a id="__codelineno-0-86" name="__codelineno-0-86"></a>    <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-87" name="__codelineno-0-87"></a>    <span class="n">data</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-88" name="__codelineno-0-88"></a>    <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"direct"</span>
+<a id="__codelineno-0-89" name="__codelineno-0-89"></a>    <span class="n">scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+<a id="__codelineno-0-90" name="__codelineno-0-90"></a>    <span class="n">layers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-91" name="__codelineno-0-91"></a>    <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-0-92" name="__codelineno-0-92"></a>    <span class="n">apply</span><span class="p">:</span> <span class="n">ApplySpec</span>
+<a id="__codelineno-0-93" name="__codelineno-0-93"></a>    <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-94" name="__codelineno-0-94"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-95" name="__codelineno-0-95"></a>
+<a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"after"</span><span class="p">)</span>
+<a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"VectorSpec"</span><span class="p">:</span>
+<a id="__codelineno-0-98" name="__codelineno-0-98"></a>        <span class="n">validate_vector_input</span><span class="p">(</span>
+<a id="__codelineno-0-99" name="__codelineno-0-99"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
+<a id="__codelineno-0-100" name="__codelineno-0-100"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+<a id="__codelineno-0-101" name="__codelineno-0-101"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">algorithm</span><span class="p">,</span>
+<a id="__codelineno-0-102" name="__codelineno-0-102"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span>
+<a id="__codelineno-0-103" name="__codelineno-0-103"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">,</span>
+<a id="__codelineno-0-104" name="__codelineno-0-104"></a>            <span class="n">normalize</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">,</span>
+<a id="__codelineno-0-105" name="__codelineno-0-105"></a>        <span class="p">)</span>
+<a id="__codelineno-0-106" name="__codelineno-0-106"></a>        <span class="k">return</span> <span class="bp">self</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.source" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">source</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.source" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.data" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">data</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.data" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">data</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.algorithm" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">algorithm</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.algorithm" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'direct'</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.scale" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">scale</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.scale" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.layers" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">layers</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.layers" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">layers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.normalize" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">normalize</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.normalize" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.apply" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">apply</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.apply" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">apply</span><span class="p">:</span> <span class="n">ApplySpec</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.params" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">params</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.params" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.steering.api.VectorSpec.name" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">name</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.steering.api.VectorSpec.name" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="model_hooks.steering.api.ApplySpec" class="doc doc-heading">
+            vllm.steer_vectors.ApplySpec
+
+
+<a href="#model_hooks.steering.api.ApplySpec" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="vllm.model_hooks.selection.spec.SelectSpec">SelectSpec</span></code></p>
+
+
+
+        <p>Where and when a steering vector applies.</p>
+<p>The selection language itself lives in <code>SelectSpec</code> (shared with
+capture); <code>ApplySpec</code> is the steering-facing name.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>vllm-steer/vllm/model_hooks/steering/api.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#__codelineno-0-56">56</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-51" name="__codelineno-0-51"></a><span class="k">class</span><span class="w"> </span><span class="nc">ApplySpec</span><span class="p">(</span><span class="n">SelectSpec</span><span class="p">):</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a><span class="w">    </span><span class="sd">"""Where and when a steering vector applies.</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a><span class="sd">    The selection language itself lives in `SelectSpec` (shared with</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a><span class="sd">    capture); `ApplySpec` is the steering-facing name.</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="sd">    """</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+    </div>
+
+</div><p><code>ApplySpec</code> inherits every field, default, validation rule, and wire-conversion
+method from <code>SelectSpec</code> below. It is the type required by <code>VectorSpec.apply</code>.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="model_hooks.selection.spec.SelectSpec" class="doc doc-heading">
+            vllm.capture.SelectSpec
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-model"><code>pydantic-model</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+        <p>The shared token-selection language (where-clause).</p>
+<p>One selection semantics used by both steering (<code>ApplySpec</code>, "which
+tokens to steer") and capture ("which rows to extract"): resolved
+identically by the trigger collector, so a clause means the same
+thing in both systems.</p>
+<p>Each phase is selected independently — <code>prompt="all"</code> selects every
+prompt token, <code>prompt_positions=[-1]</code> selects one, and a phase with
+neither "all" nor a selector is untouched. "Last prompt token plus
+the whole generation" is therefore one clause:
+<code>SelectSpec(prompt_positions=[-1], generation="all")</code>.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="prompt
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt)" href="#model_hooks.selection.spec.SelectSpec.prompt">prompt</a></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;all&#39;] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>"all" selects every prompt token — the widest prompt
+include selector; unions with the others like any include.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="generation
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation)" href="#model_hooks.selection.spec.SelectSpec.generation">generation</a></code></td>
+            <td>
+                  <code><span title="typing.Literal">Literal</span>[&#39;all&#39;] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>"all" selects every generated token — the widest
+generation include selector.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="prompt_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_tokens)" href="#model_hooks.selection.spec.SelectSpec.prompt_tokens">prompt_tokens</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Token-id allowlist over prompt tokens (real
+ids, &gt;= 0).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="prompt_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_positions)" href="#model_hooks.selection.spec.SelectSpec.prompt_positions">prompt_positions</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prompt positions; negative values are
+Python-style from the end of the prompt (<code>-1</code> = last prompt
+token). Positive values past the prompt end clamp to the
+last prompt token (warned at admission).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="prompt_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_window)" href="#model_hooks.selection.spec.SelectSpec.prompt_window">prompt_window</a></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Half-open (start, stop) over prompt positions;
+negative bounds resolve from the end of the prompt
+(<code>(-5, None)</code> = the last five prompt tokens).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="generation_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_tokens)" href="#model_hooks.selection.spec.SelectSpec.generation_tokens">generation_tokens</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Token-id allowlist over generated tokens
+(real ids, &gt;= 0).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="generation_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_positions)" href="#model_hooks.selection.spec.SelectSpec.generation_positions">generation_positions</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>0-based decode step indices (<code>[0]</code> = the
+first generated token).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="generation_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_window)" href="#model_hooks.selection.spec.SelectSpec.generation_window">generation_window</a></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Half-open (start, stop) over 0-based decode
+steps; stop=None means unbounded.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_prompt_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens">exclude_prompt_tokens</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prompt token ids to never select.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_prompt_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_positions)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_positions">exclude_prompt_positions</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prompt positions to never select
+(same convention as <code>prompt_positions</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_prompt_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_window)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_window">exclude_prompt_window</a></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prompt window to never select (same
+convention as <code>prompt_window</code>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_generation_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_tokens)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_tokens">exclude_generation_tokens</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Generated token ids to never select.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_generation_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_positions)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_positions">exclude_generation_positions</a></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Decode steps to never select.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="exclude_generation_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_window)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_window">exclude_generation_window</a></code></td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Decode-step window to never select.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p>Selection = union of the include selectors' matches ("all" being
+the widest selector of its phase); the exclude selectors union and
+always subtract — where an include and an exclude overlap, the
+exclusion wins. Exclusions require their phase to be covered, and a
+clause that selects nothing is rejected.</p>
+
+    
+      <p>Config:</p>
+      <ul>
+          <li><code>extra</code>: <code class="highlight language-python"><span class="n">forbid</span></code></li>
+      </ul>
+
+        <p>Fields:</p>
+        <ul>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="prompt
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt)" href="#model_hooks.selection.spec.SelectSpec.prompt">prompt</a></code>
+                (<code><span title="typing.Literal">Literal</span>[&#39;all&#39;] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="generation
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation)" href="#model_hooks.selection.spec.SelectSpec.generation">generation</a></code>
+                (<code><span title="typing.Literal">Literal</span>[&#39;all&#39;] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="prompt_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_tokens)" href="#model_hooks.selection.spec.SelectSpec.prompt_tokens">prompt_tokens</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="prompt_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_positions)" href="#model_hooks.selection.spec.SelectSpec.prompt_positions">prompt_positions</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="prompt_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.prompt_window)" href="#model_hooks.selection.spec.SelectSpec.prompt_window">prompt_window</a></code>
+                (<code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="generation_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_tokens)" href="#model_hooks.selection.spec.SelectSpec.generation_tokens">generation_tokens</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="generation_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_positions)" href="#model_hooks.selection.spec.SelectSpec.generation_positions">generation_positions</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="generation_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.generation_window)" href="#model_hooks.selection.spec.SelectSpec.generation_window">generation_window</a></code>
+                (<code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_prompt_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens">exclude_prompt_tokens</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_prompt_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_positions)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_positions">exclude_prompt_positions</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_prompt_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_prompt_window)" href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_window">exclude_prompt_window</a></code>
+                (<code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_generation_tokens
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_tokens)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_tokens">exclude_generation_tokens</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_generation_positions
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_positions)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_positions">exclude_generation_positions</a></code>
+                (<code><span title="list">list</span>[<span title="int">int</span>] | None</code>)
+            </li>
+            <li>
+              <code><a class="autorefs autorefs-internal" title="exclude_generation_window
+
+
+  
+      pydantic-field
+   (model_hooks.selection.spec.SelectSpec.exclude_generation_window)" href="#model_hooks.selection.spec.SelectSpec.exclude_generation_window">exclude_generation_window</a></code>
+                (<code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span> | None] | None</code>)
+            </li>
+        </ul>
+
+        <p>Validators:</p>
+        <ul>
+            <li>
+              <code><span title="model_hooks.selection.spec.SelectSpec._validate">_validate</span></code>
+            </li>
+        </ul>
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>vllm-steer/vllm/model_hooks/selection/spec.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-21"> 21</a></span>
+<span class="normal"><a href="#__codelineno-0-22"> 22</a></span>
+<span class="normal"><a href="#__codelineno-0-23"> 23</a></span>
+<span class="normal"><a href="#__codelineno-0-24"> 24</a></span>
+<span class="normal"><a href="#__codelineno-0-25"> 25</a></span>
+<span class="normal"><a href="#__codelineno-0-26"> 26</a></span>
+<span class="normal"><a href="#__codelineno-0-27"> 27</a></span>
+<span class="normal"><a href="#__codelineno-0-28"> 28</a></span>
+<span class="normal"><a href="#__codelineno-0-29"> 29</a></span>
+<span class="normal"><a href="#__codelineno-0-30"> 30</a></span>
+<span class="normal"><a href="#__codelineno-0-31"> 31</a></span>
+<span class="normal"><a href="#__codelineno-0-32"> 32</a></span>
+<span class="normal"><a href="#__codelineno-0-33"> 33</a></span>
+<span class="normal"><a href="#__codelineno-0-34"> 34</a></span>
+<span class="normal"><a href="#__codelineno-0-35"> 35</a></span>
+<span class="normal"><a href="#__codelineno-0-36"> 36</a></span>
+<span class="normal"><a href="#__codelineno-0-37"> 37</a></span>
+<span class="normal"><a href="#__codelineno-0-38"> 38</a></span>
+<span class="normal"><a href="#__codelineno-0-39"> 39</a></span>
+<span class="normal"><a href="#__codelineno-0-40"> 40</a></span>
+<span class="normal"><a href="#__codelineno-0-41"> 41</a></span>
+<span class="normal"><a href="#__codelineno-0-42"> 42</a></span>
+<span class="normal"><a href="#__codelineno-0-43"> 43</a></span>
+<span class="normal"><a href="#__codelineno-0-44"> 44</a></span>
+<span class="normal"><a href="#__codelineno-0-45"> 45</a></span>
+<span class="normal"><a href="#__codelineno-0-46"> 46</a></span>
+<span class="normal"><a href="#__codelineno-0-47"> 47</a></span>
+<span class="normal"><a href="#__codelineno-0-48"> 48</a></span>
+<span class="normal"><a href="#__codelineno-0-49"> 49</a></span>
+<span class="normal"><a href="#__codelineno-0-50"> 50</a></span>
+<span class="normal"><a href="#__codelineno-0-51"> 51</a></span>
+<span class="normal"><a href="#__codelineno-0-52"> 52</a></span>
+<span class="normal"><a href="#__codelineno-0-53"> 53</a></span>
+<span class="normal"><a href="#__codelineno-0-54"> 54</a></span>
+<span class="normal"><a href="#__codelineno-0-55"> 55</a></span>
+<span class="normal"><a href="#__codelineno-0-56"> 56</a></span>
+<span class="normal"><a href="#__codelineno-0-57"> 57</a></span>
+<span class="normal"><a href="#__codelineno-0-58"> 58</a></span>
+<span class="normal"><a href="#__codelineno-0-59"> 59</a></span>
+<span class="normal"><a href="#__codelineno-0-60"> 60</a></span>
+<span class="normal"><a href="#__codelineno-0-61"> 61</a></span>
+<span class="normal"><a href="#__codelineno-0-62"> 62</a></span>
+<span class="normal"><a href="#__codelineno-0-63"> 63</a></span>
+<span class="normal"><a href="#__codelineno-0-64"> 64</a></span>
+<span class="normal"><a href="#__codelineno-0-65"> 65</a></span>
+<span class="normal"><a href="#__codelineno-0-66"> 66</a></span>
+<span class="normal"><a href="#__codelineno-0-67"> 67</a></span>
+<span class="normal"><a href="#__codelineno-0-68"> 68</a></span>
+<span class="normal"><a href="#__codelineno-0-69"> 69</a></span>
+<span class="normal"><a href="#__codelineno-0-70"> 70</a></span>
+<span class="normal"><a href="#__codelineno-0-71"> 71</a></span>
+<span class="normal"><a href="#__codelineno-0-72"> 72</a></span>
+<span class="normal"><a href="#__codelineno-0-73"> 73</a></span>
+<span class="normal"><a href="#__codelineno-0-74"> 74</a></span>
+<span class="normal"><a href="#__codelineno-0-75"> 75</a></span>
+<span class="normal"><a href="#__codelineno-0-76"> 76</a></span>
+<span class="normal"><a href="#__codelineno-0-77"> 77</a></span>
+<span class="normal"><a href="#__codelineno-0-78"> 78</a></span>
+<span class="normal"><a href="#__codelineno-0-79"> 79</a></span>
+<span class="normal"><a href="#__codelineno-0-80"> 80</a></span>
+<span class="normal"><a href="#__codelineno-0-81"> 81</a></span>
+<span class="normal"><a href="#__codelineno-0-82"> 82</a></span>
+<span class="normal"><a href="#__codelineno-0-83"> 83</a></span>
+<span class="normal"><a href="#__codelineno-0-84"> 84</a></span>
+<span class="normal"><a href="#__codelineno-0-85"> 85</a></span>
+<span class="normal"><a href="#__codelineno-0-86"> 86</a></span>
+<span class="normal"><a href="#__codelineno-0-87"> 87</a></span>
+<span class="normal"><a href="#__codelineno-0-88"> 88</a></span>
+<span class="normal"><a href="#__codelineno-0-89"> 89</a></span>
+<span class="normal"><a href="#__codelineno-0-90"> 90</a></span>
+<span class="normal"><a href="#__codelineno-0-91"> 91</a></span>
+<span class="normal"><a href="#__codelineno-0-92"> 92</a></span>
+<span class="normal"><a href="#__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span>
+<span class="normal"><a href="#__codelineno-0-106">106</a></span>
+<span class="normal"><a href="#__codelineno-0-107">107</a></span>
+<span class="normal"><a href="#__codelineno-0-108">108</a></span>
+<span class="normal"><a href="#__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#__codelineno-0-129">129</a></span>
+<span class="normal"><a href="#__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#__codelineno-0-131">131</a></span>
+<span class="normal"><a href="#__codelineno-0-132">132</a></span>
+<span class="normal"><a href="#__codelineno-0-133">133</a></span>
+<span class="normal"><a href="#__codelineno-0-134">134</a></span>
+<span class="normal"><a href="#__codelineno-0-135">135</a></span>
+<span class="normal"><a href="#__codelineno-0-136">136</a></span>
+<span class="normal"><a href="#__codelineno-0-137">137</a></span>
+<span class="normal"><a href="#__codelineno-0-138">138</a></span>
+<span class="normal"><a href="#__codelineno-0-139">139</a></span>
+<span class="normal"><a href="#__codelineno-0-140">140</a></span>
+<span class="normal"><a href="#__codelineno-0-141">141</a></span>
+<span class="normal"><a href="#__codelineno-0-142">142</a></span>
+<span class="normal"><a href="#__codelineno-0-143">143</a></span>
+<span class="normal"><a href="#__codelineno-0-144">144</a></span>
+<span class="normal"><a href="#__codelineno-0-145">145</a></span>
+<span class="normal"><a href="#__codelineno-0-146">146</a></span>
+<span class="normal"><a href="#__codelineno-0-147">147</a></span>
+<span class="normal"><a href="#__codelineno-0-148">148</a></span>
+<span class="normal"><a href="#__codelineno-0-149">149</a></span>
+<span class="normal"><a href="#__codelineno-0-150">150</a></span>
+<span class="normal"><a href="#__codelineno-0-151">151</a></span>
+<span class="normal"><a href="#__codelineno-0-152">152</a></span>
+<span class="normal"><a href="#__codelineno-0-153">153</a></span>
+<span class="normal"><a href="#__codelineno-0-154">154</a></span>
+<span class="normal"><a href="#__codelineno-0-155">155</a></span>
+<span class="normal"><a href="#__codelineno-0-156">156</a></span>
+<span class="normal"><a href="#__codelineno-0-157">157</a></span>
+<span class="normal"><a href="#__codelineno-0-158">158</a></span>
+<span class="normal"><a href="#__codelineno-0-159">159</a></span>
+<span class="normal"><a href="#__codelineno-0-160">160</a></span>
+<span class="normal"><a href="#__codelineno-0-161">161</a></span>
+<span class="normal"><a href="#__codelineno-0-162">162</a></span>
+<span class="normal"><a href="#__codelineno-0-163">163</a></span>
+<span class="normal"><a href="#__codelineno-0-164">164</a></span>
+<span class="normal"><a href="#__codelineno-0-165">165</a></span>
+<span class="normal"><a href="#__codelineno-0-166">166</a></span>
+<span class="normal"><a href="#__codelineno-0-167">167</a></span>
+<span class="normal"><a href="#__codelineno-0-168">168</a></span>
+<span class="normal"><a href="#__codelineno-0-169">169</a></span>
+<span class="normal"><a href="#__codelineno-0-170">170</a></span>
+<span class="normal"><a href="#__codelineno-0-171">171</a></span>
+<span class="normal"><a href="#__codelineno-0-172">172</a></span>
+<span class="normal"><a href="#__codelineno-0-173">173</a></span>
+<span class="normal"><a href="#__codelineno-0-174">174</a></span>
+<span class="normal"><a href="#__codelineno-0-175">175</a></span>
+<span class="normal"><a href="#__codelineno-0-176">176</a></span>
+<span class="normal"><a href="#__codelineno-0-177">177</a></span>
+<span class="normal"><a href="#__codelineno-0-178">178</a></span>
+<span class="normal"><a href="#__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#__codelineno-0-181">181</a></span>
+<span class="normal"><a href="#__codelineno-0-182">182</a></span>
+<span class="normal"><a href="#__codelineno-0-183">183</a></span>
+<span class="normal"><a href="#__codelineno-0-184">184</a></span>
+<span class="normal"><a href="#__codelineno-0-185">185</a></span>
+<span class="normal"><a href="#__codelineno-0-186">186</a></span>
+<span class="normal"><a href="#__codelineno-0-187">187</a></span>
+<span class="normal"><a href="#__codelineno-0-188">188</a></span>
+<span class="normal"><a href="#__codelineno-0-189">189</a></span>
+<span class="normal"><a href="#__codelineno-0-190">190</a></span>
+<span class="normal"><a href="#__codelineno-0-191">191</a></span>
+<span class="normal"><a href="#__codelineno-0-192">192</a></span>
+<span class="normal"><a href="#__codelineno-0-193">193</a></span>
+<span class="normal"><a href="#__codelineno-0-194">194</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="k">class</span><span class="w"> </span><span class="nc">SelectSpec</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="w">    </span><span class="sd">"""The shared token-selection language (where-clause).</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23"></a>
+<a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    One selection semantics used by both steering (`ApplySpec`, "which</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    tokens to steer") and capture ("which rows to extract"): resolved</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">    identically by the trigger collector, so a clause means the same</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">    thing in both systems.</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28"></a>
+<a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">    Each phase is selected independently — `prompt="all"` selects every</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">    prompt token, `prompt_positions=[-1]` selects one, and a phase with</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    neither "all" nor a selector is untouched. "Last prompt token plus</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">    the whole generation" is therefore one clause:</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">    `SelectSpec(prompt_positions=[-1], generation="all")`.</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a>
+<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">    Attributes:</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        prompt: "all" selects every prompt token — the widest prompt</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">            include selector; unions with the others like any include.</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">        generation: "all" selects every generated token — the widest</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="sd">            generation include selector.</span>
+<a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">        prompt_tokens: Token-id allowlist over prompt tokens (real</span>
+<a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">            ids, &gt;= 0).</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">        prompt_positions: Prompt positions; negative values are</span>
+<a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">            Python-style from the end of the prompt (`-1` = last prompt</span>
+<a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">            token). Positive values past the prompt end clamp to the</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">            last prompt token (warned at admission).</span>
+<a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">        prompt_window: Half-open (start, stop) over prompt positions;</span>
+<a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">            negative bounds resolve from the end of the prompt</span>
+<a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">            (`(-5, None)` = the last five prompt tokens).</span>
+<a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="sd">        generation_tokens: Token-id allowlist over generated tokens</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50"></a><span class="sd">            (real ids, &gt;= 0).</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51"></a><span class="sd">        generation_positions: 0-based decode step indices (`[0]` = the</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a><span class="sd">            first generated token).</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a><span class="sd">        generation_window: Half-open (start, stop) over 0-based decode</span>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a><span class="sd">            steps; stop=None means unbounded.</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a><span class="sd">        exclude_prompt_tokens: Prompt token ids to never select.</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="sd">        exclude_prompt_positions: Prompt positions to never select</span>
+<a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="sd">            (same convention as `prompt_positions`).</span>
+<a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="sd">        exclude_prompt_window: Prompt window to never select (same</span>
+<a id="__codelineno-0-59" name="__codelineno-0-59"></a><span class="sd">            convention as `prompt_window`).</span>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a><span class="sd">        exclude_generation_tokens: Generated token ids to never select.</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a><span class="sd">        exclude_generation_positions: Decode steps to never select.</span>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a><span class="sd">        exclude_generation_window: Decode-step window to never select.</span>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a><span class="sd">    Selection = union of the include selectors' matches ("all" being</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a><span class="sd">    the widest selector of its phase); the exclude selectors union and</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a><span class="sd">    always subtract — where an include and an exclude overlap, the</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a><span class="sd">    exclusion wins. Exclusions require their phase to be covered, and a</span>
+<a id="__codelineno-0-68" name="__codelineno-0-68"></a><span class="sd">    clause that selects nothing is rejected.</span>
+<a id="__codelineno-0-69" name="__codelineno-0-69"></a><span class="sd">    """</span>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a>    <span class="n">prompt</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"all"</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a>    <span class="n">generation</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"all"</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a>    <span class="n">prompt_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="n">prompt_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-77" name="__codelineno-0-77"></a>    <span class="n">prompt_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-78" name="__codelineno-0-78"></a>    <span class="n">generation_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-79" name="__codelineno-0-79"></a>    <span class="n">generation_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-80" name="__codelineno-0-80"></a>    <span class="n">generation_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-81" name="__codelineno-0-81"></a>    <span class="n">exclude_prompt_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-82" name="__codelineno-0-82"></a>    <span class="n">exclude_prompt_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-83" name="__codelineno-0-83"></a>    <span class="n">exclude_prompt_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-84" name="__codelineno-0-84"></a>    <span class="n">exclude_generation_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-85" name="__codelineno-0-85"></a>    <span class="n">exclude_generation_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-86" name="__codelineno-0-86"></a>    <span class="n">exclude_generation_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-87" name="__codelineno-0-87"></a>
+<a id="__codelineno-0-88" name="__codelineno-0-88"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_covers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="w">        </span><span class="sd">"""Whether the clause selects anything in the given phase."""</span>
+<a id="__codelineno-0-90" name="__codelineno-0-90"></a>        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"all"</span><span class="p">:</span>
+<a id="__codelineno-0-91" name="__codelineno-0-91"></a>            <span class="k">return</span> <span class="kc">True</span>
+<a id="__codelineno-0-92" name="__codelineno-0-92"></a>        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+<a id="__codelineno-0-93" name="__codelineno-0-93"></a>            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-0-94" name="__codelineno-0-94"></a>            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">INCLUDE_SELECTOR_KEYS</span>
+<a id="__codelineno-0-95" name="__codelineno-0-95"></a>            <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">phase</span><span class="p">)</span>
+<a id="__codelineno-0-96" name="__codelineno-0-96"></a>        <span class="p">)</span>
+<a id="__codelineno-0-97" name="__codelineno-0-97"></a>
+<a id="__codelineno-0-98" name="__codelineno-0-98"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"after"</span><span class="p">)</span>
+<a id="__codelineno-0-99" name="__codelineno-0-99"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SelectSpec"</span><span class="p">:</span>
+<a id="__codelineno-0-100" name="__codelineno-0-100"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_covers</span><span class="p">(</span><span class="s2">"prompt"</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_covers</span><span class="p">(</span><span class="s2">"generation"</span><span class="p">):</span>
+<a id="__codelineno-0-101" name="__codelineno-0-101"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-102" name="__codelineno-0-102"></a>                <span class="s2">"the clause selects nothing: set prompt='all' / "</span>
+<a id="__codelineno-0-103" name="__codelineno-0-103"></a>                <span class="s2">"generation='all' or at least one include selector"</span>
+<a id="__codelineno-0-104" name="__codelineno-0-104"></a>            <span class="p">)</span>
+<a id="__codelineno-0-105" name="__codelineno-0-105"></a>        <span class="k">for</span> <span class="n">phase</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"prompt"</span><span class="p">,</span> <span class="s2">"generation"</span><span class="p">):</span>
+<a id="__codelineno-0-106" name="__codelineno-0-106"></a>            <span class="n">excludes</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-0-107" name="__codelineno-0-107"></a>                <span class="n">key</span>
+<a id="__codelineno-0-108" name="__codelineno-0-108"></a>                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">EXCLUDE_SELECTOR_KEYS</span>
+<a id="__codelineno-0-109" name="__codelineno-0-109"></a>                <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">"exclude_</span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+<a id="__codelineno-0-110" name="__codelineno-0-110"></a>            <span class="p">]</span>
+<a id="__codelineno-0-111" name="__codelineno-0-111"></a>            <span class="k">if</span> <span class="n">excludes</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_covers</span><span class="p">(</span><span class="n">phase</span><span class="p">):</span>
+<a id="__codelineno-0-112" name="__codelineno-0-112"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-113" name="__codelineno-0-113"></a>                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">excludes</span><span class="p">)</span><span class="si">}</span><span class="s2"> exclude </span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s2"> tokens, but the "</span>
+<a id="__codelineno-0-114" name="__codelineno-0-114"></a>                    <span class="sa">f</span><span class="s2">"clause selects none: set </span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s2">='all' or a "</span>
+<a id="__codelineno-0-115" name="__codelineno-0-115"></a>                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s2">_* selector"</span>
+<a id="__codelineno-0-116" name="__codelineno-0-116"></a>                <span class="p">)</span>
+<a id="__codelineno-0-117" name="__codelineno-0-117"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+<a id="__codelineno-0-118" name="__codelineno-0-118"></a>            <span class="s2">"prompt_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-119" name="__codelineno-0-119"></a>            <span class="s2">"prompt_positions"</span><span class="p">,</span>
+<a id="__codelineno-0-120" name="__codelineno-0-120"></a>            <span class="s2">"generation_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-121" name="__codelineno-0-121"></a>            <span class="s2">"generation_positions"</span><span class="p">,</span>
+<a id="__codelineno-0-122" name="__codelineno-0-122"></a>            <span class="s2">"exclude_prompt_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-123" name="__codelineno-0-123"></a>            <span class="s2">"exclude_prompt_positions"</span><span class="p">,</span>
+<a id="__codelineno-0-124" name="__codelineno-0-124"></a>            <span class="s2">"exclude_generation_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-125" name="__codelineno-0-125"></a>            <span class="s2">"exclude_generation_positions"</span><span class="p">,</span>
+<a id="__codelineno-0-126" name="__codelineno-0-126"></a>        <span class="p">):</span>
+<a id="__codelineno-0-127" name="__codelineno-0-127"></a>            <span class="n">_require_nonempty</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+<a id="__codelineno-0-128" name="__codelineno-0-128"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
+<a id="__codelineno-0-129" name="__codelineno-0-129"></a>            <span class="s2">"prompt_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-130" name="__codelineno-0-130"></a>            <span class="s2">"generation_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-131" name="__codelineno-0-131"></a>            <span class="s2">"exclude_prompt_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-132" name="__codelineno-0-132"></a>            <span class="s2">"exclude_generation_tokens"</span><span class="p">,</span>
+<a id="__codelineno-0-133" name="__codelineno-0-133"></a>        <span class="p">):</span>
+<a id="__codelineno-0-134" name="__codelineno-0-134"></a>            <span class="n">ids</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+<a id="__codelineno-0-135" name="__codelineno-0-135"></a>            <span class="k">if</span> <span class="n">ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">t</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">):</span>
+<a id="__codelineno-0-136" name="__codelineno-0-136"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must contain real token ids (&gt;= 0)"</span><span class="p">)</span>
+<a id="__codelineno-0-137" name="__codelineno-0-137"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"generation_positions"</span><span class="p">,</span> <span class="s2">"exclude_generation_positions"</span><span class="p">):</span>
+<a id="__codelineno-0-138" name="__codelineno-0-138"></a>            <span class="n">ids</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+<a id="__codelineno-0-139" name="__codelineno-0-139"></a>            <span class="k">if</span> <span class="n">ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">j</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">):</span>
+<a id="__codelineno-0-140" name="__codelineno-0-140"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-141" name="__codelineno-0-141"></a>                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must contain 0-based decode steps (&gt;= 0); "</span>
+<a id="__codelineno-0-142" name="__codelineno-0-142"></a>                    <span class="s2">"the generation length is not known up front, so "</span>
+<a id="__codelineno-0-143" name="__codelineno-0-143"></a>                    <span class="s2">"end-relative steps cannot resolve"</span>
+<a id="__codelineno-0-144" name="__codelineno-0-144"></a>                <span class="p">)</span>
+<a id="__codelineno-0-145" name="__codelineno-0-145"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"prompt_window"</span><span class="p">,</span> <span class="s2">"exclude_prompt_window"</span><span class="p">):</span>
+<a id="__codelineno-0-146" name="__codelineno-0-146"></a>            <span class="n">window</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+<a id="__codelineno-0-147" name="__codelineno-0-147"></a>            <span class="k">if</span> <span class="n">window</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-148" name="__codelineno-0-148"></a>                <span class="k">continue</span>
+<a id="__codelineno-0-149" name="__codelineno-0-149"></a>            <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="n">window</span>
+<a id="__codelineno-0-150" name="__codelineno-0-150"></a>            <span class="k">if</span> <span class="n">stop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">start</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="n">stop</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="n">stop</span> <span class="o">&lt;=</span> <span class="n">start</span><span class="p">:</span>
+<a id="__codelineno-0-151" name="__codelineno-0-151"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-152" name="__codelineno-0-152"></a>                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be a half-open (start, stop) with "</span>
+<a id="__codelineno-0-153" name="__codelineno-0-153"></a>                    <span class="sa">f</span><span class="s2">"stop &gt; start (or stop=None for the prompt end), "</span>
+<a id="__codelineno-0-154" name="__codelineno-0-154"></a>                    <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="n">window</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-0-155" name="__codelineno-0-155"></a>                <span class="p">)</span>
+<a id="__codelineno-0-156" name="__codelineno-0-156"></a>        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"generation_window"</span><span class="p">,</span> <span class="s2">"exclude_generation_window"</span><span class="p">):</span>
+<a id="__codelineno-0-157" name="__codelineno-0-157"></a>            <span class="n">window</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+<a id="__codelineno-0-158" name="__codelineno-0-158"></a>            <span class="k">if</span> <span class="n">window</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-159" name="__codelineno-0-159"></a>                <span class="k">continue</span>
+<a id="__codelineno-0-160" name="__codelineno-0-160"></a>            <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="n">window</span>
+<a id="__codelineno-0-161" name="__codelineno-0-161"></a>            <span class="k">if</span> <span class="n">start</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-0-162" name="__codelineno-0-162"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> start must be &gt;= 0, got </span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-163" name="__codelineno-0-163"></a>            <span class="k">if</span> <span class="n">stop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">stop</span> <span class="o">&lt;=</span> <span class="n">start</span><span class="p">:</span>
+<a id="__codelineno-0-164" name="__codelineno-0-164"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-165" name="__codelineno-0-165"></a>                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be a half-open (start, stop) with "</span>
+<a id="__codelineno-0-166" name="__codelineno-0-166"></a>                    <span class="sa">f</span><span class="s2">"stop &gt; start or stop=None, got </span><span class="si">{</span><span class="n">window</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-0-167" name="__codelineno-0-167"></a>                <span class="p">)</span>
+<a id="__codelineno-0-168" name="__codelineno-0-168"></a>        <span class="k">return</span> <span class="bp">self</span>
+<a id="__codelineno-0-169" name="__codelineno-0-169"></a>
+<a id="__codelineno-0-170" name="__codelineno-0-170"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_wire</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-171" name="__codelineno-0-171"></a><span class="w">        </span><span class="sd">"""Canonical dict carried on the engine struct (`apply_spec`).</span>
+<a id="__codelineno-0-172" name="__codelineno-0-172"></a>
+<a id="__codelineno-0-173" name="__codelineno-0-173"></a><span class="sd">        Fixed key order and list-only containers so the config</span>
+<a id="__codelineno-0-174" name="__codelineno-0-174"></a><span class="sd">        fingerprint and msgspec round-trips are deterministic.</span>
+<a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">        """</span>
+<a id="__codelineno-0-176" name="__codelineno-0-176"></a>
+<a id="__codelineno-0-177" name="__codelineno-0-177"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"json"</span><span class="p">)</span>
+<a id="__codelineno-0-178" name="__codelineno-0-178"></a>
+<a id="__codelineno-0-179" name="__codelineno-0-179"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-0-180" name="__codelineno-0-180"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_wire</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"SelectSpec"</span><span class="p">:</span>
+<a id="__codelineno-0-181" name="__codelineno-0-181"></a><span class="w">        </span><span class="sd">"""Validate and rebuild a spec from its `to_wire()` dict.</span>
+<a id="__codelineno-0-182" name="__codelineno-0-182"></a>
+<a id="__codelineno-0-183" name="__codelineno-0-183"></a><span class="sd">        Used engine-side to reject malformed selection clauses at</span>
+<a id="__codelineno-0-184" name="__codelineno-0-184"></a><span class="sd">        enable time instead of failing mid-forward.</span>
+<a id="__codelineno-0-185" name="__codelineno-0-185"></a><span class="sd">        """</span>
+<a id="__codelineno-0-186" name="__codelineno-0-186"></a>        <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">APPLY_SPEC_KEYS</span><span class="p">)</span>
+<a id="__codelineno-0-187" name="__codelineno-0-187"></a>        <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+<a id="__codelineno-0-188" name="__codelineno-0-188"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown selection fields: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-189" name="__codelineno-0-189"></a>
+<a id="__codelineno-0-190" name="__codelineno-0-190"></a>        <span class="n">values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+<a id="__codelineno-0-191" name="__codelineno-0-191"></a>        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="o">*</span><span class="n">INCLUDE_SELECTOR_KEYS</span><span class="p">,</span> <span class="o">*</span><span class="n">EXCLUDE_SELECTOR_KEYS</span><span class="p">):</span>
+<a id="__codelineno-0-192" name="__codelineno-0-192"></a>            <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_window"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-193" name="__codelineno-0-193"></a>                <span class="n">values</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+<a id="__codelineno-0-194" name="__codelineno-0-194"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.prompt" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">prompt</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.prompt" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">prompt</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'all'</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.generation" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">generation</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.generation" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">generation</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'all'</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.prompt_tokens" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">prompt_tokens</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.prompt_tokens" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">prompt_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.prompt_positions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">prompt_positions</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.prompt_positions" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">prompt_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.prompt_window" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">prompt_window</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.prompt_window" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">prompt_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.generation_tokens" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">generation_tokens</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.generation_tokens" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">generation_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.generation_positions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">generation_positions</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.generation_positions" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">generation_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.generation_window" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">generation_window</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.generation_window" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">generation_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_prompt_tokens</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_tokens" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_prompt_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_prompt_positions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_prompt_positions</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_positions" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_prompt_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_prompt_window" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_prompt_window</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_prompt_window" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_prompt_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_generation_tokens" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_generation_tokens</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_tokens" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_generation_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_generation_positions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_generation_positions</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_positions" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_generation_positions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.exclude_generation_window" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exclude_generation_window</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-pydantic-field"><code>pydantic-field</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.exclude_generation_window" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exclude_generation_window</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.to_wire" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">to_wire</span>
+
+
+<a href="#model_hooks.selection.spec.SelectSpec.to_wire" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">to_wire</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Canonical dict carried on the engine struct (<code>apply_spec</code>).</p>
+<p>Fixed key order and list-only containers so the config
+fingerprint and msgspec round-trips are deterministic.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/model_hooks/selection/spec.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-170">170</a></span>
+<span class="normal"><a href="#__codelineno-0-171">171</a></span>
+<span class="normal"><a href="#__codelineno-0-172">172</a></span>
+<span class="normal"><a href="#__codelineno-0-173">173</a></span>
+<span class="normal"><a href="#__codelineno-0-174">174</a></span>
+<span class="normal"><a href="#__codelineno-0-175">175</a></span>
+<span class="normal"><a href="#__codelineno-0-176">176</a></span>
+<span class="normal"><a href="#__codelineno-0-177">177</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-170" name="__codelineno-0-170"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_wire</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-171" name="__codelineno-0-171"></a><span class="w">    </span><span class="sd">"""Canonical dict carried on the engine struct (`apply_spec`).</span>
+<a id="__codelineno-0-172" name="__codelineno-0-172"></a>
+<a id="__codelineno-0-173" name="__codelineno-0-173"></a><span class="sd">    Fixed key order and list-only containers so the config</span>
+<a id="__codelineno-0-174" name="__codelineno-0-174"></a><span class="sd">    fingerprint and msgspec round-trips are deterministic.</span>
+<a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">    """</span>
+<a id="__codelineno-0-176" name="__codelineno-0-176"></a>
+<a id="__codelineno-0-177" name="__codelineno-0-177"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"json"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="model_hooks.selection.spec.SelectSpec.from_wire" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_wire</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#model_hooks.selection.spec.SelectSpec.from_wire" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_wire</span><span class="p">(</span><span class="n">wire</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SelectSpec</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Validate and rebuild a spec from its <code>to_wire()</code> dict.</p>
+<p>Used engine-side to reject malformed selection clauses at
+enable time instead of failing mid-forward.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/model_hooks/selection/spec.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#__codelineno-0-181">181</a></span>
+<span class="normal"><a href="#__codelineno-0-182">182</a></span>
+<span class="normal"><a href="#__codelineno-0-183">183</a></span>
+<span class="normal"><a href="#__codelineno-0-184">184</a></span>
+<span class="normal"><a href="#__codelineno-0-185">185</a></span>
+<span class="normal"><a href="#__codelineno-0-186">186</a></span>
+<span class="normal"><a href="#__codelineno-0-187">187</a></span>
+<span class="normal"><a href="#__codelineno-0-188">188</a></span>
+<span class="normal"><a href="#__codelineno-0-189">189</a></span>
+<span class="normal"><a href="#__codelineno-0-190">190</a></span>
+<span class="normal"><a href="#__codelineno-0-191">191</a></span>
+<span class="normal"><a href="#__codelineno-0-192">192</a></span>
+<span class="normal"><a href="#__codelineno-0-193">193</a></span>
+<span class="normal"><a href="#__codelineno-0-194">194</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="nd">@classmethod</span>
+<a id="__codelineno-0-180" name="__codelineno-0-180"></a><span class="k">def</span><span class="w"> </span><span class="nf">from_wire</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"SelectSpec"</span><span class="p">:</span>
+<a id="__codelineno-0-181" name="__codelineno-0-181"></a><span class="w">    </span><span class="sd">"""Validate and rebuild a spec from its `to_wire()` dict.</span>
+<a id="__codelineno-0-182" name="__codelineno-0-182"></a>
+<a id="__codelineno-0-183" name="__codelineno-0-183"></a><span class="sd">    Used engine-side to reject malformed selection clauses at</span>
+<a id="__codelineno-0-184" name="__codelineno-0-184"></a><span class="sd">    enable time instead of failing mid-forward.</span>
+<a id="__codelineno-0-185" name="__codelineno-0-185"></a><span class="sd">    """</span>
+<a id="__codelineno-0-186" name="__codelineno-0-186"></a>    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">APPLY_SPEC_KEYS</span><span class="p">)</span>
+<a id="__codelineno-0-187" name="__codelineno-0-187"></a>    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+<a id="__codelineno-0-188" name="__codelineno-0-188"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown selection fields: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-189" name="__codelineno-0-189"></a>
+<a id="__codelineno-0-190" name="__codelineno-0-190"></a>    <span class="n">values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+<a id="__codelineno-0-191" name="__codelineno-0-191"></a>    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="o">*</span><span class="n">INCLUDE_SELECTOR_KEYS</span><span class="p">,</span> <span class="o">*</span><span class="n">EXCLUDE_SELECTOR_KEYS</span><span class="p">):</span>
+<a id="__codelineno-0-192" name="__codelineno-0-192"></a>        <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">"_window"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-193" name="__codelineno-0-193"></a>            <span class="n">values</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+<a id="__codelineno-0-194" name="__codelineno-0-194"></a>    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="engine-facing-conversion">Engine-facing conversion<a class="headerlink" href="#engine-facing-conversion" title="Permanent link">&para;</a></h2>
+<p>Applications normally pass a <code>SteeringSpec</code> directly to <code>LLM.generate()</code> or the
+HTTP API. Integration code can use <code>to_engine_request()</code> to resolve files and
+payloads into an internal <code>SteeringRequest</code>. Its <code>name</code> and <code>int_id</code> are labels;
+payload content and application fields determine execution identity.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="model_hooks.steering.api.to_engine_request" class="doc doc-heading">
+            vllm.steer_vectors.to_engine_request
+
+
+<a href="#model_hooks.steering.api.to_engine_request" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">to_engine_request</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">int_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Resolve an authoring spec into the engine's ordered intervention list.</p>
+<p>Every source is frozen before admission. Name and integer ID are labels;
+payload content and application fields define execution identity.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/model_hooks/steering/api.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-138">138</a></span>
+<span class="normal"><a href="#__codelineno-0-139">139</a></span>
+<span class="normal"><a href="#__codelineno-0-140">140</a></span>
+<span class="normal"><a href="#__codelineno-0-141">141</a></span>
+<span class="normal"><a href="#__codelineno-0-142">142</a></span>
+<span class="normal"><a href="#__codelineno-0-143">143</a></span>
+<span class="normal"><a href="#__codelineno-0-144">144</a></span>
+<span class="normal"><a href="#__codelineno-0-145">145</a></span>
+<span class="normal"><a href="#__codelineno-0-146">146</a></span>
+<span class="normal"><a href="#__codelineno-0-147">147</a></span>
+<span class="normal"><a href="#__codelineno-0-148">148</a></span>
+<span class="normal"><a href="#__codelineno-0-149">149</a></span>
+<span class="normal"><a href="#__codelineno-0-150">150</a></span>
+<span class="normal"><a href="#__codelineno-0-151">151</a></span>
+<span class="normal"><a href="#__codelineno-0-152">152</a></span>
+<span class="normal"><a href="#__codelineno-0-153">153</a></span>
+<span class="normal"><a href="#__codelineno-0-154">154</a></span>
+<span class="normal"><a href="#__codelineno-0-155">155</a></span>
+<span class="normal"><a href="#__codelineno-0-156">156</a></span>
+<span class="normal"><a href="#__codelineno-0-157">157</a></span>
+<span class="normal"><a href="#__codelineno-0-158">158</a></span>
+<span class="normal"><a href="#__codelineno-0-159">159</a></span>
+<span class="normal"><a href="#__codelineno-0-160">160</a></span>
+<span class="normal"><a href="#__codelineno-0-161">161</a></span>
+<span class="normal"><a href="#__codelineno-0-162">162</a></span>
+<span class="normal"><a href="#__codelineno-0-163">163</a></span>
+<span class="normal"><a href="#__codelineno-0-164">164</a></span>
+<span class="normal"><a href="#__codelineno-0-165">165</a></span>
+<span class="normal"><a href="#__codelineno-0-166">166</a></span>
+<span class="normal"><a href="#__codelineno-0-167">167</a></span>
+<span class="normal"><a href="#__codelineno-0-168">168</a></span>
+<span class="normal"><a href="#__codelineno-0-169">169</a></span>
+<span class="normal"><a href="#__codelineno-0-170">170</a></span>
+<span class="normal"><a href="#__codelineno-0-171">171</a></span>
+<span class="normal"><a href="#__codelineno-0-172">172</a></span>
+<span class="normal"><a href="#__codelineno-0-173">173</a></span>
+<span class="normal"><a href="#__codelineno-0-174">174</a></span>
+<span class="normal"><a href="#__codelineno-0-175">175</a></span>
+<span class="normal"><a href="#__codelineno-0-176">176</a></span>
+<span class="normal"><a href="#__codelineno-0-177">177</a></span>
+<span class="normal"><a href="#__codelineno-0-178">178</a></span>
+<span class="normal"><a href="#__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#__codelineno-0-181">181</a></span>
+<span class="normal"><a href="#__codelineno-0-182">182</a></span>
+<span class="normal"><a href="#__codelineno-0-183">183</a></span>
+<span class="normal"><a href="#__codelineno-0-184">184</a></span>
+<span class="normal"><a href="#__codelineno-0-185">185</a></span>
+<span class="normal"><a href="#__codelineno-0-186">186</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-138" name="__codelineno-0-138"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_engine_request</span><span class="p">(</span>
+<a id="__codelineno-0-139" name="__codelineno-0-139"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">SteeringSpec</span><span class="p">,</span>
+<a id="__codelineno-0-140" name="__codelineno-0-140"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-141" name="__codelineno-0-141"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-142" name="__codelineno-0-142"></a>    <span class="n">int_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-143" name="__codelineno-0-143"></a><span class="p">):</span>
+<a id="__codelineno-0-144" name="__codelineno-0-144"></a><span class="w">    </span><span class="sd">"""Resolve an authoring spec into the engine's ordered intervention list.</span>
+<a id="__codelineno-0-145" name="__codelineno-0-145"></a>
+<a id="__codelineno-0-146" name="__codelineno-0-146"></a><span class="sd">    Every source is frozen before admission. Name and integer ID are labels;</span>
+<a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="sd">    payload content and application fields define execution identity.</span>
+<a id="__codelineno-0-148" name="__codelineno-0-148"></a><span class="sd">    """</span>
+<a id="__codelineno-0-149" name="__codelineno-0-149"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">vllm.model_hooks.steering.loading</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_vector_payload</span>
+<a id="__codelineno-0-150" name="__codelineno-0-150"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">vllm.model_hooks.steering.request</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-0-151" name="__codelineno-0-151"></a>        <span class="n">ResolvedVector</span><span class="p">,</span>
+<a id="__codelineno-0-152" name="__codelineno-0-152"></a>        <span class="n">SteeringRequest</span><span class="p">,</span>
+<a id="__codelineno-0-153" name="__codelineno-0-153"></a>        <span class="n">_next_steer_vector_id</span><span class="p">,</span>
+<a id="__codelineno-0-154" name="__codelineno-0-154"></a>    <span class="p">)</span>
+<a id="__codelineno-0-155" name="__codelineno-0-155"></a>
+<a id="__codelineno-0-156" name="__codelineno-0-156"></a>    <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-157" name="__codelineno-0-157"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">vllm.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">random_uuid</span>
+<a id="__codelineno-0-158" name="__codelineno-0-158"></a>
+<a id="__codelineno-0-159" name="__codelineno-0-159"></a>        <span class="n">name</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">vectors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">"steering-</span><span class="si">{</span><span class="n">random_uuid</span><span class="p">()[:</span><span class="mi">8</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-0-160" name="__codelineno-0-160"></a>    <span class="k">if</span> <span class="n">int_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-161" name="__codelineno-0-161"></a>        <span class="n">int_id</span> <span class="o">=</span> <span class="n">_next_steer_vector_id</span><span class="p">()</span>
+<a id="__codelineno-0-162" name="__codelineno-0-162"></a>
+<a id="__codelineno-0-163" name="__codelineno-0-163"></a>    <span class="n">vectors</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-0-164" name="__codelineno-0-164"></a>        <span class="n">ResolvedVector</span><span class="p">(</span>
+<a id="__codelineno-0-165" name="__codelineno-0-165"></a>            <span class="n">source</span><span class="o">=</span><span class="n">vector</span><span class="o">.</span><span class="n">source</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">,</span>
+<a id="__codelineno-0-166" name="__codelineno-0-166"></a>            <span class="n">payload</span><span class="o">=</span><span class="n">resolve_vector_payload</span><span class="p">(</span>
+<a id="__codelineno-0-167" name="__codelineno-0-167"></a>                <span class="n">vector</span><span class="o">.</span><span class="n">source</span><span class="p">,</span>
+<a id="__codelineno-0-168" name="__codelineno-0-168"></a>                <span class="n">vector</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+<a id="__codelineno-0-169" name="__codelineno-0-169"></a>                <span class="n">vector</span><span class="o">.</span><span class="n">algorithm</span><span class="p">,</span>
+<a id="__codelineno-0-170" name="__codelineno-0-170"></a>                <span class="n">vector</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span>
+<a id="__codelineno-0-171" name="__codelineno-0-171"></a>                <span class="n">vector</span><span class="o">.</span><span class="n">params</span><span class="p">,</span>
+<a id="__codelineno-0-172" name="__codelineno-0-172"></a>            <span class="p">),</span>
+<a id="__codelineno-0-173" name="__codelineno-0-173"></a>            <span class="n">scale</span><span class="o">=</span><span class="n">vector</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span>
+<a id="__codelineno-0-174" name="__codelineno-0-174"></a>            <span class="n">target_layers</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">vector</span><span class="o">.</span><span class="n">layers</span><span class="p">)</span> <span class="k">if</span> <span class="n">vector</span><span class="o">.</span><span class="n">layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-175" name="__codelineno-0-175"></a>            <span class="n">algorithm</span><span class="o">=</span><span class="n">vector</span><span class="o">.</span><span class="n">algorithm</span><span class="p">,</span>
+<a id="__codelineno-0-176" name="__codelineno-0-176"></a>            <span class="n">normalize</span><span class="o">=</span><span class="n">vector</span><span class="o">.</span><span class="n">normalize</span><span class="p">,</span>
+<a id="__codelineno-0-177" name="__codelineno-0-177"></a>            <span class="n">apply_spec</span><span class="o">=</span><span class="n">vector</span><span class="o">.</span><span class="n">apply</span><span class="o">.</span><span class="n">to_wire</span><span class="p">(),</span>
+<a id="__codelineno-0-178" name="__codelineno-0-178"></a>        <span class="p">)</span>
+<a id="__codelineno-0-179" name="__codelineno-0-179"></a>        <span class="k">for</span> <span class="n">vector</span> <span class="ow">in</span> <span class="n">spec</span><span class="o">.</span><span class="n">vectors</span>
+<a id="__codelineno-0-180" name="__codelineno-0-180"></a>    <span class="p">]</span>
+<a id="__codelineno-0-181" name="__codelineno-0-181"></a>    <span class="k">return</span> <span class="n">SteeringRequest</span><span class="p">(</span>
+<a id="__codelineno-0-182" name="__codelineno-0-182"></a>        <span class="n">steer_vector_name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+<a id="__codelineno-0-183" name="__codelineno-0-183"></a>        <span class="n">steer_vector_int_id</span><span class="o">=</span><span class="n">int_id</span><span class="p">,</span>
+<a id="__codelineno-0-184" name="__codelineno-0-184"></a>        <span class="n">vectors</span><span class="o">=</span><span class="n">vectors</span><span class="p">,</span>
+<a id="__codelineno-0-185" name="__codelineno-0-185"></a>        <span class="n">conflict_resolution</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">conflict</span><span class="p">,</span>
+<a id="__codelineno-0-186" name="__codelineno-0-186"></a>    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><p>The returned request is an engine transport object, not an alternative authoring
+schema. File loading can fail here before request admission.</p>
+<h2 id="engine-default-and-preload-methods">Engine default and preload methods<a class="headerlink" href="#engine-default-and-preload-methods" title="Permanent link">&para;</a></h2>
+<p>These are EasySteer's additions to <code>vllm.LLM</code>. For the rest of the class, refer
+to the upstream <a href="https://docs.vllm.ai/en/latest/api/vllm/entrypoints/llm/">LLM API</a>.
+Default changes affect new requests; admitted requests retain their snapshots.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="llm.LLM.set_default_steering" class="doc doc-heading">
+            LLM.set_default_steering
+
+
+<a href="#llm.LLM.set_default_steering" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_default_steering</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">SteeringSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Set the default for future requests, or clear it with None.</p>
+<p>Explicit per-request configurations override this default. Requests
+already admitted retain their effective weight and selection snapshot.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/entrypoints/llm.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-876">876</a></span>
+<span class="normal"><a href="#__codelineno-0-877">877</a></span>
+<span class="normal"><a href="#__codelineno-0-878">878</a></span>
+<span class="normal"><a href="#__codelineno-0-879">879</a></span>
+<span class="normal"><a href="#__codelineno-0-880">880</a></span>
+<span class="normal"><a href="#__codelineno-0-881">881</a></span>
+<span class="normal"><a href="#__codelineno-0-882">882</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-876" name="__codelineno-0-876"></a><span class="k">def</span><span class="w"> </span><span class="nf">set_default_steering</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="n">SteeringSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-877" name="__codelineno-0-877"></a><span class="w">    </span><span class="sd">"""Set the default for future requests, or clear it with None.</span>
+<a id="__codelineno-0-878" name="__codelineno-0-878"></a>
+<a id="__codelineno-0-879" name="__codelineno-0-879"></a><span class="sd">    Explicit per-request configurations override this default. Requests</span>
+<a id="__codelineno-0-880" name="__codelineno-0-880"></a><span class="sd">    already admitted retain their effective weight and selection snapshot.</span>
+<a id="__codelineno-0-881" name="__codelineno-0-881"></a><span class="sd">    """</span>
+<a id="__codelineno-0-882" name="__codelineno-0-882"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">llm_engine</span><span class="o">.</span><span class="n">set_default_steering</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="llm.LLM.get_default_steering" class="doc doc-heading">
+            LLM.get_default_steering
+
+
+<a href="#llm.LLM.get_default_steering" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_default_steering</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return the current default authoring configuration and active status.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/entrypoints/llm.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-884">884</a></span>
+<span class="normal"><a href="#__codelineno-0-885">885</a></span>
+<span class="normal"><a href="#__codelineno-0-886">886</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-884" name="__codelineno-0-884"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_default_steering</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-0-885" name="__codelineno-0-885"></a><span class="w">    </span><span class="sd">"""Return the current default authoring configuration and active status."""</span>
+<a id="__codelineno-0-886" name="__codelineno-0-886"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">llm_engine</span><span class="o">.</span><span class="n">get_default_steering</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="llm.LLM.preload_steer_vectors" class="doc doc-heading">
+            LLM.preload_steer_vectors
+
+
+<a href="#llm.LLM.preload_steer_vectors" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">preload_steer_vectors</span><span class="p">(</span><span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">'direct'</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Load steering vectors on all workers ahead of use.</p>
+<p>The frontend resolves each file once and sends the same immutable
+payload to every worker store. Different configurations share its
+content identity. Changing a file requires preloading its new content
+when steer_require_preload is enabled. For router files, params must
+match the mode/lambda/topk overrides used by the request.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>vllm-steer/vllm/entrypoints/llm.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-888">888</a></span>
+<span class="normal"><a href="#__codelineno-0-889">889</a></span>
+<span class="normal"><a href="#__codelineno-0-890">890</a></span>
+<span class="normal"><a href="#__codelineno-0-891">891</a></span>
+<span class="normal"><a href="#__codelineno-0-892">892</a></span>
+<span class="normal"><a href="#__codelineno-0-893">893</a></span>
+<span class="normal"><a href="#__codelineno-0-894">894</a></span>
+<span class="normal"><a href="#__codelineno-0-895">895</a></span>
+<span class="normal"><a href="#__codelineno-0-896">896</a></span>
+<span class="normal"><a href="#__codelineno-0-897">897</a></span>
+<span class="normal"><a href="#__codelineno-0-898">898</a></span>
+<span class="normal"><a href="#__codelineno-0-899">899</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-888" name="__codelineno-0-888"></a><span class="k">def</span><span class="w"> </span><span class="nf">preload_steer_vectors</span><span class="p">(</span>
+<a id="__codelineno-0-889" name="__codelineno-0-889"></a>    <span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"direct"</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-890" name="__codelineno-0-890"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-891" name="__codelineno-0-891"></a><span class="w">    </span><span class="sd">"""Load steering vectors on all workers ahead of use.</span>
+<a id="__codelineno-0-892" name="__codelineno-0-892"></a>
+<a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">    The frontend resolves each file once and sends the same immutable</span>
+<a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">    payload to every worker store. Different configurations share its</span>
+<a id="__codelineno-0-895" name="__codelineno-0-895"></a><span class="sd">    content identity. Changing a file requires preloading its new content</span>
+<a id="__codelineno-0-896" name="__codelineno-0-896"></a><span class="sd">    when steer_require_preload is enabled. For router files, params must</span>
+<a id="__codelineno-0-897" name="__codelineno-0-897"></a><span class="sd">    match the mode/lambda/topk overrides used by the request.</span>
+<a id="__codelineno-0-898" name="__codelineno-0-898"></a><span class="sd">    """</span>
+<a id="__codelineno-0-899" name="__codelineno-0-899"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">llm_engine</span><span class="o">.</span><span class="n">preload_steer_vectors</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">algorithm</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><p>For remote clients, the corresponding operations are described under
+<a href="../../user-guide/openai-server/#management-endpoints">HTTP management endpoints</a>.</p>
 
 
 
@@ -1786,13 +5078,13 @@ arguments and their CLI equivalents.</p>
         
         
           
-          <a href="../steer/" class="md-footer__link md-footer__link--next" aria-label="Next: easysteer.steer">
+          <a href="../payloads/" class="md-footer__link md-footer__link--next" aria-label="Next: Payload classes">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                easysteer.steer
+                Payload classes
               </div>
             </div>
             <div class="md-footer__button md-icon">
