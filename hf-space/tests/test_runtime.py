@@ -181,7 +181,14 @@ def test_api_ui_and_bundled_payload(monkeypatch):
         )
 
     tokenizer = Mock()
-    tokenizer.apply_chat_template.return_value = [101, 202, 303]
+
+    def template_result(*args, **kwargs):
+        token_ids = [101, 202, 303]
+        if kwargs.get("return_dict") is False:
+            return token_ids
+        return {"input_ids": token_ids, "attention_mask": [1, 1, 1]}
+
+    tokenizer.apply_chat_template.side_effect = template_result
     model = Mock()
     model.get_tokenizer.return_value = tokenizer
     model.generate.return_value = [
@@ -202,7 +209,10 @@ def test_api_ui_and_bundled_payload(monkeypatch):
         "refusal_direction", "Who are you?", progress=lambda *args, **kwargs: None
     ) == ("mock reply", "mock reply")
     tokenizer.apply_chat_template.assert_called_once_with(
-        requests[0]["messages"], tokenize=True, add_generation_prompt=True
+        requests[0]["messages"],
+        tokenize=True,
+        return_dict=False,
+        add_generation_prompt=True,
     )
     assert "enforce_eager" not in llm.call_args.kwargs
     assert "enable_chunked_prefill" not in llm.call_args.kwargs

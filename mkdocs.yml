@@ -64,6 +64,9 @@ nav:
       - Engine configuration: api-reference/engine-configuration.md
       - Algorithms and payloads: api-reference/algorithms.md
       - api-reference/steering-specs.md
+      - Payload classes: api-reference/payloads.md
+      - Capture API: api-reference/capture.md
+      - Algorithm extension API: api-reference/algorithm-extension.md
       - api-reference/steer.md
       - api-reference/hidden-states.md
 
@@ -75,11 +78,14 @@ plugins:
           # Static analysis only (griffe reads the source; nothing is
           # imported), so `mkdocs build --strict` runs in a plain env with
           # just requirements-docs.txt — no torch/easysteer install needed.
-          # The vllm-steer fork is deliberately NOT on this path: its API
-          # is documented by the hand-written steering guide instead.
-          paths: [.]
+          # Load EasySteer's fork modules and LLM additions without collecting
+          # unrelated upstream model implementations or importing either package.
+          paths: [., vllm-steer/vllm, vllm-steer/vllm/entrypoints]
           options:
             allow_inspection: false
+            extensions:
+              - griffe_pydantic:
+                  schema: false
             docstring_style: google
             show_source: true
             show_root_heading: true

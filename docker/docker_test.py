@@ -54,6 +54,7 @@ def main():
                 },
             ],
             tokenize=True,
+            return_dict=False,
             add_generation_prompt=True,
         )
     }

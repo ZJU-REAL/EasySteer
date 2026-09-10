@@ -137,6 +137,7 @@ prompt = {"prompt_token_ids": tokenizer.apply_chat_template(
         {"role": "user", "content": "Alice's dog has passed away. Please comfort her."},
     ],
     tokenize=True,
+    return_dict=False,
     add_generation_prompt=True,
 )}
 sampling_params = SamplingParams(temperature=0.0, max_tokens=128)

@@ -152,7 +152,10 @@ def _generate_comparison(
             llm = load_model()
             tokenized_prompt = {
                 "prompt_token_ids": llm.get_tokenizer().apply_chat_template(
-                    messages, tokenize=True, add_generation_prompt=True
+                    messages,
+                    tokenize=True,
+                    return_dict=False,
+                    add_generation_prompt=True,
                 )
             }
             sampling_params = SamplingParams(**config["sampling"])

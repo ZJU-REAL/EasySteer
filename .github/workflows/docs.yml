@@ -35,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check out steering API source
+        run: git submodule update --init --depth=1 vllm-steer
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -61,6 +63,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # mike commits on top of the existing gh-pages history
+      - name: Check out steering API source
+        run: git submodule update --init --depth=1 vllm-steer
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

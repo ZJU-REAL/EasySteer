@@ -11,12 +11,17 @@ formats, and signatures.
   ITI, SAE), the `StatisticalControlVector` container, and payload adapters.
 - [`easysteer.hidden_states`](hidden-states.md) — `capture()` / `CaptureResult` and the
   legacy extraction helpers.
-- [Steering specs](steering-specs.md) — hand-written summary of `SteeringSpec` /
-  `VectorSpec` / `ApplySpec` / `SelectSpec`; the
-  [Steering guide](../user-guide/steering.md) is the canonical reference. These
-  classes belong to the vLLM fork and are documented separately from the generated
-  `easysteer` package reference.
+- [Steering specs](steering-specs.md) — generated class and field reference for
+  `SteeringSpec`, `VectorSpec`, `ApplySpec`, and `SelectSpec`, plus default and
+  preload methods added to `LLM`.
+- [Payload classes](payloads.md) — constructors, tensor shapes, validation,
+  attributes, and wire conversion for all six payload types.
+- [Capture API](capture.md) — `vllm.capture` component constants, row metadata,
+  serialization, and worker stream/session classes.
+- [Algorithm extension API](algorithm-extension.md) — transformation and graph
+  contracts, registration, and authoring capabilities.
 
-The `easysteer` API pages are generated from source docstrings with static
-analysis. Fork specs and engine options are documented separately so the site
-can build without importing a GPU runtime.
+Class and method references use static analysis of the checked-out EasySteer and
+vLLM-fork sources. Public lazy exports are rendered from their defining modules
+with the public import names in their headings. Building the site does not
+import either package or require a GPU runtime.
