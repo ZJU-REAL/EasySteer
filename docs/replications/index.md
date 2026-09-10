@@ -7,26 +7,26 @@ Consult each experiment for its required model, data and checkpoint files.
 
 | Folder | One-liner | Category | Component |
 |---|---|---|---|
-| [`bipo/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/bipo) | Bi-directional preference optimization vectors steering power-seeking behavior | Personalization | Residual stream |
-| [`cast/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/cast) | Conditional activation steering to program refusal (CAST) | Safety | Residual stream |
-| [`controlingthinkingspeed/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/controlingthinkingspeed) | Speeding up / slowing down reasoning-model thinking on MATH500 | Reasoning | Residual stream |
-| [`creative_writing/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/creative_writing) | Steering LLMs to evaluate and amplify creativity | Style | Residual stream |
-| [`fractreason/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/fractreason) | Fractional reasoning via latent steering vectors for inference-time compute | Reasoning | Residual stream |
-| [`improve_reasoning/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/improve_reasoning) | Representation-engineering vectors that improve reasoning performance | Reasoning | Residual stream |
-| [`iti/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/iti) | Llama-2-7B-Chat attention head steering with a TruthfulQA accuracy comparison and examples | Truthfulness | Attention head outputs |
-| [`lm_steer/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/lm_steer) | Word embeddings as steers for language models (LM-Steer, GPT-2) | General | Residual stream (final block) |
-| [`loreft/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/loreft) | ReFT: train and apply LoReFT representation finetuning | General | Residual stream |
-| [`refusal_direction/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/refusal_direction) | Refusal is mediated by a single direction (DiffMean ablation) | Safety | Residual stream |
-| [`sae_entities/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sae_entities) | SAE entity-knowledge directions and hallucination awareness | Truthfulness | Residual stream |
-| [`sake/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sake) | SAKE: steering activations for knowledge editing | Knowledge | Residual stream (final block) |
-| [`seal/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/seal) | SEAL: steerable reasoning calibration (execution/reflection/transition vectors) | Reasoning | Residual stream |
-| [`sharp/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sharp) | SHARP: steering hallucination in LVLMs via representation engineering (EMNLP 2025) | Truthfulness | Residual stream |
-| [`steerable_chatbot/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steerable_chatbot) | Personalizing LLMs with preference-based activation steering | Style | Residual stream |
-| [`steermoe/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steermoe) | SteerMoE: expert (de)activation steering of MoE routers on Qwen3-30B-A3B (arXiv:2509.09660) | MoE | MoE router logits |
+| [`bipo/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/bipo) | Bi-directional preference optimization vectors steering power-seeking behavior | Personalization | `hidden_states` |
+| [`cast/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/cast) | Conditional activation steering to program refusal (CAST) | Safety | `hidden_states` |
+| [`controlingthinkingspeed/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/controlingthinkingspeed) | Speeding up / slowing down reasoning-model thinking on MATH500 | Reasoning | `hidden_states` |
+| [`creative_writing/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/creative_writing) | Steering LLMs to evaluate and amplify creativity | Style | `hidden_states` |
+| [`fractreason/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/fractreason) | Fractional reasoning via latent steering vectors for inference-time compute | Reasoning | `hidden_states` |
+| [`improve_reasoning/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/improve_reasoning) | Representation-engineering vectors that improve reasoning performance | Reasoning | `hidden_states` |
+| [`iti/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/iti) | Llama-2-7B-Chat attention head steering with a TruthfulQA accuracy comparison and examples | Truthfulness | `attention_heads` |
+| [`lm_steer/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/lm_steer) | Word embeddings as steers for language models (LM-Steer, GPT-2) | General | `hidden_states` |
+| [`loreft/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/loreft) | ReFT: train and apply LoReFT representation finetuning | General | `hidden_states` |
+| [`refusal_direction/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/refusal_direction) | Refusal is mediated by a single direction (DiffMean ablation) | Safety | `hidden_states` |
+| [`sae_entities/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sae_entities) | SAE entity-knowledge directions and hallucination awareness | Truthfulness | `hidden_states` |
+| [`sake/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sake) | SAKE: steering activations for knowledge editing | Knowledge | `hidden_states` |
+| [`seal/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/seal) | SEAL: steerable reasoning calibration (execution/reflection/transition vectors) | Reasoning | `hidden_states` |
+| [`sharp/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/sharp) (VLM) | SHARP: steering hallucination in LVLMs via representation engineering (EMNLP 2025) | Truthfulness | `hidden_states` |
+| [`steerable_chatbot/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steerable_chatbot) | Personalizing LLMs with preference-based activation steering | Style | `hidden_states` |
+| [`steermoe/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replications/steermoe) | SteerMoE: expert (de)activation steering of MoE routers on Qwen3-30B-A3B (arXiv:2509.09660) | MoE | `router_logits` |
 
-Components identify the intervention points used by these notebooks. Residual
-stream denotes decoder block output; attention head outputs are captured and
-steered before the output projection.
+Component names match the API: `hidden_states` denotes decoder block output,
+`attention_heads` denotes head outputs before the attention output projection,
+and `router_logits` denotes MoE routing scores.
 
 Contributions of new replications are welcome — see
 [Contributing](../developer-guide/contributing.md).

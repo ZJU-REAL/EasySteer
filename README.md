@@ -170,25 +170,26 @@ The [replications](replications) folder implements published steering methods wi
 
 | Method | Category | Component |
 |---|---|---|
-| [Thinking Speed](replications/controlingthinkingspeed/) | Reasoning | Residual stream |
-| [Fractional Reasoning](replications/fractreason/) | Reasoning | Residual stream |
-| [Improve Reasoning](replications/improve_reasoning/) | Reasoning | Residual stream |
-| [SEAL](replications/seal/) | Reasoning | Residual stream |
-| [Refusal Direction](replications/refusal_direction/) | Safety | Residual stream |
-| [CAST](replications/cast/) | Safety | Residual stream |
-| [Creative Writing](replications/creative_writing/) | Style | Residual stream |
-| [Steerable Chatbots](replications/steerable_chatbot/) | Style | Residual stream |
-| [SAKE](replications/sake/) | Knowledge | Residual stream (final block) |
-| [SAE Entities](replications/sae_entities/) | Truthfulness | Residual stream |
-| [SHARP](replications/sharp/) | Truthfulness | Residual stream |
-| [ITI](replications/iti/) | Truthfulness | Attention head outputs |
-| [LM-Steer](replications/lm_steer/) | General | Residual stream (final block) |
-| [LoReFT](replications/loreft/) | General | Residual stream |
-| [BiPO](replications/bipo/) | Personalization | Residual stream |
-| [SteerMoE](replications/steermoe/) | MoE | MoE router logits |
+| [Thinking Speed](replications/controlingthinkingspeed/) | Reasoning | `hidden_states` |
+| [Fractional Reasoning](replications/fractreason/) | Reasoning | `hidden_states` |
+| [Improve Reasoning](replications/improve_reasoning/) | Reasoning | `hidden_states` |
+| [SEAL](replications/seal/) | Reasoning | `hidden_states` |
+| [Refusal Direction](replications/refusal_direction/) | Safety | `hidden_states` |
+| [CAST](replications/cast/) | Safety | `hidden_states` |
+| [Creative Writing](replications/creative_writing/) | Style | `hidden_states` |
+| [Steerable Chatbots](replications/steerable_chatbot/) | Style | `hidden_states` |
+| [SAKE](replications/sake/) | Knowledge | `hidden_states` |
+| [SAE Entities](replications/sae_entities/) | Truthfulness | `hidden_states` |
+| [SHARP](replications/sharp/) (VLM) | Truthfulness | `hidden_states` |
+| [ITI](replications/iti/) | Truthfulness | `attention_heads` |
+| [LM-Steer](replications/lm_steer/) | General | `hidden_states` |
+| [LoReFT](replications/loreft/) | General | `hidden_states` |
+| [BiPO](replications/bipo/) | Personalization | `hidden_states` |
+| [SteerMoE](replications/steermoe/) | MoE | `router_logits` |
 
-Components reflect the intervention points in the examples. Residual stream
-denotes decoder block output; attention head outputs are taken before the output projection.
+Component names match the API: `hidden_states` denotes decoder block output,
+`attention_heads` denotes head outputs before the attention output projection,
+and `router_logits` denotes MoE routing scores.
 
 ## Citation
 
