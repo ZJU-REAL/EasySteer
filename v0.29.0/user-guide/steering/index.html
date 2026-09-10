@@ -788,10 +788,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-a-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build a configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#attaching-a-spec" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Attaching a spec
+        Set steering for a request
       
     </span>
   </a>
@@ -799,10 +821,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#applyspec-the-where-clause" class="md-nav__link">
+  <a href="#select-prompt-and-generation-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ApplySpec: the where-clause
+        Select prompt and generation rows
       
     </span>
   </a>
@@ -810,10 +832,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vectorspec-one-vector" class="md-nav__link">
+  <a href="#choose-weights-layers-and-strength" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VectorSpec: one vector
+        Choose weights, layers, and strength
       
     </span>
   </a>
@@ -832,24 +854,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steeringspec-vectors-conflict-policy" class="md-nav__link">
+  <a href="#combine-vectors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SteeringSpec: vectors + conflict policy
+        Combine vectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combine vectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#selection-and-combination-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selection and combination examples
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -879,7 +907,7 @@
   <a href="#migrating-from-v1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migrating from v1
+        Older steering APIs
       
     </span>
   </a>
@@ -1457,14 +1485,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
-        
-      
     
     
     
@@ -1525,6 +1545,64 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="../../api-reference/engine-configuration/" class="md-nav__link">
         
@@ -1533,7 +1611,7 @@
   <span class="md-ellipsis">
     
   
-    Engine configuration
+    Engine arguments
   
 
     
@@ -1575,6 +1653,72 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Steering
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Steering
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1589,7 +1733,7 @@
   <span class="md-ellipsis">
     
   
-    Steering specs (vllm.steer_vectors)
+    Specs and LLM methods
   
 
     
@@ -1631,6 +1775,100 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Capture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/hidden-states/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    capture() and CaptureResult
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
               
                 
   
@@ -1645,7 +1883,101 @@
   <span class="md-ellipsis">
     
   
-    Capture API
+    vllm.capture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction and Extension
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Extraction and Extension
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/steer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector extraction and adapters
   
 
     
@@ -1687,57 +2019,9 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api-reference/steer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    easysteer.steer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api-reference/hidden-states/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    easysteer.hidden_states
-  
-
-    
-  </span>
-  
-  
-
-      </a>
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1777,10 +2061,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-a-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build a configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#attaching-a-spec" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Attaching a spec
+        Set steering for a request
       
     </span>
   </a>
@@ -1788,10 +2094,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#applyspec-the-where-clause" class="md-nav__link">
+  <a href="#select-prompt-and-generation-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ApplySpec: the where-clause
+        Select prompt and generation rows
       
     </span>
   </a>
@@ -1799,10 +2105,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vectorspec-one-vector" class="md-nav__link">
+  <a href="#choose-weights-layers-and-strength" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VectorSpec: one vector
+        Choose weights, layers, and strength
       
     </span>
   </a>
@@ -1821,24 +2127,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steeringspec-vectors-conflict-policy" class="md-nav__link">
+  <a href="#combine-vectors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SteeringSpec: vectors + conflict policy
+        Combine vectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combine vectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#selection-and-combination-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selection and combination examples
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1868,7 +2180,7 @@
   <a href="#migrating-from-v1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migrating from v1
+        Older steering APIs
       
     </span>
   </a>
@@ -1975,23 +2287,48 @@
 
 
 <h1 id="steering-requests">Steering requests<a class="headerlink" href="#steering-requests" title="Permanent link">&para;</a></h1>
-<p>Steering is configured with three objects from <code>vllm.steer_vectors</code>:</p>
-<ol>
-<li><strong><code>ApplySpec</code></strong> — <em>where and when</em> a vector applies (phases, token/position filters,
-   generation window).</li>
-<li><strong><code>VectorSpec</code></strong> — one vector: source file, algorithm, scale, layers, normalize,
-   algorithm-specific <code>params</code>, and its <code>apply</code> clause.</li>
-<li><strong><code>SteeringSpec</code></strong> — an ordered list of <code>VectorSpec</code>s plus a conflict policy.</li>
-</ol>
-<p>Eager, <code>split</code>, and <code>in_graph</code> engines share the same spec API, with the graph
-payload conditions described below. A request using an algorithm outside the engine's declared <code>steer_algorithms</code>
-is rejected at admission. Set <code>steer_algorithms=["direct"]</code> for direct steering,
-or <code>steer_algorithms="all"</code> to serve all registered algorithms in <code>split</code> mode.
-An engine-default <code>steering_config</code> can infer the declaration from its spec.
-Requests with multiple vectors require <code>steer_multi_vector=True</code>
-(<code>--steer-multi-vector</code> on the CLI), which is also implied by an <code>"all"</code>
-declaration or a multi-vector engine-default spec.</p>
-<h2 id="attaching-a-spec">Attaching a spec<a class="headerlink" href="#attaching-a-spec" title="Permanent link">&para;</a></h2>
+<p>Use a steering request to select a payload, its strength, and the model rows to
+change. This guide covers request overrides, token selection, and combinations
+of vectors. For a complete runnable example, start with the
+<a href="../../getting-started/quickstart/">quickstart</a>.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<p>Use the EasySteer vLLM fork with steering enabled. Declare the algorithms the
+engine will serve with <code>steer_algorithms</code>, or provide a startup
+<code>steering_config</code> from which they can be inferred. Requests must fit that
+<a href="../../api-reference/engine-configuration/">engine declaration</a>.</p>
+<p>A request containing multiple vectors also requires <code>steer_multi_vector=True</code>.
+An <code>"all"</code> algorithm declaration or a multi-vector startup default implies this
+setting. The model must expose the component used by the chosen algorithm;
+see the <a href="../../api-reference/algorithms/#capability-table">capability table</a>.</p>
+<h2 id="build-a-configuration">Build a configuration<a class="headerlink" href="#build-a-configuration" title="Permanent link">&para;</a></h2>
+<p>Import the three authoring classes from <code>vllm.steer_vectors</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Configure</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VectorSpec</code></td>
+<td>One payload, algorithm, scale, layer set, and application rule.</td>
+<td><a href="../../api-reference/steering-specs/#model_hooks.steering.api.VectorSpec">Fields and defaults</a></td>
+</tr>
+<tr>
+<td><code>ApplySpec</code></td>
+<td>Which prompt and generation rows the vector changes.</td>
+<td><a href="../../api-reference/steering-specs/#model_hooks.selection.spec.SelectSpec">Selection fields</a></td>
+</tr>
+<tr>
+<td><code>SteeringSpec</code></td>
+<td>An ordered list of vectors and a conflict policy.</td>
+<td><a href="../../api-reference/steering-specs/#model_hooks.steering.api.SteeringSpec">Fields and defaults</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="attaching-a-spec">Set steering for a request<a class="headerlink" href="#attaching-a-spec" title="Permanent link">&para;</a></h2>
 <p>Every request resolves one effective configuration at admission. Python and HTTP
 use the same rules:</p>
 <table>
@@ -2029,15 +2366,11 @@ See <a href="../openai-server/">OpenAI-compatible server</a>.</p>
 and weight snapshot. Changing a default does not reset the prefix cache or reserve
 a permanent execution slot. Algorithms, graph mode and capacity remain engine
 settings, so every default and override must satisfy that declaration.</p>
-<h2 id="applyspec-the-where-clause"><code>ApplySpec</code>: the where-clause<a class="headerlink" href="#applyspec-the-where-clause" title="Permanent link">&para;</a></h2>
-<p><code>ApplySpec</code> shares its selection language with hidden-state capture (both subclass
-<code>SelectSpec</code>), so a clause means the same thing in both systems.</p>
-<p>Each phase is selected independently and only by what you name: there is no
-separate phase gate. <code>prompt="all"</code> selects every prompt token and
-<code>generation="all"</code> every decode step — the widest include selector of each
-phase — and six narrower include selectors, three per phase, each named for
-it and carrying a symmetric exclude twin, refine the selection. A phase with
-neither <code>"all"</code> nor a selector is untouched:</p>
+<h2 id="select-prompt-and-generation-rows">Select prompt and generation rows<a class="headerlink" href="#select-prompt-and-generation-rows" title="Permanent link">&para;</a></h2>
+<p><code>ApplySpec</code> inherits the <code>SelectSpec</code> language used by capture. Select prompt
+rows and generation rows independently. <code>prompt="all"</code> selects the full prompt;
+<code>generation="all"</code> selects every decode step. Use the fields below for a subset.
+A phase with neither <code>"all"</code> nor an include selector is unchanged.</p>
 <table>
 <thead>
 <tr>
@@ -2083,121 +2416,46 @@ neither <code>"all"</code> nor a selector is untouched:</p>
 select the <strong>union</strong> of their matches. The exclude selectors union and
 <strong>always subtract</strong>: where an include and an exclude overlap, the exclusion
 wins; an exclude requires its phase to be covered, and a clause that selects
-nothing is rejected — as is the removed <code>phases</code> key. One clause can mix
-granularities across phases:</p>
+nothing is rejected. One clause can mix granularities across phases:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Last prompt token plus the whole generation (the SHARP shape):</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Prompt tail plus the first decode steps:</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_window</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">generation_window</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
-<h2 id="vectorspec-one-vector"><code>VectorSpec</code>: one vector<a class="headerlink" href="#vectorspec-one-vector" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Default</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>source</code></td>
-<td><code>None</code></td>
-<td>EasySteer direction GGUF, a concept-pair directory, or <code>moe_router</code> JSON. For third-party checkpoint formats use <code>data</code> instead. Plain path only — no <code>"path\|algo"</code>.</td>
-</tr>
-<tr>
-<td><code>data</code></td>
-<td><code>None</code></td>
-<td>An in-memory payload (see <a href="#steering-with-your-own-tensors">Steering with your own tensors</a>). Mutually exclusive with <code>source</code>.</td>
-</tr>
-<tr>
-<td><code>algorithm</code></td>
-<td><code>"direct"</code></td>
-<td>Registry key: <code>direct</code>, <code>attention_add</code>, <code>linear</code>, <code>loreft</code>, <code>lm_steer</code>, <code>erase</code>, <code>replace</code>, <code>concept_replace</code>, <code>moe_router</code>.</td>
-</tr>
-<tr>
-<td><code>scale</code></td>
-<td><code>1.0</code></td>
-<td>Algorithm-specific scale factor; <code>direct</code> and <code>attention_add</code> add <code>scale * vector</code>.</td>
-</tr>
-<tr>
-<td><code>layers</code></td>
-<td><code>None</code></td>
-<td>Layer indices to apply to; <code>None</code> uses the layer IDs in the source or payload. Payloads without layer IDs require an explicit list.</td>
-</tr>
-<tr>
-<td><code>normalize</code></td>
-<td><code>False</code></td>
-<td>Rescale the transformed hidden state to its original norm for <code>direct</code>, <code>erase</code>, <code>replace</code>, and <code>concept_replace</code>. Other algorithms reject <code>True</code>.</td>
-</tr>
-<tr>
-<td><code>apply</code></td>
-<td>—</td>
-<td><strong>Required</strong> <code>ApplySpec</code>.</td>
-</tr>
-<tr>
-<td><code>params</code></td>
-<td><code>{}</code></td>
-<td>Algorithm-specific parameters, validated per algorithm; unknown keys are rejected. Only <code>moe_router</code> takes params: <code>expert_ids</code>, <code>mode</code>, <code>lambda</code>, <code>topk</code>.</td>
-</tr>
-<tr>
-<td><code>name</code></td>
-<td><code>None</code></td>
-<td>Label used in logs only (not identity).</td>
-</tr>
-</tbody>
-</table>
+<h2 id="choose-weights-layers-and-strength">Choose weights, layers, and strength<a class="headerlink" href="#choose-weights-layers-and-strength" title="Permanent link">&para;</a></h2>
+<p>Provide weights through <code>source</code> or <code>data</code>; these fields are mutually exclusive.
+Inline <code>moe_router</code> configuration can use <code>params</code> alone, as described below.</p>
+<ul>
+<li>Use <code>source</code> for an EasySteer direction GGUF, concept-pair directory, or router
+  JSON. The engine resolves the path; HTTP clients use a path on the server.</li>
+<li>Use <code>data</code> for a <a href="../../api-reference/payloads/">payload object</a>, including
+  tensors constructed in Python or loaded through a checkpoint adapter.</li>
+</ul>
+<p><code>layers</code> selects true decoder-layer IDs. If the payload records its own IDs,
+<code>layers</code> restricts that set; it does not move weights to a different layer.
+Payloads without recorded IDs require an explicit list.</p>
+<p>For <code>direct</code> and <code>attention_add</code>, <code>scale</code> multiplies the added direction.
+Other algorithms have their own <a href="../../api-reference/algorithms/#transformations-and-scale">scale semantics</a>.
+Use <code>steering=False</code> for a baseline. <code>normalize=True</code> preserves the original row
+norm only for algorithms that support it; it is separate from normalizing a
+vector during extraction. Every vector requires an explicit <code>apply</code> selection.</p>
+<p>The <a href="../../api-reference/steering-specs/#model_hooks.steering.api.VectorSpec">VectorSpec reference</a>
+provides all field types, defaults, and validation rules. Only <code>moe_router</code>
+accepts algorithm-specific <code>params</code>.</p>
 <p>For <code>moe_router</code>, explicit <code>mode</code>, <code>lambda</code> and <code>topk</code> parameters override those
 values in a source file or <code>RouterConfig</code>; omitted parameters retain the payload's
 values. <code>expert_ids</code> in <code>params</code> is only for inline configuration without <code>source</code>
 or <code>data</code>. A file or <code>RouterConfig</code> records its own expert IDs per layer.</p>
 <h2 id="steering-with-your-own-tensors">Steering with your own tensors<a class="headerlink" href="#steering-with-your-own-tensors" title="Permanent link">&para;</a></h2>
-<p>The engine loads only formats whose schema EasySteer defines. Everything else —
-pyreft checkpoints, LM-Steer <code>.pt</code> files, pickled transport maps, or tensors you
-just computed — is passed in memory through <code>VectorSpec(data=...)</code> using the
-canonical payload structures:</p>
-<table>
-<thead>
-<tr>
-<th>Payload</th>
-<th>Algorithms</th>
-<th>Shape</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>DirectionVector({layer: vec})</code></td>
-<td><code>direct</code>, <code>attention_add</code>, <code>erase</code>, <code>replace</code></td>
-<td>one 1-D vector per layer; <code>attention_add</code> uses concatenated query head outputs</td>
-</tr>
-<tr>
-<td><code>LinearMap(weight, bias=None)</code></td>
-<td><code>linear</code></td>
-<td>one affine map, applied to each <code>layers</code> entry</td>
-</tr>
-<tr>
-<td><code>LowRankProjector(projector1, projector2)</code></td>
-<td><code>lm_steer</code></td>
-<td>low-rank update factors, applied to each <code>layers</code> entry</td>
-</tr>
-<tr>
-<td><code>ReftIntervention(rotate_layer, learned_source_weight, learned_source_bias=None, layer=None)</code></td>
-<td><code>loreft</code></td>
-<td>Uses its recorded <code>layer</code>; without one, requires <code>VectorSpec.layers</code></td>
-</tr>
-<tr>
-<td><code>ConceptPair(h1=..., h2=...)</code></td>
-<td><code>concept_replace</code></td>
-<td>replace the component along <code>h1</code> with the corresponding component along <code>h2</code></td>
-</tr>
-<tr>
-<td><code>RouterConfig({layer: config})</code></td>
-<td><code>moe_router</code></td>
-<td>per-layer expert IDs and routing mode</td>
-</tr>
-</tbody>
-</table>
+<p>Load third-party checkpoints in the client through
+<a href="../../api-reference/steer/#payload-adapters-easysteervectors"><code>easysteer.vectors</code></a>,
+then pass the returned payload as <code>VectorSpec.data</code>. Use the
+<a href="../../api-reference/algorithms/#native-sources-and-checkpoint-adapters">format table</a>
+to choose an adapter, or construct a <a href="../../api-reference/payloads/">payload object</a>
+from your own tensors.</p>
+<p>This fragment assumes <code>my_vector</code> contains a direction for layer 10 of the
+loaded model, with the same width as that layer's hidden states:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">DirectionVector</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Any tensor you have — numpy or torch — becomes steerable directly:</span>
@@ -2220,10 +2478,9 @@ remain available (<code>from_pyreft</code>,
 <code>from_lm_steer</code>, <code>from_linear_transport</code>, <code>from_pt_direction</code>, <code>from_gguf</code>),
 and <code>easysteer.vectors.from_control_vector(cv)</code> steers an extraction result
 with no GGUF round-trip.</p>
-<p>When a payload records layer IDs, <code>VectorSpec.layers</code> restricts those IDs; it does
-not move an intervention to a different layer. For a checkpoint with a recorded
-LoReFT layer, omit <code>layers</code> or include that layer in the list.</p>
-<h2 id="steeringspec-vectors-conflict-policy"><code>SteeringSpec</code>: vectors + conflict policy<a class="headerlink" href="#steeringspec-vectors-conflict-policy" title="Permanent link">&para;</a></h2>
+<p>For a checkpoint with a recorded LoReFT layer, omit <code>layers</code> or include that
+layer in the list.</p>
+<h2 id="combine-vectors">Combine vectors<a class="headerlink" href="#combine-vectors" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -2246,7 +2503,7 @@ LoReFT layer, omit <code>layers</code> or include that layer in the list.</p>
 </tbody>
 </table>
 <p><code>moe_router</code> is not yet supported in multi-vector specs.</p>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
+<h3 id="selection-and-combination-examples">Selection and combination examples<a class="headerlink" href="#selection-and-combination-examples" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Single vector on every prompt + generated token</span>
@@ -2274,46 +2531,45 @@ LoReFT layer, omit <code>layers</code> or include that layer in the list.</p>
 <a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="p">])</span>
 </code></pre></div>
 <h2 id="interaction-with-engine-features">Interaction with engine features<a class="headerlink" href="#interaction-with-engine-features" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Prefix caching</strong> is supported: block hashes include the effective request's
-  steering fingerprint. Default and explicit requests with identical configs can
-  reuse blocks; different configs remain separate. Updating or clearing the default
-  preserves reusable blocks for previous configurations.</li>
-<li><strong>Chunked prefill</strong> is supported; negative positions resolve stably across chunks.</li>
-<li><strong>Beam search</strong> requires steering to be disabled. Use <code>steering=False</code> (HTTP:
-  <code>"steering": false</code>) when a default is configured; effective steering with beam
-  search is rejected because its prompt/generation selection semantics differ.</li>
-<li><strong>CUDA graphs</strong>: <code>split</code> supports all algorithms and multi-vector specs, with
-  steering between compiled graph segments. <code>in_graph</code> requires a single-vector
-  spec whose algorithm has a graph kernel: <code>direct</code>, <code>attention_add</code>, <code>erase</code>,
-  <code>replace</code>, and <code>concept_replace</code> support it; <code>loreft</code> and <code>lm_steer</code> also require
-  payload rank at most <code>steer_graph_max_rank</code> (default 32). <code>moe_router</code> supports inline and
-  file-backed <code>activate</code>, <code>deactivate</code>, <code>soft</code>, and <code>soft_topk</code> configurations;
-  <code>soft_random</code> and <code>linear</code> use <code>split</code>.
-  Normalization for <code>direct</code>, <code>erase</code>, <code>replace</code>, and <code>concept_replace</code> is supported
-  in both tiers; <code>attention_add</code> requires <code>normalize=False</code>. The default
-  <code>steer_graph_mode="auto"</code> evaluates an engine-default spec's actual payloads;
-  with a names-only declaration, conditional algorithms select <code>split</code>.
-  Resolution and admission share the same capability rules, and the engine logs
-  its selection reason. Eager execution uses
-  the same specs without graph capture. See the
-  <a href="https://github.com/ZJU-REAL/EasySteer-vllm-v1/blob/main/docs/features/steer_vectors.md#graph-tiers">engine guide</a>
-  for explicit graph settings.</li>
-</ul>
-<p>The algorithm selects its model component: <code>moe_router</code> edits <code>router_logits</code>
-at an accessible MoE gate; <code>attention_add</code> edits <code>attention_heads</code> before the
-attention output projection. The other algorithms edit decoder <code>hidden_states</code>.
-Steering and capture share layer discovery and hook availability, including
-checks for fused routers whose gate modules are bypassed.</p>
-<p>See <a href="../performance/">graphs, caching, and performance</a> for startup selection,
-capture execution, and tuning. The <a href="../../api-reference/algorithms/">algorithm reference</a>
-compares payload formats, scale semantics, and graph conditions in one table.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Steering behavior</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prefix caching</td>
+<td>Matching prompts and effective configurations can reuse blocks; different steering configurations remain separate. Updating a default preserves reusable entries.</td>
+<td><a href="../performance/#prefix-caching">Cache identity</a></td>
+</tr>
+<tr>
+<td>Chunked prefill</td>
+<td>Selection uses positions in the complete prompt, including negative positions.</td>
+<td><a href="#select-prompt-and-generation-rows">Selection rules</a></td>
+</tr>
+<tr>
+<td>CUDA graphs</td>
+<td><code>split</code> serves all algorithms; <code>in_graph</code> serves single-vector requests that satisfy the algorithm's payload conditions.</td>
+<td><a href="../performance/#graph-modes">Mode selection</a> · <a href="../../api-reference/algorithms/#capability-table">Algorithm conditions</a></td>
+</tr>
+<tr>
+<td>Beam search</td>
+<td>Effective steering must be disabled, including any engine default. Pass <code>steering=False</code>.</td>
+<td>Beam search uses different prompt/generation selection semantics.</td>
+</tr>
+</tbody>
+</table>
+<p>The algorithm determines the component: <code>attention_add</code> edits <code>attention_heads</code>,
+<code>moe_router</code> edits <code>router_logits</code>, and the other algorithms edit
+<code>hidden_states</code>. Steering and capture use the same layer discovery and check
+that the relevant hook runs, including for fused MoE implementations.</p>
 <h2 id="attention-head-intervention">Attention head intervention<a class="headerlink" href="#attention-head-intervention" title="Permanent link">&para;</a></h2>
-<p><code>attention_add</code> adds a direction to the concatenated attention head outputs,
-after attention aggregation and before the output projection. Declare
-<code>steer_algorithms=["attention_add"]</code> when creating the engine. It supports eager,
-<code>split</code>, and <code>in_graph</code> execution; the default <code>auto</code> mode selects <code>in_graph</code>
-for a single-vector attention declaration.</p>
+<p>To steer attention head outputs, declare <code>steer_algorithms=["attention_add"]</code>
+and use a direction extracted for those outputs. The request uses the same
+spec and selection language:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">attention</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">".runtime/iti/iti.gguf"</span><span class="p">,</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"attention_add"</span><span class="p">,</span>
@@ -2322,38 +2578,18 @@ for a single-vector attention declaration.</p>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)])</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">prompts</span><span class="p">,</span> <span class="n">steering</span><span class="o">=</span><span class="n">attention</span><span class="p">)</span>
 </code></pre></div>
-<p>Use a standard decoder MHA/GQA model with <code>tensor_parallel_size=1</code>.
-MLA, encoder attention, and cross-attention are outside this component's scope.
-Each layer's vector width is <code>num_heads * head_size</code>, obtained from the
-<a href="../hidden-state-capture/#attention-head-outputs">capture layout</a>, and need not
-equal the residual hidden size. <code>num_heads</code> counts query heads, including for
-GQA. To select heads, leave the other head slices zero in the existing
-<code>DirectionVector</code> or GGUF payload. <code>normalize=True</code> is rejected.</p>
-<p>The <a href="../extracting-vectors/#iti-attention-head-directions">ITI example</a> learns
-head directions and their scale from TruthfulQA development data. Its
-<code>ApplySpec</code> includes the last prompt token so the first answer-token prediction
-is also steered.
-The <a href="../attention/">attention guide</a> explains the component layout, captures its
-head outputs, and links the complete paper replication.</p>
-<h2 id="migrating-from-v1">Migrating from v1<a class="headerlink" href="#migrating-from-v1" title="Permanent link">&para;</a></h2>
-<p>The v1 surface (trigger fields, <code>steer_vector_request</code>, <code>--steer-vector-path</code> flags, the
-<code>-1</code> token sentinel, <code>"path|algo"</code> sources) has been <strong>deleted</strong>. Key semantic changes:</p>
-<ul>
-<li>Exclusions always subtract; nothing bypasses them.</li>
-<li><code>generation_window=(0, k)</code> steers exactly <code>k</code> decode steps (the v1 <code>first_k</code>
-  off-by-one is gone).</li>
-<li><code>prompt="all"</code> / <code>generation="all"</code> replace the <code>-1</code> token sentinel. There is
-  no <code>phases</code> field; narrower selectors imply their own phase.</li>
-<li><code>normalize</code> defaults to <code>False</code> everywhere, including default configurations.</li>
-<li><code>generation_window</code> is an include selector like any other: it <strong>unions</strong> with
-  the token/position selectors instead of constraining decode tokens, and a
-  cross-phase clause with only a <code>generation_window</code> no longer covers the
-  prompt — select prompt tokens explicitly (e.g. <code>prompt_window=(0, None)</code>).</li>
-<li>Every selector is phase-scoped and named for it: token-id filters split into
-  <code>prompt_tokens</code> / <code>generation_tokens</code>, and <code>prompt_positions</code> (formerly
-  <code>positions</code>) selects prompt tokens only — decode steps are always addressed
-  through <code>generation_positions</code> / <code>generation_window</code>.</li>
-</ul>
+<p>The <a href="../attention/">attention guide</a> covers supported MHA/GQA models, head layout,
+capture, and the ITI replication. Use its captured query-head layout to size the
+vector; attention head outputs need not have the model's hidden-state width.</p>
+<h2 id="migrating-from-v1">Older steering APIs<a class="headerlink" href="#migrating-from-v1" title="Permanent link">&para;</a></h2>
+<p>The earlier steering API used <code>steer_vector_request</code>, trigger fields,
+<code>--steer-vector-path</code>, and <code>"path|algo"</code> sources. These interfaces have been
+removed. Use <code>SteeringSpec</code>, plain <code>source</code> paths, and phase-specific selections.
+This API change is separate from vLLM's V1/V2 model-runner naming.</p>
+<p>When updating an old example, check selection semantics: includes form a union,
+exclusions subtract from it, and a generation window selects only decode rows.
+<code>generation_window=(0, k)</code> selects the first <code>k</code> decode steps. Select prompt rows
+explicitly when needed; <code>prompt_positions</code> never selects generation rows.</p>
 
 
 
