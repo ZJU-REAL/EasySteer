@@ -1,6 +1,6 @@
 services:
   easysteer:
-    image: easysteer:latest
+    image: ${EASYSTEER_IMAGE:-xuhaolei/easysteer:v0.29.0}
     container_name: easysteer
     environment:
       - NVIDIA_VISIBLE_DEVICES=all

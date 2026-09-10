@@ -7,6 +7,7 @@
 [![GitHub Repo stars](https://img.shields.io/github/stars/ZJU-REAL/EasySteer?style=social)](https://github.com/ZJU-REAL/EasySteer/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-v0.29.0-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/xuhaolei/easysteer/tags?name=v0.29.0)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 [![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
@@ -22,7 +23,7 @@
 <a id="news"></a>
 ## 新闻 🔥
 
-- [2026/09/10] 当前版本基于 vLLM v0.29.0（V2 模型运行器），新增注意力头输出捕获（`attention_heads`）、`attention_add` 干预与 [ITI 复现](replications/iti/)。干预、捕获与 Docker 用法见[文档站](https://zju-real.github.io/EasySteer/latest/)。
+- [2026/09/10] 发布 [EasySteer v0.29.0](https://github.com/ZJU-REAL/EasySteer/releases/tag/v0.29.0) 及 [Docker 镜像](https://hub.docker.com/r/xuhaolei/easysteer/tags?name=v0.29.0)，基于 vLLM v0.29.0（V2 模型运行器），新增注意力头输出捕获（`attention_heads`）、`attention_add` 干预与 [ITI 复现](replications/iti/)。用法见[文档站](https://zju-real.github.io/EasySteer/latest/)。
 - [2026/08/22] [EasySteer 论文](https://arxiv.org/abs/2509.25175)被 EMNLP 2026 System Demonstrations 接收 🎉
 - [2026/04/06] 基于 EasySteer 的工作 [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) 被 ACL 2026 主会接收 🎉
 - [2026/02/16] 上线 [Hugging Face 轻量级 Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) 和 [OpenAI 兼容干预 API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)。完整 Web 界面见[演示文档](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/)。
@@ -166,14 +167,17 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 
 [replications](replications) 目录使用 EasySteer 实现已发表论文的干预方法，各示例的范围见[复现集](https://zju-real.github.io/EasySteer/latest/replications/)：
 
-| 类别 | 复现 |
-|---|---|
-| 推理 | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) |
-| 安全 | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) |
-| 风格 | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) |
-| 知识与真实性 | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) · [ITI](replications/iti/) |
-| 通用与个性化 | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) |
-| MoE | [SteerMoE](replications/steermoe/) |
+| 类别 | 复现 | 干预位置 |
+|---|---|---|
+| 推理 | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) | 残差流 |
+| 安全 | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) | 残差流 |
+| 风格 | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) | 残差流 |
+| 知识与真实性 | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) | 残差流 |
+| 真实性 | [ITI](replications/iti/) | 注意力头输出 |
+| 通用与个性化 | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) | 残差流 |
+| MoE | [SteerMoE](replications/steermoe/) | MoE 路由 logits |
+
+干预位置以示例代码的实际实现为准：残差流指解码器层输出，注意力头输出位于输出投影之前。
 
 ## 引用
 

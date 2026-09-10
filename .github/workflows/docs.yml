@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: docs-${{ github.ref }}
+  group: docs-${{ github.event_name == 'push' && 'deploy' || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -74,12 +74,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      # main -> the rolling "dev" version, which also carries the "latest" alias
-      # (retitle the alias handling when the first stable release tag exists).
+      # Keep development docs separate from the latest published release.
       - name: Deploy dev docs
         if: github.ref == 'refs/heads/main'
-        run: mike deploy --push --update-aliases dev latest
-      # version tags (v*) -> that version number, e.g. /v0.2.0/
+        run: mike deploy --push dev
+      # Release tags publish a versioned snapshot and update the stable alias.
       - name: Deploy release docs
         if: startsWith(github.ref, 'refs/tags/v')
-        run: mike deploy --push "${GITHUB_REF_NAME}"
+        run: mike deploy --push --update-aliases "${GITHUB_REF_NAME}" latest

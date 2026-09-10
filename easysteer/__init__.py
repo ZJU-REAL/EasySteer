@@ -2,7 +2,7 @@
 
 from importlib import import_module
 
-__version__ = "0.1.0"
+__version__ = "0.29.0"
 __all__ = ["hidden_states", "steer", "reft"]
 
 

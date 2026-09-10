@@ -7,6 +7,7 @@
 [![GitHub Repo stars](https://img.shields.io/github/stars/ZJU-REAL/EasySteer?style=social)](https://github.com/ZJU-REAL/EasySteer/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/commits/main)
 [![GitHub](https://img.shields.io/github/license/ZJU-REAL/EasySteer)](https://github.com/ZJU-REAL/EasySteer/blob/main/LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-v0.29.0-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/xuhaolei/easysteer/tags?name=v0.29.0)
 [![arXiv](https://img.shields.io/badge/arXiv-2509.25175-b31b1b.svg)](https://arxiv.org/abs/2509.25175)
 [![Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Lite%20Demo-blue)](https://huggingface.co/spaces/zjuxhl/EasySteer)
 [![YouTube](https://img.shields.io/badge/YouTube-Video-red?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=3rRGzZmhrXg)
@@ -22,7 +23,7 @@
 <a id="news"></a>
 ## News 🔥
 
-- [2026/09/10] The current release runs on vLLM v0.29.0 (V2 model runner) and adds attention head output capture (`attention_heads`), `attention_add` steering, and an [ITI replication](replications/iti/). See the [docs](https://zju-real.github.io/EasySteer/latest/) for steering, capture, and Docker guides.
+- [2026/09/10] Released [EasySteer v0.29.0](https://github.com/ZJU-REAL/EasySteer/releases/tag/v0.29.0) and its [Docker image](https://hub.docker.com/r/xuhaolei/easysteer/tags?name=v0.29.0), based on vLLM v0.29.0 (V2 model runner), with attention head output capture (`attention_heads`), `attention_add` steering, and an [ITI replication](replications/iti/). See the [docs](https://zju-real.github.io/EasySteer/latest/) for usage.
 - [2026/08/22] [EasySteer](https://arxiv.org/abs/2509.25175) has been accepted to EMNLP 2026 System Demonstrations 🎉
 - [2026/04/06] [Seeing but Not Thinking: Routing Distraction in Multimodal Mixture-of-Experts](https://arxiv.org/abs/2604.08541) — work built on EasySteer — accepted to the ACL 2026 main conference 🎉
 - [2026/02/16] Launched the [Hugging Face Lite Demo](https://huggingface.co/spaces/zjuxhl/EasySteer) and [OpenAI-compatible steering API](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/). See the [Web demo docs](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) for the full interface.
@@ -167,14 +168,18 @@ We welcome paper replications, new steering algorithms, and support for addition
 
 The [replications](replications) folder implements published steering methods with EasySteer. See the [replication gallery](https://zju-real.github.io/EasySteer/latest/replications/) for each example's scope:
 
-| Category | Replications |
-|---|---|
-| Reasoning | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) |
-| Safety | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) |
-| Style | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) |
-| Knowledge & Reality | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) · [ITI](replications/iti/) |
-| General & Personalization | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) |
-| MoE | [SteerMoE](replications/steermoe/) |
+| Category | Replications | Component |
+|---|---|---|
+| Reasoning | [Thinking Speed](replications/controlingthinkingspeed/) · [Fractional Reasoning](replications/fractreason/) · [Improve Reasoning](replications/improve_reasoning/) · [SEAL](replications/seal/) | Residual stream |
+| Safety | [Refusal Direction](replications/refusal_direction/) · [CAST](replications/cast/) | Residual stream |
+| Style | [Creative Writing](replications/creative_writing/) · [Steerable Chatbots](replications/steerable_chatbot/) | Residual stream |
+| Knowledge & Truthfulness | [SAKE](replications/sake/) · [SAE Entities](replications/sae_entities/) · [SHARP](replications/sharp/) | Residual stream |
+| Truthfulness | [ITI](replications/iti/) | Attention head outputs |
+| General & Personalization | [LM-Steer](replications/lm_steer/) · [LoReFT](replications/loreft/) · [BiPO](replications/bipo/) | Residual stream |
+| MoE | [SteerMoE](replications/steermoe/) | MoE router logits |
+
+Components reflect the intervention points in the examples. Residual stream
+denotes decoder block output; attention head outputs are taken before the output projection.
 
 ## Citation
 

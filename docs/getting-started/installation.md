@@ -110,7 +110,22 @@ A full source build can take from ~20 minutes (128 cores) to several hours.
 
 ## Docker
 
-Build the image from the checked-out source to use the current steering API:
+The published v0.29.0 image includes EasySteer and its pinned vLLM fork for
+Linux x86_64. Docker and NVIDIA Container Toolkit are required on the host:
+
+```bash
+docker pull xuhaolei/easysteer:v0.29.0
+docker run --gpus all --shm-size=16g -it \
+  -v /path/to/your/models:/app/models \
+  -w /app/easysteer \
+  xuhaolei/easysteer:v0.29.0
+```
+
+The version tag fixes the release; `xuhaolei/easysteer:latest` follows the
+latest published version. Model weights are supplied separately through the
+mounted directory.
+
+To build from your own checkout:
 
 ```bash
 # From the EasySteer repository root; requires Docker and NVIDIA Container Toolkit
@@ -120,9 +135,7 @@ docker run --gpus all -it \
   easysteer:latest
 ```
 
-Here `latest` is the image built locally by the script. The historical published
-`v0.17.1` image uses an older engine and v1-era APIs; it is not the v0.29.0 build
-described on this page.
+Here `easysteer:latest` is a local image built by the script.
 
 The default base image uses CUDA 13.0. For a CUDA 12.9 build, select the
 corresponding official image:
