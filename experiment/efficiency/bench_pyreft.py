@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""pyreft (HF transformers) efficiency benchmark (EasySteer paper, 5.1).
+"""PyReFT-compatible additive intervention benchmark.
 
-The framework comparison attaches rank-4 LoReFT to every layer and zeros its
-parameters. Sequential by default; --batch N (paper: 256) times one padded
-batch instead.
+The comparison attaches a zero additive vector to every layer. The default
+benchmark uses padded batches of 256 prompts. Use ``--samples`` to submit
+more prompts in successive batches, or pass ``--batch 0`` for sequential mode.
 """
 
 import argparse
@@ -17,6 +17,7 @@ def load_reft_model(device):
     import transformers
 
     from easysteer.reft import pyreft
+    from easysteer.reft.pyreft.reft.algorithms import BiasIntervention
 
     model = transformers.AutoModelForCausalLM.from_pretrained(
         MODEL, dtype=torch.bfloat16, device_map=device
@@ -26,15 +27,16 @@ def load_reft_model(device):
     )
     tokenizer.pad_token = tokenizer.eos_token
 
-    # Retain the all-layer LoReFT computation with zeroed parameters.
+    # Use the same additive h + vector operation as EasySteer's direct
+    # algorithm. A zero bias keeps the generated tokens unchanged while the
+    # intervention wrapper remains active on every layer.
     reft_config = pyreft.ReftConfig(
         representations=[
             {
                 "layer": layer,
                 "component": "block_output",
-                "low_rank_dimension": 4,
-                "intervention": pyreft.LoreftIntervention(
-                    embed_dim=model.config.hidden_size, low_rank_dimension=4
+                "intervention": BiasIntervention(
+                    embed_dim=model.config.hidden_size,
                 ),
             }
             for layer in range(model.config.num_hidden_layers)
@@ -60,11 +62,19 @@ def main():
     parser.add_argument(
         "--batch",
         type=nonnegative_int,
-        default=0,
-        help="batch size; 0 = sequential (paper: 256)",
+        default=256,
+        help="per-call batch size; 0 = sequential (paper: 256)",
+    )
+    parser.add_argument(
+        "--samples",
+        type=nonnegative_int,
+        default=None,
+        help="total prompts to evaluate; defaults to --batch",
     )
     parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
     args = parser.parse_args()
+    if args.batch and args.samples == 0:
+        parser.error("--samples must be positive when --batch is nonzero")
 
     import torch
 
@@ -80,21 +90,38 @@ def main():
     warmup_kwargs = {**gen_kwargs, "min_new_tokens": 8, "max_new_tokens": 8}
 
     if args.batch:
-        inputs = tokenizer(
-            load_examples(args.batch), return_tensors="pt", padding=True
-        ).to(device)
-        input_dict = {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"],
-        }
-        reft_model.generate(input_dict, **warmup_kwargs)
+        samples = args.samples if args.samples is not None else args.batch
+        examples = load_examples(samples)
+        batches = []
+        for start in range(0, samples, args.batch):
+            inputs = tokenizer(
+                examples[start : start + args.batch],
+                return_tensors="pt",
+                padding=True,
+            )
+            batches.append(
+                {
+                    "input_ids": inputs["input_ids"],
+                    "attention_mask": inputs["attention_mask"],
+                }
+            )
+
+        warmup_batch = {key: value.to(device) for key, value in batches[0].items()}
+        reft_model.generate(warmup_batch, **warmup_kwargs)
+        del warmup_batch
         torch.cuda.synchronize()
         start = time.perf_counter()
-        _, generated = reft_model.generate(input_dict, **gen_kwargs)
+        tokens = 0
+        for input_dict in batches:
+            input_dict = {key: value.to(device) for key, value in input_dict.items()}
+            _, generated = reft_model.generate(input_dict, **gen_kwargs)
+            tokens += generated_token_count(
+                generated, input_dict["input_ids"].shape[1]
+            )
+            del input_dict, generated
         torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
-        tokens = generated_token_count(generated, inputs["input_ids"].shape[1])
-        report(tokens, elapsed, args.batch)
+        report(tokens, elapsed, samples)
     else:
         examples = load_examples(N_SEQUENTIAL)
         prepared = [tokenizer(e, return_tensors="pt").to(device) for e in examples]

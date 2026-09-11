@@ -43,7 +43,9 @@ MODES = ("eager", "split", "in_graph")
 def run_mode(args):
     from vllm import SamplingParams
 
-    llm = build_engine(args.mode, args.max_steer)
+    llm = build_engine(
+        args.mode, args.max_steer, max_num_seqs=args.max_num_seqs
+    )
     params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
     layers = list(range(args.layers))
@@ -84,6 +86,12 @@ def main():
     )
     parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument(
+        "--max-num-seqs",
+        type=positive_int,
+        default=None,
+        help="scheduler sequence limit; unset uses the vLLM default",
+    )
+    parser.add_argument(
         "--layers", type=positive_int, default=28, help="steered layer count per config"
     )
     parser.add_argument(
@@ -117,6 +125,11 @@ def main():
         str(args.max_tokens),
         "--layers",
         str(args.layers),
+        *(
+            ["--max-num-seqs", str(args.max_num_seqs)]
+            if args.max_num_seqs is not None
+            else []
+        ),
     ]
     env = {**os.environ, "VLLM_LOGGING_LEVEL": "WARNING"}
     for mode in args.modes:

@@ -3,8 +3,9 @@
 
 Wraps the model in repeng's ControlModel with the SEAL execution vector
 applied at strength 0 on layers 1-27 (the paper's all-layer, zero-valued
-setup). Sequential by default; --batch N (paper: 64) times one padded
-batch instead.
+setup). The default benchmark uses one padded batch of 256 prompts. Use
+``--samples`` to submit more prompts in successive batches, or pass
+``--batch 0`` for sequential mode.
 """
 
 import argparse
@@ -25,11 +26,19 @@ def main():
     parser.add_argument(
         "--batch",
         type=nonnegative_int,
-        default=0,
-        help="batch size; 0 = sequential (paper: 64)",
+        default=256,
+        help="per-call batch size; 0 = sequential (paper: 64)",
+    )
+    parser.add_argument(
+        "--samples",
+        type=nonnegative_int,
+        default=None,
+        help="total prompts to evaluate; defaults to --batch",
     )
     parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
     args = parser.parse_args()
+    if args.batch and args.samples == 0:
+        parser.error("--samples must be positive when --batch is nonzero")
 
     import numpy as np
     import torch
@@ -54,19 +63,36 @@ def main():
     warmup_settings = {**settings, "min_new_tokens": 8, "max_new_tokens": 8}
 
     if args.batch:
-        inputs = tokenizer(
-            load_examples(args.batch), return_tensors="pt", padding=True
-        ).to(model.device)
-        model.generate(**inputs, **warmup_settings)
+        samples = args.samples if args.samples is not None else args.batch
+        examples = load_examples(samples)
+        batches = []
+        for start in range(0, samples, args.batch):
+            batches.append(
+                tokenizer(
+                    examples[start : start + args.batch],
+                    return_tensors="pt",
+                    padding=True,
+                )
+            )
+
+        warmup_batch = {key: value.to(model.device) for key, value in batches[0].items()}
+        model.generate(**warmup_batch, **warmup_settings)
+        del warmup_batch
         torch.cuda.synchronize()
         start = time.perf_counter()
-        outputs = model.generate(**inputs, **settings)
+        tokens = 0
+        for inputs in batches:
+            inputs = {key: value.to(model.device) for key, value in inputs.items()}
+            outputs = model.generate(**inputs, **settings)
+            # min_new_tokens == max_new_tokens keeps every generated suffix
+            # full; subtract each batch's padded prompt width.
+            tokens += outputs.shape[0] * (
+                outputs.shape[1] - inputs["input_ids"].shape[1]
+            )
+            del inputs, outputs
         torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
-        # min_new_tokens == max_new_tokens keeps every generated suffix full;
-        # subtract the padded prompt width, not the number of non-EOS input IDs.
-        tokens = outputs.shape[0] * (outputs.shape[1] - inputs["input_ids"].shape[1])
-        report(tokens, elapsed, args.batch)
+        report(tokens, elapsed, samples)
     else:
         prepared = [
             tokenizer(e, return_tensors="pt").to(model.device)

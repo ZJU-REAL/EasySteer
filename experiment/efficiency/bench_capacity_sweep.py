@@ -32,7 +32,11 @@ from common import build_engine, distinct_spec, load_examples, positive_int, war
 def run_capacity(args):
     from vllm import SamplingParams
 
-    llm = build_engine(args.tier, args.capacity)
+    llm = build_engine(
+        args.tier,
+        args.capacity,
+        max_num_seqs=args.max_num_seqs or args.batch,
+    )
     params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
     layers = list(range(args.layers))
@@ -64,6 +68,12 @@ def main():
     )
     parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument("--layers", type=positive_int, default=28)
+    parser.add_argument(
+        "--max-num-seqs",
+        type=positive_int,
+        default=None,
+        help="scheduler sequence limit (defaults to --batch)",
+    )
     parser.add_argument("--tier", choices=["in_graph", "eager"], default="in_graph")
     parser.add_argument(
         "--capacity", type=positive_int, help=argparse.SUPPRESS
@@ -93,6 +103,8 @@ def main():
                 str(args.layers),
                 "--tier",
                 args.tier,
+                "--max-num-seqs",
+                str(args.max_num_seqs or args.batch),
             ],
             check=True,
             env=env,

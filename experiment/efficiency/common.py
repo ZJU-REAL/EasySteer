@@ -56,35 +56,47 @@ def load_examples(n: int) -> list[str]:
 
 
 def build_engine(
-    tier: str, max_steer: int | None = None, *, multi_vector: bool = False
+    tier: str,
+    max_steer: int | None = None,
+    *,
+    multi_vector: bool = False,
+    max_num_seqs: int | None = None,
 ):
     """Use the same model and batching policy for all vLLM comparisons."""
     from vllm import LLM
 
-    llm = LLM(
-        model=MODEL,
-        dtype="bfloat16",
-        enable_steer_vector=True,
-        steer_algorithms=["direct"],
-        steer_multi_vector=multi_vector,
-        max_steer_vectors=max_steer,
-        enforce_eager=tier == "eager",
-        steer_graph_mode="auto" if tier == "eager" else tier,
-        enable_prefix_caching=False,
-        enable_chunked_prefill=False,
-    )
+    engine_kwargs = {
+        "model": MODEL,
+        "dtype": "bfloat16",
+        "enable_steer_vector": True,
+        "steer_algorithms": ["direct"],
+        "steer_multi_vector": multi_vector,
+        "max_steer_vectors": max_steer,
+        "enforce_eager": tier == "eager",
+        "steer_graph_mode": "auto" if tier == "eager" else tier,
+    }
+    if max_num_seqs is not None:
+        engine_kwargs["max_num_seqs"] = max_num_seqs
+    llm = LLM(**engine_kwargs)
     config = llm.llm_engine.vllm_config
     print(
         f"ENGINE dtype={config.model_config.dtype} "
         f"steer_graph_mode={config.steer_vector_config.graph_mode} "
-        f"cudagraph_mode={config.compilation_config.cudagraph_mode}",
+        f"cudagraph_mode={config.compilation_config.cudagraph_mode} "
+        f"prefix_caching={config.cache_config.enable_prefix_caching} "
+        f"chunked_prefill={config.scheduler_config.enable_chunked_prefill} "
+        f"max_num_batched_tokens={config.scheduler_config.max_num_batched_tokens}",
         flush=True,
     )
     return llm
 
 
 def distinct_spec(index: int, layers: list[int], source: str = SEAL_VECTOR):
-    """A zero-scale configuration with a distinct selection fingerprint."""
+    """Distinct slot fingerprints with identical zero-scale token coverage.
+
+    The generation window unions with ``generation="all"``, preserving the
+    effective mask without referring to potentially short prompt positions.
+    """
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
     return SteeringSpec(
@@ -94,7 +106,7 @@ def distinct_spec(index: int, layers: list[int], source: str = SEAL_VECTOR):
                 scale=0.0,
                 layers=layers,
                 apply=ApplySpec(
-                    prompt="all", generation="all", exclude_prompt_positions=[index]
+                    prompt="all", generation="all", generation_window=(index, index + 1)
                 ),
             )
         ]
@@ -111,6 +123,13 @@ def warmup(llm, prompts, steering=None) -> None:
         steering=steering,
         use_tqdm=False,
     )
+    reset_prefix_cache(llm)
+
+
+def reset_prefix_cache(llm) -> None:
+    """Clear KV prefix hashes after a completed warmup or probe call."""
+    if not llm.reset_prefix_cache():
+        raise RuntimeError("prefix-cache reset failed while requests were still running")
 
 
 def report(total_output_tokens, elapsed, n_requests, one_token_s=None):

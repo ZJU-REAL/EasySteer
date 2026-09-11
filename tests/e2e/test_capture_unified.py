@@ -53,6 +53,7 @@ def test_engine_keeps_full_cudagraphs(llm):
         "capture support must not cost the idle engine its full CUDA "
         "graphs"
     )
+    assert rpc(llm, "capture_status", "hidden_states")[0]["hooked_layers"] == 0
 
 
 def test_capture_on_compiled_engine(llm):
@@ -97,7 +98,8 @@ def test_repeated_capture_has_complete_labels_and_clears_stream(llm):
         assert all(match_capture_request_id(rid, output.request_id)
                    for rid in request_ids)
         previous_ids.update(request_ids)
-        assert not rpc(llm, "capture_status", "hidden_states")[0]["enabled"]
+        status = rpc(llm, "capture_status", "hidden_states")[0]
+        assert not status["enabled"] and status["hooked_layers"] == 0
         assert rpc(llm, "fetch_captured", "hidden_states", clear=False)[0] == {}
 
 
@@ -194,6 +196,7 @@ def test_capture_replays_graph_after_helper_stop_and_restart(llm):
         assert result.sample_positions(0) == list(range(plen, plen + 3))
     after = rpc(llm, "capture_status", "hidden_states")[0]
     assert not after["enabled"] and after["graph_ready"]
+    assert after["hooked_layers"] == 0
     assert after["graph_replays"] >= before["graph_replays"] + 6
     assert after["graph_buffer_bytes"] > 0
 

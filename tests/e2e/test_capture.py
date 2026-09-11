@@ -97,9 +97,11 @@ def test_full_capture_all_layers_and_clear(llm, expected_rows):
 
 def test_layer_subset_captures_only_those_layers(llm):
     with capturing(llm, "hidden_states", layers=[5, 10]):
+        assert rpc(llm, "capture_status", "hidden_states")["hooked_layers"] == 2
         generate(llm)
         captured = rpc(llm, "fetch_captured", "hidden_states")
     assert sorted(captured) == [5, 10], f"got layers {sorted(captured)}"
+    assert rpc(llm, "capture_status", "hidden_states")["hooked_layers"] == 0
 
 
 def test_reduce_last_and_mean_preserve_rows_and_differ_on_prefill(llm):

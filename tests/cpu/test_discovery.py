@@ -21,7 +21,6 @@ from vllm.model_executor.layers.fused_moe.runner.moe_runner_interface import (
 from vllm.model_executor.layers.mamba.abstract import MambaBase
 from vllm.model_executor.models.utils import PPMissingLayer
 from vllm.model_hooks.capture.session import CaptureSession
-from vllm.model_hooks.capture.store import StreamConfig, StreamStore
 from vllm.model_hooks.components import outputs
 from vllm.model_hooks.components.discovery import (
     ModelDiscovery,
@@ -234,10 +233,10 @@ def test_capture_and_steering_share_discovered_indices(monkeypatch):
     session = CaptureSession()
     session.attach(model, components)
     assert find_decoders.call_count == 1
-    store = StreamStore(StreamConfig(budget_rows=20))
+    session.enable_stream(HIDDEN_STATES, budget_rows=20)
+    store = session._streams[HIDDEN_STATES]
     append = Mock(wraps=store.append)
     monkeypatch.setattr(store, "append", append)
-    session._streams[HIDDEN_STATES] = store
     request_index = store.req_index("sample")
     labels = torch.tensor(
         [[request_index, 0, 10], [request_index, 1, 11]], dtype=torch.int32
@@ -250,6 +249,51 @@ def test_capture_and_steering_share_discovered_indices(monkeypatch):
         assert [call.args[0] for call in append.call_args_list] == expected == [0, 1]
     finally:
         session.detach()
+
+
+def test_capture_installs_only_enabled_layers_and_preserves_existing_hooks(monkeypatch):
+    from vllm.model_hooks.components.registry import COMPONENTS, ComponentTarget
+
+    model = nn.Sequential(nn.Identity(), nn.Identity())
+    steering = model[0].register_forward_hook(lambda mod, args, output: output + 3)
+    components = dict.fromkeys(COMPONENTS, ())
+    components[HIDDEN_STATES] = tuple(
+        ComponentTarget(f"layer.{i}", i, layer) for i, layer in enumerate(model)
+    )
+    components[ROUTER_LOGITS] = (ComponentTarget("router.0", 0, model[0]),)
+    session = CaptureSession()
+    session.attach(model, components)
+    assert not model._forward_hooks and len(model[0]._forward_hooks) == 1
+    assert session.stream_status(HIDDEN_STATES)["hooked_layers"] == 0
+    try:
+        session.enable_stream(HIDDEN_STATES, layers=[1])
+        assert len(model[0]._forward_hooks) == len(model[1]._forward_hooks) == 1
+        assert session.stream_status(HIDDEN_STATES)["hooked_layers"] == 1
+        session.enable_stream(HIDDEN_STATES, layers=[0])
+        assert len(model[0]._forward_hooks) == 2 and not model[1]._forward_hooks
+        session.enable_stream(ROUTER_LOGITS, layers=[0])
+        assert len(model[0]._forward_hooks) == 3 and len(model._forward_hooks) == 1
+        monkeypatch.setattr(
+            "vllm.model_hooks.capture.session.prepare_rows",
+            lambda tensor, store, *args: (
+                tensor,
+                torch.tensor([[store.req_index("a"), 0, 10]], dtype=torch.int32),
+            ),
+        )
+        model(torch.zeros(1, 4))
+        from vllm.capture import deserialize_captured
+
+        for stream in (HIDDEN_STATES, ROUTER_LOGITS):
+            rows, _ = deserialize_captured(session.fetch_stream(stream))
+            torch.testing.assert_close(rows[0], torch.full((1, 4), 3.0))
+        session.disable_stream(HIDDEN_STATES)
+        assert len(model[0]._forward_hooks) == 2 and len(model._forward_hooks) == 1
+        session.disable_stream(ROUTER_LOGITS)
+        assert len(model[0]._forward_hooks) == 1 and not model._forward_hooks
+        assert session.stream_status(ROUTER_LOGITS)["hooked_layers"] == 0
+    finally:
+        session.detach()
+        steering.remove()
 
 
 def test_attention_capture_preserves_query_head_layout_and_global_layer(monkeypatch):
@@ -499,7 +543,7 @@ def test_worker_hooks_only_declared_components_without_changing_capture(
         session.attach(model, components)
         try:
             assert all(
-                session._hooked_layers[kind] == {target.layer_id for target in targets}
+                session._available_layers[kind] == {target.layer_id for target in targets}
                 for kind, targets in components.items()
             )
         finally:

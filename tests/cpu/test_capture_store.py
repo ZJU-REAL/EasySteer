@@ -6,6 +6,7 @@ import torch
 from vllm.model_hooks.capture.serialization import deserialize_captured
 from vllm.model_hooks.capture.session import CaptureSession
 from vllm.model_hooks.capture.store import StreamConfig, StreamStore
+from vllm.model_hooks.components.registry import COMPONENTS
 
 
 def append_rows(store, layer=0, request="a", values=None, name="layer.0"):
@@ -49,8 +50,8 @@ def test_unsupported_wire_dtype_is_rejected_when_enabling_stream(dtype):
 
 def test_per_layer_fetch_clear_releases_only_that_layers_budget():
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0, 1}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0, 1}
     session.enable_stream("hidden_states", budget_rows=3)
     store = session._streams["hidden_states"]
     append_rows(store, layer=0)
@@ -227,8 +228,8 @@ def test_request_drain_preserves_order_without_copying_unrelated_activations():
 
 def test_capture_failure_rejects_failed_request_but_allows_other_request_drain():
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.enable_stream("hidden_states", budget_rows=6)
     store = session._streams["hidden_states"]
     session.fail_requests({"bad-01234567": "overlapping steering selections"})

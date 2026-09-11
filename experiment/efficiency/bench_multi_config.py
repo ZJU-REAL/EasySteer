@@ -68,6 +68,12 @@ def main():
     )
     parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument(
+        "--max-num-seqs",
+        type=positive_int,
+        default=None,
+        help="scheduler sequence limit; unset uses the vLLM default",
+    )
+    parser.add_argument(
         "--distinct-paths",
         action="store_true",
         help="give every config its own vector file on "
@@ -91,7 +97,11 @@ def main():
 
     from vllm import SamplingParams
 
-    llm = build_engine("in_graph" if args.cudagraph else "eager", args.max_steer)
+    llm = build_engine(
+        "in_graph" if args.cudagraph else "eager",
+        args.max_steer,
+        max_num_seqs=args.max_num_seqs,
+    )
     params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
     prompts = load_examples(args.batch)
 

@@ -11,6 +11,7 @@ from vllm.model_hooks.capture.graph import CaptureGraphState
 from vllm.model_hooks.capture.serialization import deserialize_captured
 from vllm.model_hooks.capture.session import CaptureSession
 from vllm.model_hooks.capture.store import StreamConfig, StreamStore
+from vllm.model_hooks.components.registry import COMPONENTS
 from vllm.model_hooks.selection.batch import BatchGeometry
 
 
@@ -251,8 +252,8 @@ def test_cache_elision_uses_request_override_for_its_stream(
     global_select, override, missing
 ):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["router_logits"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["router_logits"] = {0}
     session.enable_stream("hidden_states", select=global_select)
     session.enable_stream("router_logits", select={"generation": "all"})
     session.add_request("a", {"hidden_states": override})
@@ -281,7 +282,7 @@ def test_reduction_cache_elision_preserves_already_captured_requests(
     reduce, skipped, missing
 ):
     session = CaptureSession()
-    session._attached = True
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
     session.enable_stream("hidden_states", reduce=reduce, budget_rows=20)
     store = session._streams["hidden_states"]
     # A preempted request retains its previously captured rows in this store.
@@ -309,8 +310,8 @@ def test_late_capture_checks_cache_hits_and_preserves_request_selection(
     config, override, missing
 ):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.add_request(
         "active", {} if override is None else {"hidden_states": override}
     )
@@ -340,8 +341,8 @@ def test_late_capture_checks_cache_hits_and_preserves_request_selection(
 
 def test_late_capture_ignores_completed_requests_awaiting_worker_cleanup():
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     # The prior generation is finished, but worker cleanup is carried by the
     # next scheduler output; enable cannot infer active requests from history.
     session.mark_cache_elided("finished", [10, 11, 12, 13], 3)
@@ -363,8 +364,8 @@ def test_late_capture_ignores_completed_requests_awaiting_worker_cleanup():
 
 def test_late_capture_rejects_only_scheduled_prompt_embedding_requests():
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.add_request("embed-01234567", {}, capture_supported=False)
     assert not session.any_enabled()
     session.enable_stream("hidden_states", budget_rows=20)
@@ -477,8 +478,8 @@ def test_dispatch_upper_bound_never_skips_rows_the_actual_collector_wants(
 
 def test_graph_dispatch_checks_every_request_override_and_enabled_stream():
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers = {"hidden_states": {0}, "router_logits": {0}}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers = {"hidden_states": {0}, "router_logits": {0}}
     session.enable_stream("hidden_states", select={"prompt": "all"})
 
     def required():
@@ -509,8 +510,8 @@ def test_reduction_dispatch_requires_final_prefill_for_last_and_every_chunk_for_
 
 def test_graph_buffers_reuse_capacity_and_store_owns_rows_after_replay(context):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.enable_stream("hidden_states", budget_rows=20)
     state = CaptureGraphState(session.graph_signature())
     session.graph_state = state
@@ -535,6 +536,7 @@ def test_graph_buffers_reuse_capacity_and_store_owns_rows_after_replay(context):
 @pytest.fixture
 def capture_runner():
     from vllm.config.compilation import CUDAGraphMode
+    from vllm.model_hooks.components.registry import ComponentTarget
     from vllm.v1.worker.capture_model_runner_mixin import CaptureModelRunnerMixin
 
     runner = CaptureModelRunnerMixin()
@@ -546,9 +548,13 @@ def capture_runner():
     runner.parallel_config = SimpleNamespace(world_size_across_dp=1)
     runner.speculative_config = None
     runner.lora_config = None
-    session = runner._capture_session()
-    session._attached = True
-    session._hooked_layers = {"hidden_states": {0, 1}, "router_logits": {0}}
+    model = torch.nn.Sequential(torch.nn.Identity(), torch.nn.Identity())
+    components = dict.fromkeys(COMPONENTS, ())
+    components["hidden_states"] = tuple(
+        ComponentTarget(f"layer.{i}", i, layer) for i, layer in enumerate(model)
+    )
+    components["router_logits"] = (ComponentTarget("router.0", 0, model[0]),)
+    runner._attach_capture_hooks(model, components)
     runner.start_capture("hidden_states", layers=[0])
     return runner
 
@@ -574,7 +580,10 @@ def test_graph_variant_reuses_selection_changes_and_invalidates_layers_together(
     assert session.graph_state is state
     runner.stop_capture("hidden_states")
     assert runner.capture_status("hidden_states")["graph_ready"]
+    assert runner.capture_status("hidden_states")["hooked_layers"] == 0
+    assert not any(module._forward_hooks for module in session._model.modules())
     runner.start_capture("hidden_states", layers=[0], select={"prompt": "all"})
+    assert runner.capture_status("hidden_states")["hooked_layers"] == 1
     assert session.graph_signature() == state.signature
     assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4) is manager
     runner.start_capture("hidden_states", layers=[1], reduce="last")
@@ -712,8 +721,8 @@ def test_budget_accounting_counts_actual_selection_and_request_overrides(
 
 def test_budget_trims_before_copy_and_full_layers_keep_ordinary_dispatch(context):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.enable_stream("hidden_states", budget_rows=2)
     store = session._streams["hidden_states"]
     tensor = torch.arange(8.0).reshape(4, 2)
@@ -752,7 +761,7 @@ def test_detach_releases_capture_graph_streams_and_request_state(capture_runner)
     session = runner.capture_session
     session.add_request("a", {"hidden_states": {"prompt": "all"}})
     handle = Mock()
-    session._hook_handles = [handle]
+    session._hook_handles["hidden_states"].append(handle)
     state = CaptureGraphState(session.graph_signature())
     runner.capture_graph_manager = object()
     state.record("hidden_states", 0, torch.ones(2, 2), "layer.0")
@@ -762,7 +771,7 @@ def test_detach_releases_capture_graph_streams_and_request_state(capture_runner)
     handle.remove.assert_called_once()
     assert not session._attached and not session.any_enabled()
     assert not session._request_selects and not session._hook_handles
-    assert not any(session._hooked_layers.values())
+    assert not any(session._available_layers.values())
     assert session.graph_state is None
     assert runner.capture_graph_manager is None and not state.buffers
     assert not hasattr(runner, "capture_session")
@@ -779,12 +788,14 @@ def test_capture_reattachment_releases_previous_model_and_graph(capture_runner):
         components["hidden_states"] = (ComponentTarget("layer.0", 0, model[0]),)
         runner._attach_capture_hooks(model, components)
         assert runner.capture_graph_manager is None
+        assert not model._forward_hooks and not model[0]._forward_hooks
         if previous is not None:
             old_model, old_session, old_state = previous
             assert not old_model._forward_hooks and not old_model[0]._forward_hooks
             assert not old_state.buffers and old_session.graph_state is None
             assert runner.capture_session is not old_session
         runner.start_capture("hidden_states", layers=[0])
+        assert len(model._forward_hooks) == len(model[0]._forward_hooks) == 1
         session = runner.capture_session
         state = CaptureGraphState(session.graph_signature())
         state.record("hidden_states", 0, torch.ones(2, 2), "layer.0")
@@ -825,8 +836,8 @@ def test_worker_capture_rpc_rejects_separate_multimodal_encoder_runner():
 
 def test_full_budget_remembers_processed_requests_until_completion(context):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.enable_stream("hidden_states", budget_rows=0)
     session.prepare_batch(context.batch_geometry)
     store = session._streams["hidden_states"]
@@ -841,8 +852,8 @@ def test_full_budget_remembers_processed_requests_until_completion(context):
 @pytest.mark.parametrize("clear", ["fetch", "explicit"])
 def test_clearing_rows_preserves_active_request_history(context, clear):
     session = CaptureSession()
-    session._attached = True
-    session._hooked_layers["hidden_states"] = {0}
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0}
     session.enable_stream("hidden_states", budget_rows=1)
     session.prepare_batch(context.batch_geometry)
     store = session._streams["hidden_states"]

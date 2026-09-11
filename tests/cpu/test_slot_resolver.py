@@ -19,6 +19,7 @@ from vllm.model_hooks.selection.batch import BatchGeometry
 from vllm.model_hooks.selection.runtime import (
     clause_cache_key,
     collect_positions_apply_spec,
+    selects_all_tokens,
 )
 from vllm.model_hooks.steering.api import ApplySpec
 from vllm.v1.worker.gpu.model_hook_utils import build_batch_geometry
@@ -129,6 +130,47 @@ def test_resolver_matches_torch_collector_per_clause():
     # somewhere (an all-None table would vacuously pass).
     fired = [k for k, v in resolved.items() if v is not None]
     assert len(fired) >= 4
+
+
+def test_benchmark_slots_are_distinct_without_changing_coverage(monkeypatch, caplog):
+    from vllm.model_hooks.steering.api import to_engine_request
+    from vllm.model_hooks.steering.payloads import DirectionVector
+    from vllm.model_hooks.steering.request import (
+        config_fingerprint,
+        warn_clamped_prompt_positions,
+    )
+
+    from experiment.efficiency.common import distinct_spec
+
+    payload = DirectionVector({0: [1.0, 2.0]}).to_wire()
+    monkeypatch.setattr(
+        "vllm.model_hooks.steering.loading.resolve_vector_payload",
+        lambda *args: payload,
+    )
+    source = "/tmp/shared-benchmark-vector.gguf"
+    requests = [
+        to_engine_request(distinct_spec(index, [0], source)) for index in range(256)
+    ]
+    assert len({config_fingerprint(request) for request in requests}) == 256
+    clauses = []
+    for request in requests:
+        vector = request.vectors[0]
+        assert vector.source == source and vector.scale == 0.0
+        assert selects_all_tokens(vector.apply_spec)
+        warn_clamped_prompt_positions(request, prompt_len=1, request_id="short")
+        clauses.append(vector.apply_spec)
+    assert not caplog.records
+
+    geo = make_geometry()
+    token_slots = np.zeros(len(TOKEN_IDS), dtype=np.int32)
+    resolved = resolve_slot_positions(
+        {0: clauses}, [0], np.zeros(len(REQS), dtype=np.int32),
+        torch.device("cpu"), geo,
+    )
+    expected = list(range(len(TOKEN_IDS)))
+    for clause in clauses:
+        assert resolved[(0, clause_cache_key(clause))].tolist() == expected
+        assert reference_positions(geo, token_slots, 0, clause) == expected
 
 
 def test_recomputed_outputs_keep_original_prompt_boundary_and_decode_indices():
@@ -275,6 +317,8 @@ def test_empty_request_segments_never_claim_another_requests_rows():
 
 def test_graph_scatter_combines_slots_without_crossing_mask_families():
     """Two direct slots share one mask; replacement uses the same layer's other mask."""
+    from experiment.efficiency.common import distinct_spec
+
     offsets = np.array([0, 2, 3, 5, 6], dtype=np.int32)
     batch = SimpleNamespace(
         req_ids=["direct-a", "direct-b", "replace", "plain"],
@@ -289,7 +333,10 @@ def test_graph_scatter_combines_slots_without_crossing_mask_families():
         input_ids=torch.arange(6, dtype=torch.int32),
     )
     slots = {"direct-a": 0, "direct-b": 1, "replace": 2}
-    clause = ApplySpec(generation="all").to_wire()
+    clauses = {
+        slot: distinct_spec(index, [0]).vectors[0].apply.to_wire()
+        for slot, index in enumerate((0, 127, 255))
+    }
     masks = torch.full((4, 8), 99.0)
     controller = SimpleNamespace(graph_mask=masks[2], replace_mask=masks[3])
     # Nonzero storage offsets ensure scatter writes into each actual mask.
@@ -297,7 +344,7 @@ def test_graph_scatter_combines_slots_without_crossing_mask_families():
         slot: (
             row,
             SimpleNamespace(
-                vectors=[SimpleNamespace(apply_spec=clause, algorithm=algorithm)]
+                vectors=[SimpleNamespace(apply_spec=clauses[slot], algorithm=algorithm)]
             ),
             [controller],
         )
@@ -307,7 +354,7 @@ def test_graph_scatter_combines_slots_without_crossing_mask_families():
     }
     manager = SimpleNamespace(
         slot_for_request=slots.get,
-        slot_clauses=lambda: {slot: [clause] for slot in entries},
+        slot_clauses=lambda: {slot: [clauses[slot]] for slot in entries},
         token_rows_buf=torch.full((8,), 99, dtype=torch.int64),
         graph_masks_buf=masks,
         zero_graph_masks=lambda n: masks[:, :n].zero_(),

@@ -1,142 +1,61 @@
 # Efficiency benchmarks
 
-Measure generation throughput and steering overhead on
-`deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`, using the same MATH prompts and
-zero-scale control vectors (or zeroed LoReFT parameters). The original
-experiment settings follow Section 5.1 of the EasySteer paper.
+## Latest results
 
-## Setup
+These are the latest v0.29.0 measurements. The model and software versions
+differ from the original paper measurements.
 
-Run the scripts from `experiment/efficiency/` in an installed EasySteer
-v0.29.0 environment. Use one benchmark process per GPU.
+Hardware and software:
 
-- `EASYSTEER_MODEL`: the model ID above, or an existing local copy of that model.
-- `EASYSTEER_VECTOR`: defaults to the committed SEAL
-  `replications/seal/execution_avg_vector.gguf`. It must match the model.
-- `EASYSTEER_BENCH_DATA`: defaults to `../math/math_train_1000.json`, a JSON
-  list of problem strings. Data is not committed; see `../math/README.md`.
+- NVIDIA RTX A6000, 48 GB, driver 580.105.08
+- vLLM 0.29.0 with PyTorch 2.13.0+cu130
+- Transformers 5.16.1, repeng 0.4.0, NumPy 2.3.5
+- DeepSeek-R1-Distill-Qwen-1.5B in BF16
 
-The prompt format remains the experiment's raw R1 reasoning prompt. The
-all-layer setting uses this model's 28 layers; the single-layer setting uses
-layer 20. Pointing the environment variable at a different architecture is
-not a substitute for reproducing this workload.
+The workload contains 512 MATH prompts. vLLM processes them in one batch; the
+Transformers baselines use batch 256 for 128-token generation and batch 128
+for 2048-token generation. Decoding is greedy and each request produces
+exactly the requested number of tokens. The prefix cache is cleared after
+warmup and probe calls. TPS is generated tokens divided by elapsed generation
+time;
+TTLT is elapsed time divided by the number of requests.
 
-The Transformers baselines use the bundled `easysteer.reft.pyreft` and the
-separately installed `repeng` package. The repeng script retains its NumPy
-alias compatibility for the older dependency; it is not needed by EasySteer
-or vLLM. Record dependency versions when rerunning either baseline.
+## EasySteer execution tiers
 
-## Measurement
+All steering vectors use the direct algorithm with scale 0. Single-layer
+steering targets layer 20, all-layer steering targets 28 layers, and
+multi-vector steering uses three vectors on all layers. The resolved execution
+modes are NONE, PIECEWISE, and FULL_AND_PIECEWISE for eager, split, and
+in-graph execution.
 
-Current runs explicitly use BF16 weights, greedy decoding, and fixed output
-lengths: `ignore_eos=True` in vLLM and matching `min_new_tokens` /
-`max_new_tokens` in Transformers. Metrics count generated token IDs.
+| Mode | Eager (max 256) | Eager (max 512) | Split (max 512) | In-graph (max 512) |
+|---|---:|---:|---:|---:|
+| Baseline | 6,170.28 | 10,207.12 | 13,216.10 | **14,956.94** |
+| Single layer (layer 20) | 5,190.10 | 9,856.90 | 12,871.58 | **14,706.51** |
+| All layers (28 layers) | 4,654.24 | 8,716.36 | 10,882.72 | **14,597.28** |
+| Multi-vector (3 × 28 layers) | 4,193.97 | 7,565.08 | 9,142.93 | — |
+| All layers, 2048 tokens | 5,458.78 | 9,453.38 | 10,979.25 | **11,531.75** |
 
-- TPS is aggregate generated tokens divided by elapsed wall time.
-- TTLT retains the historical label for elapsed wall time divided by the
-  number of submitted requests. It is amortized batch time, not the mean
-  latency observed by individual requests.
-- `bench_vllm.py` additionally reports the wall time of a one-token generate
-  call. For a batch this waits for all requests; it is not streaming TTFT.
+## Framework comparison
 
-Model loading, compilation, CUDA graph recording, and an eight-token warmup
-are outside the timer. Steady-state rows warm up the same steering workload,
-including its payloads. Transformers measurements synchronize CUDA before
-and after timing. vLLM's blocking `generate()` returns completed outputs.
+| Framework | 128 tokens | 2048 tokens |
+|---|---:|---:|
+| EasySteer, in-graph | **14,597.28** | **11,531.75** |
+| EasySteer, split | 10,882.72 | 10,979.25 |
+| EasySteer, eager (max 512) | 8,716.36 | 9,453.38 |
+| EasySteer, eager (max 256) | 4,654.24 | 5,458.78 |
+| PyReFT-compatible additive | 1,049.96 | 668.50 (batch 128) |
+| repeng | 1,151.37 | 788.22 (batch 128) |
 
-The vLLM comparisons disable prefix caching and chunked prefill consistently,
-so warmup cannot turn a measured prompt into a prefix-cache hit. Eager,
-split, and in-graph execution remain explicit experimental controls; these
-settings are not recommendations for serving. The engine prints its resolved
-graph mode before measurement.
+The PyReFT-compatible batch-256 run at 2048 tokens ended with OOM. The
+batch-128 result completed all 512 requests.
 
-`--distinct-paths` is the exception to payload warmup: every K gets new vector
-paths, and its first (`cold`) row includes loading those paths. The second
-(`warm`) row reuses them. Model warmup remains outside both timers. Temporary
-vector files are removed after the run.
+## Distinct configurations per batch
 
-The framework baselines retain their original intervention settings:
-EasySteer adds a zero-scale vector on 28 layers, repeng uses layers 1–27,
-and pyreft attaches zeroed rank-4 LoReFT on 28 layers. These compare framework
-workloads, not identical intervention kernels. Transformers inputs are
-prepared before timing; vLLM timing includes prompt processing in `generate()`.
+This in-graph run uses 512 requests, 28 layers, and max_steer_vectors=256.
+K is the number of distinct zero-scale configurations assigned across the
+batch.
 
-## Quick rerun
-
-Start with six throughput rows at one batch size and generation length.
-Each execution mode loads its own engine and measures an unsteered batch
-followed by a batch sharing one all-layer configuration:
-
-```bash
-python bench_mode_compare.py --batch 64 --configs 0 1 \
-    --max-steer 32 --max-tokens 128 --modes eager split in_graph
-```
-
-Add K=8 to the same command when checking mixed request configurations. A
-separate multi-vector run checks the sequential-composition path, which
-resolves to split execution:
-
-```bash
-python bench_vllm.py --mode multi_vector --batch 64 --max-tokens 128 --cudagraph
-```
-
-This subset avoids repeating every historical batch, capacity, and output
-length. Keep the model, GPU, dependency versions, batch size, and token count
-with the resulting measurements.
-
-## Other benchmark commands
-
-```bash
-# Original vLLM workload settings; eager is the default control.
-# Add --cudagraph for automatic selection, or
-# --cudagraph --graph-mode split to select piecewise execution.
-python bench_vllm.py --mode baseline     --batch 256 --max-tokens 128
-python bench_vllm.py --mode single_layer --batch 256 --max-tokens 128
-python bench_vllm.py --mode all_layer    --batch 256 --max-tokens 128
-python bench_vllm.py --mode multi_vector --batch 256 --max-tokens 128
-python bench_vllm.py --mode all_layer    --batch 256 --max-tokens 2048
-
-# Transformers baselines at their original batch sizes.
-python bench_pyreft.py --batch 256 --max-tokens 128
-python bench_repeng.py --batch 64 --max-tokens 128
-
-# K configurations sharing a vector file; add --distinct-paths to compare
-# first load against reuse with a separate file for every configuration.
-python bench_multi_config.py --batch 256 --configs 0 1 8 32 64 128 256 \
-    --max-steer 256 --max-tokens 128 --cudagraph
-
-# One distinct configuration per request; sweep the slot capacity.
-python bench_capacity_sweep.py --batch 256 --capacities 2 8 32 128 256 \
-    --max-tokens 128
-```
-
-## Results: v0.29.0 on RTX A6000
-
-Measured on 2026-09-11 (UTC) with one NVIDIA RTX A6000 (48 GB), driver
-580.105.08, PyTorch 2.13.0+cu130, and Transformers 5.16.1. The model uses BF16
-and its default 131,072-token context. All modes use `OMP_NUM_THREADS=4`.
-
-The comparison used batch 64, 128 output tokens per request, and 32 steering
-slots. Every row generated exactly 8,192 tokens. K counts distinct zero-scale
-configurations assigned across the batch; K=0 disables steering. Each
-configuration targets all 28 layers, with a distinct prompt-position exclusion.
-
-| Execution mode | K=0 | K=1 | K=8 |
-|---|---:|---:|---:|
-| Eager | 2,115.21 | 1,703.71 | 1,080.25 |
-| Split | 3,613.63 | 2,590.09 | 1,359.41 |
-| In-graph | 7,685.29 | 7,161.86 | 6,932.30 |
-
-Values are generated tokens/s. The engine resolved these modes to `NONE`,
-`PIECEWISE`, and `FULL_AND_PIECEWISE`, respectively. At K=1, in-graph execution
-was 4.20× faster than eager in this workload.
-
-A separate three-vector sequential run automatically selected split execution:
-8,192 tokens in 5.6870 seconds, or **1,440.48 tokens/s**. Its one-token batch
-call took 345.31 ms; this measures the completed batch, not streaming TTFT.
-
-These are single measurements of the current benchmark, using the warmup
-procedure above. They compare execution modes within v0.29.0, not performance
-against an older release or the paper's different batch sizes. The ten timed
-runs took 36.8 seconds in total; the full process took 9.5 minutes including
-loading, initialization, compilation, and warmup.
+| K | 0 | 1 | 8 | 32 | 64 | 128 | 256 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| TPS | 14,982.30 | 12,632.06 | 14,049.05 | 13,729.54 | 12,156.79 | 10,876.59 | 8,039.90 |

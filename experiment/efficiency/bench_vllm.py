@@ -22,7 +22,9 @@ from common import (
     build_engine,
     load_examples,
     nonnegative_int,
+    positive_int,
     report,
+    reset_prefix_cache,
     warmup,
 )
 
@@ -59,6 +61,12 @@ def main():
     )
     parser.add_argument("--max-tokens", type=int, default=2048, choices=[128, 2048])
     parser.add_argument(
+        "--max-num-seqs",
+        type=positive_int,
+        default=None,
+        help="scheduler sequence limit; unset uses the vLLM default",
+    )
+    parser.add_argument(
         "--cudagraph",
         action="store_true",
         help="enable CUDA graphs (paper numbers are eager)",
@@ -90,6 +98,7 @@ def main():
     llm = build_engine(
         tier,
         multi_vector=args.mode == "multi_vector",
+        max_num_seqs=args.max_num_seqs,
     )
     params = SamplingParams(
         temperature=0,
@@ -105,6 +114,7 @@ def main():
         start = time.perf_counter()
         llm.generate(examples, one_token, steering=steering, use_tqdm=False)
         one_token_s = time.perf_counter() - start
+        reset_prefix_cache(llm)
         start = time.perf_counter()
         outs = llm.generate(examples, params, steering=steering, use_tqdm=False)
         elapsed = time.perf_counter() - start
@@ -116,6 +126,7 @@ def main():
         start = time.perf_counter()
         llm.generate(examples[0], one_token, steering=steering, use_tqdm=False)
         one_token_s = time.perf_counter() - start
+        reset_prefix_cache(llm)
         tokens = 0
         start = time.perf_counter()
         for example in examples:
