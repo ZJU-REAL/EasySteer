@@ -11,12 +11,11 @@ same K distinct zero-scale configurations round-robined over the batch
   in_graph  compiled engine, steering baked into full cudagraphs as a
             data-driven kernel
 
-Each tier runs in its own subprocess (engines cannot share the GPU) and
-sweeps the same K values, so rows are directly comparable both across K
-within a tier and across tiers at fixed K. K=0 is the tier's unsteered
-baseline: the spread of the K=0 rows is the cost of the execution mode
-itself; the decay over K within one row group is the cost of
-distinct-configuration steering.
+Each K value runs in its own subprocess (engines cannot share the GPU),
+so rows are directly comparable without carrying graph or payload state
+from one K value into the next. K=0 is the tier's unsteered baseline: the
+spread of the K=0 rows is the cost of the execution mode itself; the decay
+over K within one row group is the cost of distinct-configuration steering.
 
 Fixed output lengths keep token counts comparable across execution modes.
 Routing correctness is covered by the e2e suites.
@@ -28,16 +27,54 @@ import subprocess
 import sys
 import time
 
+import numpy as np
+
 from common import (
+    SEAL_VECTOR,
     build_engine,
-    distinct_spec,
     load_examples,
     nonnegative_int,
     positive_int,
+    reset_prefix_cache,
     warmup,
 )
 
 MODES = ("eager", "split", "in_graph")
+
+
+def distinct_config_specs(count: int, layers: list[int]):
+    """Build distinct fingerprints without changing the selected tokens.
+
+    Each payload differs in one value, while scale zero makes every config
+    numerically inert.  Keeping the apply clause identical avoids coupling the
+    K sweep to prompt-length-sensitive selectors.
+    """
+    from vllm.model_hooks.steering.loading import load_file_payload
+    from vllm.model_hooks.steering.payloads import DirectionVector
+    from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+
+    base = load_file_payload(SEAL_VECTOR, format="gguf")
+    vectors = {
+        layer: np.array(value, copy=True) for layer, value in base.layers.items()
+    }
+    first_layer = min(vectors)
+    specs = []
+    for index in range(count):
+        payload_vectors = {layer: value.copy() for layer, value in vectors.items()}
+        payload_vectors[first_layer][0] += index * 1e-4
+        specs.append(
+            SteeringSpec(
+                vectors=[
+                    VectorSpec(
+                        data=DirectionVector(payload_vectors),
+                        scale=0.0,
+                        layers=layers,
+                        apply=ApplySpec(prompt="all", generation="all"),
+                    )
+                ]
+            )
+        )
+    return specs
 
 
 def run_mode(args):
@@ -46,15 +83,32 @@ def run_mode(args):
     llm = build_engine(
         args.mode, args.max_steer, max_num_seqs=args.max_num_seqs
     )
-    params = SamplingParams(temperature=0, max_tokens=args.max_tokens, ignore_eos=True)
+    params = SamplingParams(
+        temperature=0,
+        max_tokens=args.max_tokens,
+        skip_special_tokens=False,
+        ignore_eos=True,
+    )
+    probe = SamplingParams(temperature=0, max_tokens=1, ignore_eos=True)
     prompts = load_examples(args.batch)
     layers = list(range(args.layers))
     ks = sorted(set(args.configs))
-    specs = [distinct_spec(i, layers) for i in range(max(ks) or 1)]
+    specs = distinct_config_specs(max(ks) or 1, layers)
 
     for k in ks:
-        steering = None if k == 0 else [specs[i % k] for i in range(args.batch)]
+        # A single shared spec must use the scalar API path.  Passing a list
+        # of 512 identical specs needlessly exercises per-request admission
+        # and does not represent one shared configuration.
+        steering = (
+            None
+            if k == 0
+            else specs[0]
+            if k == 1
+            else [specs[i % k] for i in range(args.batch)]
+        )
         warmup(llm, prompts, steering)
+        llm.generate(prompts, probe, steering=steering, use_tqdm=False)
+        reset_prefix_cache(llm)
         start = time.perf_counter()
         outs = llm.generate(prompts, params, steering=steering, use_tqdm=False)
         elapsed = time.perf_counter() - start
@@ -81,8 +135,11 @@ def main():
     parser.add_argument(
         "--max-steer",
         type=positive_int,
-        default=32,
-        help="max_steer_vectors, identical for every tier (K <= this)",
+        default=None,
+        help=(
+            "max_steer_vectors override (default: vLLM resolves "
+            "min(256, max_num_seqs))"
+        ),
     )
     parser.add_argument("--max-tokens", type=positive_int, default=128)
     parser.add_argument(
@@ -107,8 +164,10 @@ def main():
     args = parser.parse_args()
 
     ks = sorted(set(args.configs))
-    if max(ks) > min(args.max_steer, args.batch):
+    if args.max_steer is not None and max(ks) > min(args.max_steer, args.batch):
         parser.error("K must not exceed --max-steer or --batch")
+    if args.max_steer is None and max(ks) > args.batch:
+        parser.error("K must not exceed --batch")
 
     if args.mode:
         run_mode(args)
@@ -117,10 +176,11 @@ def main():
     passthrough = [
         "--batch",
         str(args.batch),
-        "--configs",
-        *[str(k) for k in ks],
-        "--max-steer",
-        str(args.max_steer),
+        *(
+            ["--max-steer", str(args.max_steer)]
+            if args.max_steer is not None
+            else []
+        ),
         "--max-tokens",
         str(args.max_tokens),
         "--layers",
@@ -133,12 +193,21 @@ def main():
     ]
     env = {**os.environ, "VLLM_LOGGING_LEVEL": "WARNING"}
     for mode in args.modes:
-        print(f"===== tier: {mode} =====", flush=True)
-        subprocess.run(
-            [sys.executable, os.path.abspath(__file__), "--mode", mode, *passthrough],
-            check=True,
-            env=env,
-        )
+        for k in ks:
+            print(f"===== tier: {mode}, K={k} =====", flush=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    os.path.abspath(__file__),
+                    "--mode",
+                    mode,
+                    "--configs",
+                    str(k),
+                    *passthrough,
+                ],
+                check=True,
+                env=env,
+            )
 
 
 if __name__ == "__main__":

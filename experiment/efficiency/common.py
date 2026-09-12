@@ -71,10 +71,13 @@ def build_engine(
         "enable_steer_vector": True,
         "steer_algorithms": ["direct"],
         "steer_multi_vector": multi_vector,
-        "max_steer_vectors": max_steer,
         "enforce_eager": tier == "eager",
         "steer_graph_mode": "auto" if tier == "eager" else tier,
     }
+    # Leave capacity resolution to vLLM unless a benchmark explicitly asks
+    # for a fixed slot limit.  vLLM resolves None to min(256, max_num_seqs).
+    if max_steer is not None:
+        engine_kwargs["max_steer_vectors"] = max_steer
     if max_num_seqs is not None:
         engine_kwargs["max_num_seqs"] = max_num_seqs
     llm = LLM(**engine_kwargs)

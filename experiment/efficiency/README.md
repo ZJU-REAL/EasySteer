@@ -30,20 +30,20 @@ in-graph execution.
 
 | Mode | Eager (max 256) | Eager (max 512) | Split (max 512) | In-graph (max 512) |
 |---|---:|---:|---:|---:|
-| Baseline | 6,170.28 | 10,207.12 | 13,216.10 | **14,956.94** |
-| Single layer (layer 20) | 5,190.10 | 9,856.90 | 12,871.58 | **14,706.51** |
-| All layers (28 layers) | 4,654.24 | 8,716.36 | 10,882.72 | **14,597.28** |
-| Multi-vector (3 × 28 layers) | 4,193.97 | 7,565.08 | 9,142.93 | — |
-| All layers, 2048 tokens | 5,458.78 | 9,453.38 | 10,979.25 | **11,531.75** |
+| Baseline | 6,923.93 | 10,491.27 | 13,712.53 | **15,453.77** |
+| Single layer (layer 20) | 6,633.48 | 9,863.54 | 12,067.68 | **15,124.27** |
+| All layers (28 layers) | 5,851.63 | 8,768.30 | 11,036.08 | **15,024.35** |
+| Multi-vector (3 × 28 layers) | 4,830.55 | 7,586.36 | 9,352.51 | — |
+| All layers, 2048 tokens | 6,253.81 | 9,818.66 | 10,871.24 | **11,613.44** |
 
 ## Framework comparison
 
 | Framework | 128 tokens | 2048 tokens |
 |---|---:|---:|
-| EasySteer, in-graph | **14,597.28** | **11,531.75** |
-| EasySteer, split | 10,882.72 | 10,979.25 |
-| EasySteer, eager (max 512) | 8,716.36 | 9,453.38 |
-| EasySteer, eager (max 256) | 4,654.24 | 5,458.78 |
+| EasySteer, in-graph | **15,024.35** | **11,613.44** |
+| EasySteer, split | 11,036.08 | 10,871.24 |
+| EasySteer, eager (max 512) | 8,768.30 | 9,818.66 |
+| EasySteer, eager (max 256) | 5,851.63 | 6,253.81 |
 | PyReFT-compatible additive | 1,049.96 | 668.50 (batch 128) |
 | repeng | 1,151.37 | 788.22 (batch 128) |
 
@@ -52,10 +52,11 @@ batch-128 result completed all 512 requests.
 
 ## Distinct configurations per batch
 
-This in-graph run uses 512 requests, 28 layers, and max_steer_vectors=256.
-K is the number of distinct zero-scale configurations assigned across the
-batch.
+This in-graph run uses 512 requests and 28 layers. vLLM resolves
+max_steer_vectors to 256 for this workload. K is the number of distinct
+zero-scale configurations assigned across the batch. Each K value is
+measured in a fresh engine process.
 
 | K | 0 | 1 | 8 | 32 | 64 | 128 | 256 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| TPS | 14,982.30 | 12,632.06 | 14,049.05 | 13,729.54 | 12,156.79 | 10,876.59 | 8,039.90 |
+| TPS | 14,938.23 | 14,615.41 | 13,376.36 | 12,853.19 | 11,539.70 | 8,984.34 | 5,642.41 |
