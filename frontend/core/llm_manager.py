@@ -9,6 +9,8 @@ from typing import Any, Dict, Optional
 
 from vllm import LLM
 
+from core.validation import normalize_gpu_devices
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,9 +88,7 @@ class LLMManager:
         Returns:
             The loaded or cached LLM instance.
         """
-        gpu_devices = ",".join(device.strip() for device in gpu_devices.split(","))
-        if not gpu_devices or any(not device for device in gpu_devices.split(",")):
-            raise ValueError("gpu_devices must contain one or more GPU IDs or UUIDs")
+        gpu_devices = normalize_gpu_devices(gpu_devices)
 
         # Key the effective constructor arguments, including keyword overrides.
         llm_config = {

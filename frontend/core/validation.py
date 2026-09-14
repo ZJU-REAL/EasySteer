@@ -3,6 +3,18 @@
 from .messages import get_message
 
 
+def normalize_gpu_devices(value):
+    """Normalize a nonempty, distinct list of GPU IDs or UUIDs."""
+    if not isinstance(value, str):
+        raise TypeError("gpu_devices must contain one or more GPU IDs or UUIDs")
+    devices = [device.strip() for device in value.split(",")]
+    if not all(devices):
+        raise ValueError("gpu_devices must contain one or more GPU IDs or UUIDs")
+    if len(set(devices)) != len(devices):
+        raise ValueError("gpu_devices must not contain duplicate devices")
+    return ",".join(devices)
+
+
 def require_fields(data, fields, lang='zh'):
     """Check that each field is present and non-empty in the request payload.
 

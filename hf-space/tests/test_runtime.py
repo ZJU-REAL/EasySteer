@@ -2,9 +2,12 @@
 
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
+from textwrap import dedent
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
 
@@ -86,6 +89,49 @@ def test_payload_kind_must_match_preset(tmp_path):
         runtime.load_payload(path, "loreft")
 
 
+def test_api_mode_imports_without_gpu_dependencies():
+    code = dedent(
+        """
+        import importlib.abc
+        import sys
+
+        forbidden = {"torch", "vllm", "easysteer"}
+
+        class BlockGpuImports(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname.split(".")[0] in forbidden:
+                    raise ModuleNotFoundError(
+                        f"GPU dependency blocked: {fullname}", name=fullname
+                    )
+
+        sys.meta_path.insert(0, BlockGpuImports())
+        import app
+
+        assert app.USE_API
+        assert not any(name.split(".")[0] in forbidden for name in sys.modules)
+        app._api_client.close()
+        """
+    )
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(SPACE),
+        "DEMO_MODE": "api",
+        "VLLM_API_URL": "http://127.0.0.1:1/v1",
+        "VLLM_MODEL_NAME": "qwen-demo",
+        "GRADIO_ANALYTICS_ENABLED": "False",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=SPACE,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_api_ui_and_bundled_payload(monkeypatch):
     monkeypatch.syspath_prepend(str(SPACE))
     monkeypatch.setenv("DEMO_MODE", "api")
@@ -93,9 +139,7 @@ def test_api_ui_and_bundled_payload(monkeypatch):
     monkeypatch.setenv("VLLM_MODEL_NAME", "qwen-demo")
     monkeypatch.setenv("VLLM_VECTOR_BASE_PATH", "/remote/hf-space")
     monkeypatch.setenv("GRADIO_ANALYTICS_ENABLED", "False")
-    before = set(sys.modules)
     app = load_module("space_api_app", SPACE / "app.py")
-    assert not {"torch", "vllm", "easysteer"} & (set(sys.modules) - before)
     direct = app.load_steering_spec(
         app.SINGLE_CONFIGS["emotion_direct"],
         app._resolve_path,

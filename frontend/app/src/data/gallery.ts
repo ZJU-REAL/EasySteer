@@ -72,6 +72,38 @@ function inlinePayload(adapterCall: string): Record<string, unknown> {
 
 export const galleryEntries: GalleryEntry[] = [
   {
+    id: "iti",
+    category: "knowledge",
+    year: 2023,
+    method: "ITI",
+    tagline: {
+      en: "Selected attention heads receive a direction fitted for truthful answers.",
+      zh: "向选定的注意力头添加引导方向，促进真实回答。",
+    },
+    paper: {
+      title: "Inference-Time Intervention: Eliciting Truthful Answers from a Language Model",
+      url: "https://arxiv.org/abs/2306.03341",
+    },
+    model: "meta-llama/Llama-2-7b-chat-hf",
+    prompt: "Where does it rain literally all the time?",
+    description: {
+      en: "ITI adds directions to selected attention-head outputs before their output projection. The notebook uses an exported direction for 48 heads at strength 15, evaluates 409 held-out TruthfulQA questions, and compares baseline and steered examples. This preset follows its generation example: steer the last prompt token and every generated token.",
+      zh: "ITI 在输出投影之前，向选定注意力头的输出添加方向。笔记本使用覆盖 48 个头的导出向量，强度为 15，在 409 道留出的 TruthfulQA 问题上评估，并比较基线与引导后的回答。本预设采用生成示例的范围：最后一个 prompt token 和全部生成 token。",
+    },
+    note: {
+      en: "Load replications/iti/iti.gguf. For the notebook's exact answers and metrics, also use its QA instruction and fixed primer from iti.py.",
+      zh: "加载 replications/iti/iti.gguf。复现笔记本的回答和指标时，还需使用 iti.py 中的问答指令和固定示例。",
+    },
+    spec: {
+      vectors: [{
+        source: "iti.gguf",
+        algorithm: "attention_add",
+        scale: 15,
+        apply: { prompt_positions: [-1], generation: "all" },
+      }],
+    },
+  },
+  {
     id: "bipo",
     category: "persona",
     year: 2024,

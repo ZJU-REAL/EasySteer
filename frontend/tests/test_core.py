@@ -27,6 +27,7 @@ assert not {'core.runtime', 'core.llm_manager', 'vllm', 'torch', 'transformers'}
 
 @pytest.fixture
 def manager(monkeypatch):
+    monkeypatch.syspath_prepend(str(FRONTEND))
     created = []
 
     def llm(**config):
@@ -55,12 +56,15 @@ def test_changed_constructor_arguments_never_reuse_an_engine(manager, changed):
     second = cache.get_or_create_llm(**{"model_path": "model", **changed})
     assert first is not second
     assert len(created) == 2
+    expected_tp = changed.get("tensor_parallel_size", 1)
+    assert second.config["tensor_parallel_size"] == expected_tp
 
 
 def test_equivalent_effective_config_reuses_engine_and_survives_input_mutation(manager):
     cache, created = manager
     nested = {"mode": 0, "extra": {"a": [1, 2], "b": True}}
     first = cache.get_or_create_llm("ignored", model="model", gpu_devices=" 0, 1 ", compilation_config=nested)
+    assert first.config["tensor_parallel_size"] == 2
     reordered = {"extra": {"b": True, "a": [1, 2]}, "mode": 0}
     assert cache.get_or_create_llm("model", gpu_devices="0,1", compilation_config=reordered) is first
     nested["extra"]["a"].append(3)

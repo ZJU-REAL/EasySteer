@@ -6,6 +6,7 @@ import torch
 from core import ConfigStore, project_root_on_path
 from core.job_status import append_job_log, finish_job
 from core.runtime import llm_manager, resource_manager
+from core.validation import normalize_gpu_devices
 from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
@@ -93,14 +94,8 @@ def run_extraction(config):
         if method not in ("lat", "pca", "diffmean"):
             raise ValueError(f"Unsupported extraction method: {method}")
 
-        gpu_devices = config.get("gpu_devices", "0")
-        if len([device for device in gpu_devices.split(",") if device.strip()]) != 1:
-            raise ValueError(
-                "Hidden-state capture supports one GPU; select one GPU ID or UUID"
-            )
-
-        if config.get("gpu_devices"):
-            os.environ["CUDA_VISIBLE_DEVICES"] = config["gpu_devices"]
+        gpu_devices = normalize_gpu_devices(config.get("gpu_devices", "0"))
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         update_extraction_status(f"Using device: {device}")

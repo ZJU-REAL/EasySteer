@@ -74,6 +74,7 @@ describe("validateApplySpec", () => {
   it("generation_window implies the generation phase", () => {
     const apply = {
       ...defaultApplySpec(),
+      prompt: null,
       generation: null,
       generation_window: [0, 8] as [number, number],
     };
@@ -113,6 +114,7 @@ describe("validateApplySpec", () => {
     const apply = {
       ...defaultApplySpec(),
       prompt: null,
+      generation: null,
       prompt_window: [0, 10] as [number, number],
     };
     expect(validateApplySpec(apply)).toEqual([]);
@@ -148,6 +150,7 @@ describe("validateApplySpec", () => {
   it("generation_positions implies the generation phase", () => {
     const apply = {
       ...defaultApplySpec(),
+      prompt: null,
       generation: null,
       generation_positions: [0],
     };

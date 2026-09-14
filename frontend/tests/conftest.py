@@ -1,6 +1,7 @@
 """Load the real payload code without bootstrapping the GPU engine."""
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -8,6 +9,17 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def preserve_cuda_visibility():
+    """Production jobs mutate this variable even when their GPU work is mocked."""
+    previous = os.environ.get("CUDA_VISIBLE_DEVICES")
+    yield
+    if previous is None:
+        os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = previous
 
 
 @pytest.fixture

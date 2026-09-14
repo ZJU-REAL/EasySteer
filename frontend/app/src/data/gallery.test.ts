@@ -3,10 +3,12 @@ import { specFromJson, validateSteeringSpec } from "../lib/spec";
 import { galleryEntries } from "./gallery";
 
 describe("gallery entries", () => {
-  it("covers all 15 replication notebooks", () => {
-    expect(galleryEntries.length).toBe(15);
+  it("covers each replication notebook exactly once", () => {
+    const notebooks = Object.keys(import.meta.glob("../../../../replications/*/*.ipynb"));
+    const notebookIds = notebooks.map((path) => path.split("/").at(-2));
     const ids = galleryEntries.map((e) => e.id);
-    expect(new Set(ids).size).toBe(15);
+    expect(notebookIds.length).toBeGreaterThan(0);
+    expect(ids.sort()).toEqual(notebookIds.sort());
   });
 
   it("every entry parses into a valid SteeringSpec", () => {
@@ -59,5 +61,11 @@ describe("gallery entries", () => {
     const lmSteer = byId["lm_steer"];
     expect(lmSteer.vectors[0].scale).toBeCloseTo(0.002);
     expect(lmSteer.vectors[0].layers).toEqual([11]);
+
+    const iti = byId["iti"].vectors[0];
+    expect(iti.algorithm).toBe("attention_add");
+    expect(iti.scale).toBe(15);
+    expect(iti.apply.prompt_positions).toEqual([-1]);
+    expect(iti.apply.generation).toBe("all");
   });
 });

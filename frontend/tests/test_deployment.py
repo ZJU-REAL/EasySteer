@@ -2,6 +2,7 @@
 
 import importlib.util
 import sys
+import weakref
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -126,9 +127,11 @@ def extraction(monkeypatch, tmp_path):
     engine = object()
     activity = []
     calls = []
+    engine_configs = []
 
     def load_engine(**kwargs):
         activity.append("load")
+        engine_configs.append(kwargs)
         return engine
 
     def cuda_available():
@@ -145,9 +148,10 @@ def extraction(monkeypatch, tmp_path):
     )
 
     class Captured:
-        layer_ids = [8, 22]
-        prompts = []
-        position = -1
+        def __init__(self, prompts, position):
+            self.layer_ids = [8, 22]
+            self.prompts = prompts
+            self.position = position
 
         def __len__(self):
             return len(self.prompts)
@@ -163,15 +167,17 @@ def extraction(monkeypatch, tmp_path):
         def rows(self, layer):
             return [[float(layer)] for _ in self.prompts]
 
-    captured = Captured()
+    captures = []
+    live_batches = []
     hidden_states = ModuleType("easysteer.hidden_states")
 
     def capture(llm, prompts, **kwargs):
         assert llm is engine
         activity.append("capture")
         calls.append((prompts, kwargs))
-        captured.prompts = prompts
-        captured.position = kwargs["select"]["prompt_positions"][0]
+        captured = Captured(prompts, kwargs["select"]["prompt_positions"][0])
+        captures.append(weakref.ref(captured))
+        live_batches.append(sum(reference() is not None for reference in captures))
         return captured
 
     hidden_states.capture = capture
@@ -241,7 +247,9 @@ def extraction(monkeypatch, tmp_path):
         config=config,
         calls=calls,
         extracted=extracted,
-        captured=captured,
+        captures=captures,
+        live_batches=live_batches,
+        engine_configs=engine_configs,
         activity=activity,
         updates=updates,
         output=tmp_path / "vector.gguf",
@@ -272,7 +280,7 @@ def test_extraction_uses_labelled_capture_and_shared_dispatch(
         assert options["budget_bytes"] > 0
     (call,) = job.extracted
     if method != "diffmean":
-        assert call["all_hidden_states"] is job.captured
+        assert call["all_hidden_states"] is job.captures[-1]()
         assert call["positive_indices"] == [0]
         assert call["negative_indices"] == [1]
         assert call["token_pos"] == 0
@@ -302,7 +310,10 @@ def test_invalid_token_position_fails_before_cuda_or_capture(extraction, token_p
 
 
 @pytest.mark.parametrize("changes,error", [
-    ({"gpu_devices": "0,1"}, "one GPU"),
+    ({"gpu_devices": ""}, "GPU IDs or UUIDs"),
+    ({"gpu_devices": "0, "}, "GPU IDs or UUIDs"),
+    ({"gpu_devices": "0,0"}, "duplicate devices"),
+    ({"gpu_devices": None}, "GPU IDs or UUIDs"),
     ({"method": "linear_probe"}, "Unsupported extraction method"),
 ])
 def test_unsupported_job_configuration_fails_before_model_load(extraction, changes, error):
@@ -314,18 +325,30 @@ def test_unsupported_job_configuration_fails_before_model_load(extraction, chang
     assert not job.output.exists()
 
 
-def test_diffmean_consumes_batches_without_retaining_the_whole_capture(extraction):
-    extraction.config["positive_samples"] = ["happy"] * 33
+@pytest.mark.parametrize("devices", [" 0, 1 ", " GPU-first, GPU-second "])
+def test_extraction_passes_multiple_devices_to_the_engine(extraction, devices):
+    extraction.config["gpu_devices"] = devices
     extraction.module.run_extraction(extraction.config)
-    assert [len(prompts) for prompts, _ in extraction.calls] == [32, 1, 1]
-    assert extraction.updates == [
-        (8, 32, True),
-        (22, 32, True),
-        (8, 1, True),
-        (22, 1, True),
-        (8, 1, False),
-        (22, 1, False),
+    assert extraction.engine_configs == [
+        {"model_path": "model", "gpu_devices": devices.replace(" ", "")}
     ]
+    assert extraction.calls
+    assert extraction.module.extraction_status["error_message"] is None
+    assert extraction.output.exists()
+
+
+def test_diffmean_consumes_batches_without_retaining_the_whole_capture(extraction):
+    extraction.config["positive_samples"] = ["happy"] * 129
+    extraction.module.run_extraction(extraction.config)
+    batch_sizes = [32, 32, 32, 32, 1, 1]
+    assert [len(prompts) for prompts, _ in extraction.calls] == batch_sizes
+    assert extraction.updates == [
+        (layer, size, index < len(batch_sizes) - 1)
+        for index, size in enumerate(batch_sizes)
+        for layer in (8, 22)
+    ]
+    assert max(extraction.live_batches) <= 2
+    assert all(reference() is None for reference in extraction.captures)
 
 
 @pytest.mark.parametrize("token_pos", [4, -5])
