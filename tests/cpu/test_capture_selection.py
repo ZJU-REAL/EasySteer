@@ -11,7 +11,7 @@ from vllm.model_hooks.capture.graph import CaptureGraphState
 from vllm.model_hooks.capture.serialization import deserialize_captured
 from vllm.model_hooks.capture.session import CaptureSession
 from vllm.model_hooks.capture.store import StreamConfig, StreamStore
-from vllm.model_hooks.components.registry import COMPONENTS
+from vllm.model_hooks.components.registry import COMPONENTS, ComponentTarget
 from vllm.model_hooks.selection.batch import BatchGeometry
 
 
@@ -51,6 +51,67 @@ def test_geometry_device_views_live_for_one_step():
     next_view = next_geo.device_view()
     assert next_view is not view
     assert next_view.is_decode.tolist() == [True, True]
+
+
+@pytest.mark.parametrize("budget", [{"budget_rows": 1}, {"budget_bytes": 1}])
+def test_tp_replica_exports_once_and_keeps_dispatch_after_owner_budget(context, budget):
+    """Local storage exhaustion must not split TP ranks across execution modes."""
+    sessions = []
+    for rank in range(2):
+        model = torch.nn.Sequential(torch.nn.Identity())
+        components = dict.fromkeys(COMPONENTS, ())
+        components["hidden_states"] = (ComponentTarget("layer.0", 0, model[0]),)
+        session = CaptureSession(tp_rank=rank, tp_size=2)
+        session.attach(model, components)
+        session.enable_stream("hidden_states", **budget)
+        model(torch.ones(4, 4))
+        sessions.append(session)
+    for session in sessions:
+        assert session.needs_capture_for_batch(["a"], [0], [3], [3], [True])
+    assert sessions[1].fetch_stream("hidden_states") == {}
+    assert sessions[1].stream_status("hidden_states")["storage_bytes"] == 0
+    if "budget_bytes" in budget:
+        with pytest.raises(RuntimeError, match="budget.*exceeded"):
+            sessions[0].fetch_stream("hidden_states")
+    else:
+        raw = sessions[0].fetch_stream("hidden_states")
+        assert raw[0]["shape"] == [1, 4]
+        assert raw[0]["shard"] == {
+            "kind": "replicated", "tp_rank": 0, "tp_size": 2,
+            "feature_start": 0, "global_width": 4,
+        }
+    for session in sessions:
+        session.disable_stream("hidden_states")
+        assert not session.needs_capture_for_batch(["a"], [0], [3], [3], [True])
+
+
+def test_tp_attention_budget_bounds_combined_worker_storage(context):
+    """Head shards include their own labels in the aggregate byte limit."""
+    stores = []
+    for rank in range(2):
+        model = torch.nn.Sequential(torch.nn.Identity())
+        components = dict.fromkeys(COMPONENTS, ())
+        components["attention_heads"] = (
+            ComponentTarget(
+                "attention.0", 0, model[0], width=4, num_heads=2, head_size=2,
+                tp_rank=rank, tp_size=2,
+            ),
+        )
+        session = CaptureSession(tp_rank=rank, tp_size=2)
+        session.attach(model, components)
+        session.enable_stream("attention_heads", budget_bytes=224)
+        model(torch.ones(4, 4))
+        store = session._streams["attention_heads"]
+        assert store.storage_bytes == store.config.budget_bytes == 112
+        stores.append(store)
+        raw = session.fetch_stream("attention_heads", clear=False)
+        assert raw[0]["layout"] == {"width": 4, "num_heads": 2, "head_size": 2}
+        assert raw[0]["shard"]["feature_start"] == rank * 4
+        model(torch.ones(4, 4))
+        with pytest.raises(RuntimeError, match="budget.*exceeded"):
+            session.fetch_stream("attention_heads")
+        session.disable_stream("attention_heads")
+    assert sum(store.storage_bytes for store in stores) == 224
 
 
 def test_layers_share_labels_but_own_rows_and_exclude_padding(context):
@@ -544,6 +605,7 @@ def capture_runner():
     runner.cudagraph_manager = SimpleNamespace(
         cudagraph_mode=CUDAGraphMode.FULL,
         dispatch=lambda *args: SimpleNamespace(cg_mode=CUDAGraphMode.FULL),
+        _capture_descs={CUDAGraphMode.FULL: (4, 2, 1)},
     )
     runner.parallel_config = SimpleNamespace(world_size_across_dp=1)
     runner.speculative_config = None
@@ -559,13 +621,19 @@ def capture_runner():
     return runner
 
 
+def initialize_cpu_capture_graph(runner, state):
+    with state.record_outputs(runner.capture_session._model):
+        runner.capture_session._model(torch.ones(4, 2))
+    return object()
+
+
 def test_graph_variant_reuses_selection_changes_and_invalidates_layers_together(
     capture_runner, monkeypatch,
 ):
     from vllm.v1.worker.gpu import model_hook_utils
 
     monkeypatch.setattr(
-        model_hook_utils, "_initialize_capture_graph", lambda *args: object(),
+        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
     )
     runner = capture_runner
     session = runner.capture_session
@@ -598,7 +666,11 @@ def test_graph_variant_reuses_selection_changes_and_invalidates_layers_together(
 
 
 @pytest.mark.parametrize(
-    "unsupported", ["parallel", "spec", "lora", "split", "nonfull"],
+    "unsupported", [
+        "pipeline_parallel_size", "data_parallel_size", "prefill_context_parallel_size",
+        "decode_context_parallel_size", "enable_sp", "use_sequence_parallel_moe",
+        "enable_expert_parallel", "spec", "lora", "split", "nonfull",
+    ],
 )
 def test_capture_graph_keeps_unsupported_execution_eager(
     unsupported, capture_runner, monkeypatch,
@@ -608,11 +680,17 @@ def test_capture_graph_keeps_unsupported_execution_eager(
 
     runner = capture_runner
     monkeypatch.setattr(
-        model_hook_utils, "_initialize_capture_graph", lambda *args: object(),
+        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
     )
     assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4)
-    if unsupported == "parallel":
-        runner.parallel_config.world_size_across_dp = 2
+    if unsupported.endswith("_parallel_size"):
+        setattr(runner.parallel_config, unsupported, 2)
+    elif unsupported == "enable_sp":
+        runner.compilation_config = SimpleNamespace(
+            pass_config=SimpleNamespace(enable_sp=True),
+        )
+    elif unsupported in ("use_sequence_parallel_moe", "enable_expert_parallel"):
+        setattr(runner.parallel_config, unsupported, True)
     elif unsupported == "spec":
         runner.speculative_config = object()
     elif unsupported == "lora":
@@ -624,6 +702,130 @@ def test_capture_graph_keeps_unsupported_execution_eager(
             cg_mode=CUDAGraphMode.NONE,
         )
     assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4) is None
+
+
+@pytest.mark.parametrize("rank", [0, 1])
+def test_tp_graph_reuses_and_rebuilds_global_variants_on_nonowners(
+    rank, capture_runner, monkeypatch,
+):
+    from vllm.v1.worker.gpu import model_hook_utils
+
+    runner = capture_runner
+    runner.parallel_config.tensor_parallel_size = 2
+    runner.parallel_config.rank = rank
+    runner._attach_capture_hooks(
+        runner.capture_session._model, runner.capture_session._components,
+    )
+    runner.start_capture("hidden_states", layers=[0])
+    peer_rebuild = False
+
+    def agree(decisions, **kwargs):
+        decisions[1 - rank].copy_(decisions[rank])
+        decisions[1 - rank, 5] |= peer_rebuild
+
+    monkeypatch.setattr(model_hook_utils, "get_tp_group", lambda: SimpleNamespace(
+        cpu_group=object(),
+    ))
+    monkeypatch.setattr(model_hook_utils.dist, "all_reduce", agree)
+    monkeypatch.setattr(
+        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
+    )
+
+    def prepare():
+        return model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4)
+
+    manager = prepare()
+    state = runner.capture_session.graph_state
+    assert state.ready and state.signature == (("hidden_states", (0,)),)
+    assert set(state.buffers) == ({("hidden_states", 0)} if rank == 0 else set())
+    assert prepare() is manager
+    runner.stop_capture("hidden_states")
+    runner.start_capture("hidden_states", layers=[0], select={"generation": "all"})
+    assert prepare() is manager
+
+    runner.start_capture("hidden_states", layers=[1], budget_rows=0)
+    replacement = prepare()
+    assert replacement is not manager
+    assert not state.buffers
+    assert runner.capture_session.graph_state.signature == (("hidden_states", (1,)),)
+    assert prepare() is replacement
+    peer_rebuild = True
+    assert prepare() is not replacement
+
+
+@pytest.mark.parametrize(
+    "stream", ["hidden_states", "router_logits", "attention_heads"],
+)
+@pytest.mark.parametrize("rank", [0, 1])
+def test_tp_graph_validates_only_locally_owned_outputs(stream, rank):
+    model = torch.nn.Identity()
+    components = dict.fromkeys(COMPONENTS, ())
+    components[stream] = (ComponentTarget(
+        "layer.0", 0, model, width=2,
+        tp_rank=rank if stream == "attention_heads" else 0,
+        tp_size=2 if stream == "attention_heads" else 1,
+    ),)
+    session = CaptureSession(tp_rank=rank, tp_size=2)
+    session.attach(model, components)
+    session.enable_stream(stream)
+    state = CaptureGraphState(
+        session.graph_signature(), session.graph_expected_outputs(),
+    )
+    session.graph_state = state
+    with state.record_outputs(model):
+        model(torch.ones(3, 2))
+    assert state.ready
+    owned = rank == 0 or stream == "attention_heads"
+    assert set(state.buffers) == ({(stream, 0)} if owned else set())
+    if owned:
+        with pytest.raises(RuntimeError, match="did not write"):
+            state.begin_forward()
+            state.end_forward()
+
+
+@pytest.mark.parametrize("failure", ["local_hooks", "peer_hooks", "plan"])
+@pytest.mark.parametrize("local_full", [True, False])
+def test_tp_graph_preflight_rejects_every_rank_before_recording(
+    failure, local_full, capture_runner, monkeypatch,
+):
+    from unittest.mock import Mock
+
+    from vllm.config.compilation import CUDAGraphMode
+    from vllm.v1.worker.gpu import model_hook_utils
+
+    runner = capture_runner
+    runner.parallel_config.tensor_parallel_size = 2
+    runner._attach_capture_hooks(
+        runner.capture_session._model, runner.capture_session._components,
+    )
+    runner.start_capture("hidden_states", layers=[0])
+    if not local_full:
+        runner.cudagraph_manager.dispatch = lambda *args: SimpleNamespace(
+            cg_mode=CUDAGraphMode.NONE,
+        )
+    if failure == "local_hooks":
+        runner.capture_session._hook_handles["hidden_states"].clear()
+    participated = []
+
+    def disagree(decisions, **kwargs):
+        participated.append(True)
+        decisions[1].copy_(decisions[0])
+        if failure == "peer_hooks":
+            decisions[1, 4] = 0
+        elif failure == "plan":
+            decisions[1, 0] ^= 1
+
+    monkeypatch.setattr(model_hook_utils, "get_tp_group", lambda: SimpleNamespace(
+        cpu_group=object(),
+    ))
+    monkeypatch.setattr(model_hook_utils.dist, "all_reduce", disagree)
+    initialize = Mock()
+    monkeypatch.setattr(model_hook_utils, "_initialize_capture_graph", initialize)
+    with pytest.raises(RuntimeError, match="TP"):
+        model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4)
+    assert participated == [True]
+    initialize.assert_not_called()
+    assert runner.capture_session.graph_state is None
 
 
 def test_graph_each_forward_requires_all_outputs_despite_existing_warmup_buffers():

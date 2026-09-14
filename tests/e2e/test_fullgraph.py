@@ -128,8 +128,16 @@ def test_mixed_batch_completes_and_steers(outs):
     assert mixed[0] != mixed[1], "the mixed-batch steering effect is missing"
 
 
-def test_attention_head_delta_is_isolated(llm):
-    """Check the head delta and request/token isolation on fixed decode inputs."""
+@pytest.mark.parametrize(
+    "num_prompts,max_tokens", [(1, 4), (2, 1)],
+    ids=["single_decode", "mixed_prefill"],
+)
+def test_attention_head_delta_is_isolated(llm, num_prompts, max_tokens):
+    """Check token isolation in decode and request isolation in prefill.
+
+    Mixed requests can enter separate decode batches across capture calls;
+    their batch-dependent rounding is unsuitable for a direct delta oracle.
+    """
     import numpy as np
     import torch
     from vllm.model_hooks.steering.payloads import DirectionVector
@@ -137,40 +145,78 @@ def test_attention_head_delta_is_isolated(llm):
 
     from easysteer.hidden_states import capture
 
-    if llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size != 1:
-        pytest.skip("attention_heads currently requires tensor_parallel_size=1")
+    tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
     layer = 10
     token = llm.get_tokenizer().encode(" the", add_special_tokens=False)[0]
     options = dict(
-        layers=[layer], stream="attention_heads", max_tokens=4,
+        layers=[layer], stream="attention_heads", max_tokens=max_tokens,
         temperature=0.0, ignore_eos=True, allowed_token_ids=[token],
     )
-    baseline = capture(llm, [TEXT, TEXT], steering=False, **options)
+    prompts = [TEXT] * num_prompts
+    baseline = capture(llm, prompts, steering=False, **options)
     layout = baseline.layouts[layer]
     direction = np.zeros(layout["width"], dtype=np.float32)
-    direction[:layout["head_size"]] = 0.5
+    # Distinct directions on either side of the rank-0/rank-1 boundary
+    # catch both rank-0-only application and reuse of the same local slice.
+    boundary = layout["width"] // max(tp_size, 2)
+    head_size = layout["head_size"]
+    direction[boundary - head_size:boundary] = 0.25
+    direction[boundary:boundary + head_size] = -0.5
     spec = SteeringSpec(vectors=[VectorSpec(
         data=DirectionVector({layer: direction}), algorithm="attention_add",
         scale=2.0, layers=[layer],
         apply=ApplySpec(prompt_positions=[-1], generation_positions=[0]),
     )])
-    result = capture(llm, [TEXT, TEXT], steering=[False, spec], **options)
-    for index in range(2):
+    steering = [False] * (num_prompts - 1) + [spec]
+    result = capture(llm, prompts, steering=steering, **options)
+    for index in range(num_prompts):
         reference = baseline.sample(index)[layer]
         actual = result.sample(index)[layer]
         assert result.sample_positions(index) == baseline.sample_positions(index)
+        assert result.sample_token_ids(index) == baseline.sample_token_ids(index)
         expected = reference.clone()
-        if index == 1:
+        selected = torch.zeros(reference.shape[0], dtype=torch.bool)
+        if index == num_prompts - 1:
             prompt_len = len(result.outputs[index].prompt_token_ids)
             selected = torch.tensor([
                 position in (prompt_len - 1, prompt_len)
                 for position in result.sample_positions(index)
             ])
             expected[selected] += torch.from_numpy(direction).to(expected.dtype) * 2
-            assert selected.sum() == 2
+            assert selected.sum() == (2 if max_tokens > 1 else 1)
             assert (actual[selected] - reference[selected]).abs().max() > 0.5
         tolerance = 2 * torch.finfo(actual.dtype).eps
-        torch.testing.assert_close(actual, expected, rtol=tolerance, atol=tolerance)
+        context = (
+            f"attention_heads sample={index}, layer={layer}, TP={tp_size}, "
+            f"selected_rows={selected.nonzero().flatten().tolist()}"
+        )
+        torch.testing.assert_close(
+            actual, expected, rtol=tolerance, atol=tolerance,
+            msg=lambda message: f"{context}\n{message}",
+        )
+
+
+def test_attention_steering_runs_in_ordinary_decode_graphs(llm, outs):
+    """Generation-only head steering exercises graph replay without capture."""
+    import numpy as np
+    from vllm.model_hooks.steering.payloads import DirectionVector
+
+    config = llm.llm_engine.vllm_config.model_config.hf_text_config
+    heads = config.num_attention_heads
+    head_size = getattr(config, "head_dim", None) or config.hidden_size // heads
+    direction = np.zeros(heads * head_size, dtype=np.float32)
+    midpoint = (heads // 2) * head_size
+    direction[midpoint - head_size:midpoint] = 0.25
+    direction[midpoint:midpoint + head_size] = -0.5
+    payload = DirectionVector({10: direction})
+    zero = _data_spec(payload, "attention_add", 0.0, generation="all")
+    assert gen(llm, [TEXT], steering=zero)[0] == outs["plain"]
+
+    # Prompt processing stays unsteered; any difference must arise during decode.
+    nonzero = _data_spec(payload, "attention_add", 16.0, generation="all")
+    mixed = gen(llm, [TEXT, TEXT], steering=[nonzero, False])
+    assert len(mixed) == 2 and all(mixed)
+    assert mixed[0] != mixed[1], "attention steering had no effect during decode"
 
 
 # ---------------------------------------------------------------------------

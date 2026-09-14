@@ -14,7 +14,7 @@ and applies the additional payload conditions below.
 | Component | Representation / model requirement |
 |---|---|
 | `hidden_states` | Decoder-layer output; separate hidden and residual outputs are combined for the intervention. |
-| `attention_heads` | Concatenated query-head outputs before the output projection; standard decoder MHA/GQA with one GPU worker. |
+| `attention_heads` | Concatenated query-head outputs before the output projection; standard decoder MHA/GQA, including ordinary tensor parallelism. |
 | `router_logits` | MoE gate scores; the model must expose a gate output that executes during inference. |
 
 | Algorithm | Component | Payload | `normalize=True` | `in_graph` |
@@ -107,7 +107,8 @@ payload = DirectionVector({10: direction})
 ```
 
 The width must match the selected model component. For attention, use the
-capture layout rather than the hidden-state width. Both NumPy and PyTorch
+capture layout's global query-head width, including with TP, rather than the
+hidden-state width. Both NumPy and PyTorch
 tensors are accepted. The [payload class reference](payloads.md) gives constructor
 arguments and shapes; tensor payloads validate dimensions and finite values
 before workers materialize their tensors.

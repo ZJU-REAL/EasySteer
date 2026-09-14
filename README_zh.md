@@ -154,7 +154,8 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 
 - **干预 spec 语言**（phase、位置、多向量、冲突策略、CUDA 图）: [干预指南](https://zju-real.github.io/EasySteer/latest/user-guide/steering/)
 - **OpenAI 兼容 HTTP 服务**（按请求与服务端级干预）: [服务指南](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)
-- **捕获隐状态**与 MoE 路由 logits: [捕获指南](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
+- **捕获隐状态、注意力头输出与 MoE 路由 logits**，支持常规张量并行: [捕获指南](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
+- **注意力头干预**（全局头方向向量，支持 TP）: [注意力指南](https://zju-real.github.io/EasySteer/latest/user-guide/attention/)
 - **提取向量**（DiffMean、PCA、LAT、线性探针、SAE）: [向量提取指南](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/)
 - **训练干预**（ReFT / LoReFT / LM-Steer）: [ReFT 训练](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
 - **API 参考**: [zju-real.github.io/EasySteer/latest/api-reference/](https://zju-real.github.io/EasySteer/latest/api-reference/)

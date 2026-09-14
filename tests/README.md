@@ -51,6 +51,61 @@ set the same model variables. Dense suites assume Qwen2.5-1.5B layer indices,
 vocabulary and hidden size; changing the model path does not make them tests
 for an arbitrary architecture.
 
+### Tensor-parallel capture and steering
+
+Set `STEER_TEST_TP=2` and select two currently available GPUs. Run the capture
+suites in separate processes so the chunked-prefill suite keeps its own engine
+configuration:
+
+```bash
+export GPU_ID=0,1 STEER_TEST_TP=2
+"$STEER_TEST_PYTHON" tests/run_process.py -- \
+    "$STEER_TEST_PYTHON" -m pytest tests/e2e/test_capture_unified.py -q
+"$STEER_TEST_PYTHON" tests/run_process.py -- \
+    "$STEER_TEST_PYTHON" -m pytest tests/e2e/test_capture_chunked.py -q
+"$STEER_TEST_PYTHON" tests/run_process.py -- \
+    "$STEER_TEST_PYTHON" -m pytest tests/e2e/test_fullgraph.py -q
+```
+
+These checks cover global attention-head assembly, replicated capture ownership,
+budget failure and recovery, selection across prefill chunks and cached prefixes,
+and attention steering on both sides of a TP shard boundary. TP capture tests
+check actual FULL graph replay on every rank, capture ownership, graph lifecycle,
+and eager fallback for ineligible batches. Attention steering retains its normal
+graph modes.
+
+Set `STEER_TEST_CAPTURE_GRAPH_MODE=FULL` when running `test_capture_unified.py`
+to include graph capture of eligible prefill batches. Set
+`STEER_TEST_ATTENTION_BACKEND=TRITON_ATTN` when the default backend supports
+only decode graphs (for example, FlashAttention 2). Prefill checks inspect the
+worker's resolved mode and skip when the backend downgrades FULL.
+`FULL_DECODE_ONLY` checks
+decode replay with eager capture fallback for prefill. The default follows the
+engine's graph configuration. The suite uses named worker extension RPCs for
+its eager comparison; workers must be able to import `tests/helpers.py` (for a
+source checkout, include the `tests` directory in `PYTHONPATH`).
+
+For OLMoE router logits, set `STEER_TEST_MOE_MODEL` to the checkpoint and run
+the semantics in each execution mode, keeping each engine in its own process:
+
+```bash
+for mode in eager split in_graph; do
+    STEER_TEST_MOE_MODE="$mode" "$STEER_TEST_PYTHON" tests/run_process.py -- \
+        "$STEER_TEST_PYTHON" -m pytest tests/moe/test_moe.py -q
+done
+"$STEER_TEST_PYTHON" tests/run_process.py -- \
+    "$STEER_TEST_PYTHON" -m pytest tests/moe/test_moe_compiled.py -q
+"$STEER_TEST_PYTHON" tests/run_process.py -- \
+    "$STEER_TEST_PYTHON" -m pytest tests/moe/test_moe_fullgraph.py -q
+```
+
+These tests check router transformations, request isolation, per-rank random
+expert agreement in eager/split execution, and replicated router capture under
+FULL graph replay. `soft_random` is skipped in `in_graph` because that mode is
+unsupported.
+
+### HTTP-only checks
+
 For HTTP-only checks, set `STEER_TEST_SERVER_URL=http://127.0.0.1:8017`
 (without `/v1`) and `STEER_TEST_SERVED_MODEL` to reuse an existing service:
 
@@ -195,8 +250,10 @@ throughput, including prefill, using the actual output-token count.
   when the effective selection needs otherwise skipped prompt rows; writes
   remain enabled and caller salts are preserved. Starting capture after a
   request has already reused selected rows is reported as incomplete at fetch.
-  Separate FULL capture graphs require a single worker, no speculative decoding
-  or LoRA, and steering disabled or `in_graph`; other selected steps run eagerly.
+  Ordinary TP capture requires `PP=DP=1`, with context, sequence, and expert
+  parallelism disabled. Separate FULL capture graphs support TP and require no
+  speculative decoding or LoRA, and steering disabled or `in_graph`; other
+  selected steps, including piecewise-only execution, run eagerly.
 - Steering with KV-transfer rejection/reconstruction remains a known risk:
   the reconstructed `EngineCoreRequest` may omit steering state. The baseline
   does not cover this path.

@@ -76,9 +76,11 @@ Eligible FULL-graph batches reuse it across capture calls. Changing row
 selectors or storage dtype does not require a new graph; changing the component
 or layer set replaces the cached capture graph.
 
-This graph path requires one GPU worker, no LoRA or speculative decoding, and
-steering disabled or using `in_graph`. Other batches with selected rows use
-eager capture. A step with no selected rows follows normal model execution.
+This graph path supports ordinary TP, with no LoRA or speculative decoding and
+steering disabled or using `in_graph`. All TP ranks coordinate graph creation
+and replay, even when only rank 0 retains the selected component. Ineligible
+capture batches, including piecewise-only execution, run eagerly. A step with
+no selected rows follows normal model execution.
 The [capture guide](hidden-state-capture.md#graph-execution) describes these
 requirements; an eager capture step does not mean ordinary generation has lost
 its graphs.

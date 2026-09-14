@@ -50,6 +50,26 @@ def test_result_rejects_missing_or_incomplete_row_labels(invalid):
         CaptureResult(layers, meta, [SimpleNamespace(request_id="a")])
 
 
+def test_result_rejects_reversed_sample_order_in_another_layer():
+    """A shared sample index must never return another request's layer rows."""
+    first = CaptureMeta(
+        req_ids=["a", "b"],
+        positions=torch.tensor([0, 0], dtype=torch.int32),
+        token_ids=torch.tensor([10, 20], dtype=torch.int32),
+    )
+    reversed_labels = CaptureMeta(
+        req_ids=["b", "a"],
+        positions=first.positions.flip(0),
+        token_ids=first.token_ids.flip(0),
+    )
+    with pytest.raises(RuntimeError, match="row labels differ between layers"):
+        CaptureResult(
+            {2: torch.tensor([[10.], [20.]]), 7: torch.tensor([[200.], [100.]])},
+            {2: first, 7: reversed_labels},
+            [SimpleNamespace(request_id="a"), SimpleNamespace(request_id="b")],
+        )
+
+
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
     """The engine plans cache reads; the helper must not re-key prompts."""
@@ -79,6 +99,7 @@ def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
     assert seen["steering"] is steering
     assert seen["sampling_params"].temperature == 0.25
     assert calls == [
+        "capture_status",
         "start_capture",
         "capture_status",
         "fetch_captured",
@@ -283,3 +304,228 @@ def test_capture_failures_stop_the_stream_without_returning_partial_rows(failure
     assert calls[-1] == "stop_capture"
     if failure == "dropped":
         assert "fetch_captured" not in calls
+
+
+def _topology(rank, **overrides):
+    return {
+        "tp_rank": rank, "tp_size": 2,
+        "pp_size": 1, "dp_size": 1, "pcp_size": 1, "dcp_size": 1,
+        "sequence_parallel": False, "sequence_parallel_moe": False,
+        "expert_parallel": False, **overrides,
+    }
+
+
+def _capture_shard(rank, *, kind="feature_shard", dtype=torch.float32):
+    from vllm.model_hooks.capture.serialization import serialize_capture_layer
+
+    tensor = torch.arange(rank * 4, rank * 4 + 4, dtype=dtype).reshape(2, 2)
+    labels = torch.tensor([[0, 0, 10], [0, 1, 11]], dtype=torch.int32)
+    wire = serialize_capture_layer(tensor, labels, {0: "sample"}, "model.layers.7")
+    wire["shard"] = {
+        "kind": kind, "tp_rank": rank, "tp_size": 2,
+        "feature_start": rank * 2 if kind == "feature_shard" else 0,
+        "global_width": 4 if kind == "feature_shard" else 2,
+    }
+    if kind == "feature_shard":
+        wire["layout"] = {"width": 2, "num_heads": 2, "head_size": 1}
+    return {7: wire}
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_capture_assembles_global_attention_heads_independent_of_reply_order(dtype):
+    from vllm.capture import assemble_captured
+
+    tensors, meta, layouts = assemble_captured(
+        [_capture_shard(1, dtype=dtype), _capture_shard(0, dtype=dtype)], tp_size=2
+    )
+    torch.testing.assert_close(
+        tensors[7], torch.tensor([[0, 1, 4, 5], [2, 3, 6, 7]], dtype=dtype)
+    )
+    assert layouts[7] == {"width": 4, "num_heads": 4, "head_size": 1}
+    assert meta[7].req_ids == ["sample", "sample"]
+    assert meta[7].positions.tolist() == [0, 1]
+    assert meta[7].token_ids.tolist() == [10, 11]
+
+
+def test_capture_exports_only_one_replicated_owner_without_scaling():
+    from vllm.capture import assemble_captured
+
+    tensors, meta, layouts = assemble_captured(
+        [{}, _capture_shard(0, kind="replicated")], tp_size=2
+    )
+    torch.testing.assert_close(tensors[7], torch.arange(4.).reshape(2, 2))
+    assert len(meta[7]) == 2 and not layouts
+    assert assemble_captured([{}, {}], tp_size=2) == ({}, {}, {})
+
+
+def test_capture_assembly_compares_request_identity_instead_of_local_table_indices():
+    from vllm.capture import assemble_captured
+
+    results = [_capture_shard(0), _capture_shard(1)]
+    labels = results[1][7]["meta"]
+    labels["req_table"] = ["unused-local-request", "sample"]
+    labels["req_idx"] = torch.ones(2, dtype=torch.int32).numpy().tobytes()
+    tensors, metadata, _ = assemble_captured(results, tp_size=2)
+    assert tuple(tensors[7].shape) == (2, 4)
+    assert metadata[7].req_ids == ["sample", "sample"]
+
+
+def test_capture_assembly_accepts_original_single_worker_wire_format():
+    from vllm.capture import assemble_captured
+
+    raw = _capture_shard(0)
+    del raw[7]["shard"]
+    tensors, _, layouts = assemble_captured([raw], tp_size=1)
+    assert tuple(tensors[7].shape) == (2, 2)
+    assert layouts[7] == raw[7]["layout"]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "missing_worker", "missing_shard", "duplicate_rank", "missing_metadata",
+        "wrong_tp_size", "overlap", "gap", "global_width", "dtype",
+        "head_size", "request", "position", "token",
+    ],
+)
+def test_capture_assembly_rejects_incomplete_or_misaligned_attention_shards(failure):
+    from vllm.capture import assemble_captured
+
+    results = [_capture_shard(0), _capture_shard(1)]
+    info = results[1][7]
+    if failure == "missing_worker":
+        results.pop()
+    elif failure == "missing_shard":
+        results[1] = {}
+    elif failure == "duplicate_rank":
+        info["shard"]["tp_rank"] = 0
+    elif failure == "missing_metadata":
+        del info["shard"]
+    elif failure == "wrong_tp_size":
+        info["shard"]["tp_size"] = 3
+    elif failure in ("overlap", "gap"):
+        info["shard"]["feature_start"] = 1 if failure == "overlap" else 3
+    elif failure == "global_width":
+        info["shard"]["global_width"] = 6
+    elif failure == "dtype":
+        results[1] = _capture_shard(1, dtype=torch.bfloat16)
+    elif failure == "head_size":
+        info["layout"].update(head_size=2, num_heads=1)
+    elif failure == "request":
+        info["meta"]["req_table"] = ["different-request"]
+    else:
+        key = "positions" if failure == "position" else "token_ids"
+        info["meta"][key] = torch.tensor([1, 2], dtype=torch.int32).numpy().tobytes()
+    with pytest.raises(ValueError):
+        assemble_captured(results, tp_size=2)
+
+
+@pytest.mark.parametrize("owner_ranks", [(0, 0), (0, 1), (1,)])
+def test_capture_assembly_rejects_duplicate_replicas_or_missing_owner(owner_ranks):
+    from vllm.capture import assemble_captured
+
+    results = [_capture_shard(rank, kind="replicated") for rank in owner_ranks]
+    results.extend({} for _ in range(2 - len(results)))
+    with pytest.raises(ValueError):
+        assemble_captured(results, tp_size=2)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tp_rank", 0), ("tp_size", 3), ("pp_size", 2), ("dp_size", 2),
+        ("pcp_size", 2), ("dcp_size", 2), ("sequence_parallel", True),
+        ("sequence_parallel_moe", True), ("expert_parallel", True),
+    ],
+)
+def test_capture_rejects_unsupported_topology_before_starting_workers(field, value):
+    from easysteer.hidden_states import capture
+
+    calls = []
+
+    def rpc(method, **kwargs):
+        calls.append(method)
+        return [
+            {"topology": _topology(0)},
+            {"topology": _topology(1, **{field: value})},
+        ]
+
+    llm = SimpleNamespace(llm_engine=SimpleNamespace(collective_rpc=rpc))
+    with pytest.raises(ValueError):
+        capture(llm, ["prompt"])
+    assert calls == ["capture_status"]
+
+
+@pytest.mark.parametrize("per_prompt", [False, True])
+def test_capture_validates_selectors_before_contacting_workers(per_prompt):
+    from easysteer.hidden_states import capture
+
+    def rpc(*args, **kwargs):
+        pytest.fail("Invalid selectors must not reach workers")
+
+    kwargs = (
+        {"per_prompt_selects": [{"prompt": "invalid"}]}
+        if per_prompt else {"select": {"prompt": "invalid"}}
+    )
+    llm = SimpleNamespace(llm_engine=SimpleNamespace(collective_rpc=rpc))
+    with pytest.raises(ValueError):
+        capture(llm, ["prompt"], **kwargs)
+
+
+@pytest.mark.parametrize("failure", [None, "dropped", "fetch", "generate"])
+def test_capture_helper_assembles_workers_and_observes_nonzero_rank_failures(failure):
+    from easysteer.hidden_states import capture
+
+    calls = []
+
+    def rpc(method, **kwargs):
+        calls.append(method)
+        if method == "capture_status":
+            return [
+                {"topology": _topology(rank), "tokens_dropped": int(
+                    rank == 1 and failure == "dropped" and "start_capture" in calls
+                )}
+                for rank in (1, 0)
+            ]
+        if method == "fetch_captured":
+            if failure == "fetch":
+                raise RuntimeError("rank 1 capture failed")
+            return [_capture_shard(1), _capture_shard(0)]
+        return [True, True]
+
+    def generate(*args, **kwargs):
+        if failure == "generate":
+            raise RuntimeError("generation failed")
+        return [SimpleNamespace(request_id="sample")]
+
+    llm = SimpleNamespace(
+        llm_engine=SimpleNamespace(collective_rpc=rpc), generate=generate
+    )
+    if failure is None:
+        result = capture(llm, ["prompt"], stream="attention_heads")
+        assert result.layouts[7]["width"] == 4
+        torch.testing.assert_close(
+            result.sample_rows(0, 7), torch.tensor([[0., 1., 4., 5.], [2., 3., 6., 7.]])
+        )
+    else:
+        with pytest.raises(RuntimeError):
+            capture(llm, ["prompt"], stream="attention_heads")
+    assert calls[-1] == "stop_capture"
+    if failure == "dropped":
+        assert "fetch_captured" not in calls
+
+
+def test_capture_preserves_original_error_if_cleanup_also_fails():
+    from easysteer.hidden_states import capture
+
+    def rpc(method, **kwargs):
+        if method == "capture_status":
+            return [{"tokens_dropped": 0}]
+        if method == "stop_capture":
+            raise RuntimeError("cleanup failed")
+        raise ValueError("original start failed")
+
+    llm = SimpleNamespace(llm_engine=SimpleNamespace(collective_rpc=rpc))
+    with pytest.raises(ValueError, match="original start failed") as exc:
+        capture(llm, ["prompt"])
+    assert str(exc.value.__cause__) == "cleanup failed"

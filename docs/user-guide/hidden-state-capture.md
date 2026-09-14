@@ -20,10 +20,13 @@ llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", tensor_parallel_size=1)
 # prefix-cache reads when necessary to compute selected prompt rows.
 ```
 
-The client helper requires a single worker. Tensor-parallel capture returns
-per-rank shards and is rejected rather than merging them implicitly. Capture
-also depends on the engine being able to discover the model's decoder layers
-or MoE gates; test new model architectures before relying on their activations.
+The client helper supports ordinary tensor parallelism, including
+`tensor_parallel_size=2` on two GPUs. Use one pipeline stage and one data-parallel
+replica (`PP=DP=1`), with context, sequence, and expert parallelism disabled.
+The helper returns complete tensors in the same layout at every TP size.
+Capture also depends on the engine being able to discover the model's decoder
+layers or MoE gates; test new model architectures before relying on their
+activations.
 
 ## Capture a batch
 
@@ -61,7 +64,7 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 | `per_prompt_selects` | One `SelectSpec` or wire dict per prompt, overriding the global selection (`None` entries keep the global one). The list length must match `prompts`. |
 | `stream` | `"hidden_states"` (default), `"router_logits"` (MoE), or `"attention_heads"` (before the attention output projection). |
 | `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering; use `False` to disable it even when the engine has a default. |
-| `budget_bytes` | Optional limit on raw CPU values and row labels, including pending transfers, across the stream's layers. Exceeding it fails capture instead of returning a partial result. |
+| `budget_bytes` | Optional total limit on raw CPU values and row labels, including pending transfers, across the stream's layers and workers. Exceeding it fails capture instead of returning a partial result. |
 | `**generate_kwargs` | Forwarded into `SamplingParams` (e.g. `temperature`). |
 
 ### Select rows
@@ -149,7 +152,11 @@ budget; reduce its size, select fewer rows/layers, or increase the limit.
 explicitly. The budget counts values and labels in worker CPU storage and
 pending transfers. It excludes model memory, CUDA graph buffers, serialization
 copies, and tensors retained by the caller; it is not a process memory limit.
-The low-level `capture_status` RPC reports `storage_bytes` and `budget_bytes`.
+With TP, attention capture divides this budget equally among workers, including
+each worker's row labels; unused capacity on one worker cannot be borrowed by
+another. Replicated hidden states and router logits are stored by one owner,
+which keeps the full budget. The low-level `capture_status` RPC reports each
+worker's `storage_bytes` and assigned `budget_bytes`.
 
 Per-layer extraction reads only the requested token rows and processes one
 layer at a time. Online means require space proportional to feature width.
@@ -183,10 +190,11 @@ head_outputs = heads.sample(0)[10].reshape(
 
 The stored tensors remain two-dimensional `(rows, width)`. The layout records
 `width = num_heads * head_size`, where `num_heads` is the query head count and
-`head_size` is the value-output dimension per head. Neither KV head counts nor
-the model's residual hidden size should be used to infer this layout.
+`head_size` is the value-output dimension per head. Public results and layouts
+use the model's global query-head order at every TP size. Neither KV head counts
+nor the model's residual hidden size should be used to infer this layout.
 
-This stream supports standard decoder MHA/GQA with `tensor_parallel_size=1`;
+This stream supports standard decoder MHA/GQA with ordinary tensor parallelism;
 MLA, encoder attention, and cross-attention are not exposed as head outputs.
 It shares capture's graph and prefix-cache policy. These activations feed the
 [ITI extractor](extracting-vectors.md#iti-attention-head-directions).
@@ -199,20 +207,36 @@ including `prompt` and `multi_modal_data`; capture preserves their cache salts.
 ## Graph execution
 
 Eligible FULL-graph batches use a separate CUDA graph that records activations.
-This path requires one worker, no LoRA or speculative decoding, and steering
-either disabled or running `in_graph`. Other batches that need captured rows
-run eagerly; steps with no selected rows keep ordinary model execution.
+This path supports ordinary tensor parallelism, requires no LoRA or speculative
+decoding, and requires steering either disabled or running `in_graph`.
+Ineligible capture batches, including piecewise-only execution, run eagerly;
+steps with no selected rows keep ordinary model execution.
+The attention backend must support FULL graphs for the batch being captured;
+vLLM can downgrade a requested FULL configuration to decode-only execution.
 The first eligible batch records the capture graph. One component/layer
 combination stays cached across `capture()` calls; changing the selected token
 positions, storage dtype or reduction does not require recording it again.
 Changing components or layers replaces that cached graph. Ordinary model graphs
 do not contain capture operations.
 
+All TP ranks record and replay the same graph variant, including ranks that do
+not retain replicated hidden states or router logits. Attention outputs stay
+sharded during replay and are assembled when fetched. `capture_status` reports
+`graph_replays` on every rank; a non-owner rank can have a ready graph with zero
+capture buffer bytes.
+
 The graph's fixed output buffers contain whole execution batches before row
 selection. Selecting fewer rows reduces retained CPU data and transfer volume,
 but does not shrink those fixed GPU buffers. Stopping capture clears the stream
 while retaining the cached graph for reuse; status reports its buffer and total
 allocation sizes separately.
+
+For a long-running TP engine that repeatedly changes captured components or
+layers, set `disable_custom_all_reduce=True` when constructing `LLM`. vLLM's
+custom all-reduce graph registration table has a fixed lifetime capacity;
+replacing CUDA graphs does not reclaim those registrations. This option uses
+vLLM's NCCL path and retains capture graph replay. Reusing the same capture
+variant does not add registrations.
 
 ## Prefix caching
 

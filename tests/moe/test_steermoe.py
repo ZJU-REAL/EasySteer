@@ -53,6 +53,7 @@ TOP_K = _hf_cfg["num_experts_per_tok"]
 ENGINE_PROFILE = "olmoe_eager"
 ENGINE_KWARGS = dict(
     model=MODEL,
+    worker_extension_cls="moe.worker_extension.RouterProbeWorkerExtension",
     enable_steer_vector=True,
     steer_algorithms=["moe_router"],
     enforce_eager=True,

@@ -23,6 +23,46 @@ DENSE_VECTOR = str(Path(os.environ.get(
 )).expanduser().resolve())
 
 
+class CaptureGraphWorkerExtension:
+    """Named test RPCs for an eager oracle and capture-buffer diagnostics."""
+
+    def capture_test_set_eager(self, enabled):
+        from vllm.config.compilation import CUDAGraphMode
+
+        runner = self.model_runner
+        if enabled:
+            assert not hasattr(self, "_capture_test_idle_graph")
+            manager = runner.cudagraph_manager
+            assert manager is not None
+            self._capture_test_idle_graph = (manager, manager.cudagraph_mode)
+            # Disable capture eligibility while leaving ordinary dispatch valid
+            # for steps whose selections are empty (including prompt prefill).
+            manager.cudagraph_mode = CUDAGraphMode.NONE
+        elif hasattr(self, "_capture_test_idle_graph"):
+            manager, mode = self._capture_test_idle_graph
+            manager.cudagraph_mode = mode
+            del self._capture_test_idle_graph
+        return True
+
+    def capture_test_graph_state(self):
+        runner = self.model_runner
+        state = runner.capture_session.graph_state
+        manager = runner.capture_graph_manager
+        return {
+            "rank": runner.capture_status("hidden_states")["topology"]["tp_rank"],
+            "idle_mode": runner.cudagraph_manager.cudagraph_mode.name,
+            "manager": id(manager) if manager is not None else None,
+            "mode": manager.cudagraph_mode.name if manager is not None else None,
+            "signature": None if state is None else [
+                [stream, list(layers)] for stream, layers in state.signature
+            ],
+            "buffers": {} if state is None else {
+                f"{stream}:{layer}": tensor.data_ptr()
+                for (stream, layer), (tensor, _) in state.buffers.items()
+            },
+        }
+
+
 _INCLUDE_KWARGS = (
     "prompt", "generation", "prompt_tokens", "prompt_positions",
     "prompt_window", "generation_tokens", "generation_positions",

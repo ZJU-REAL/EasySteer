@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """MoE gate steering semantics and per-request routing on OLMoE-1B-7B.
 
-One eager engine exercises 'activate' / 'deactivate' (log-softmax,
+An eager engine by default exercises 'activate' / 'deactivate' (log-softmax,
 per-token max+eps / min-eps). Gate steering routes per request through
-the same slot machinery as decoder-layer steering.
+the same slot machinery as decoder-layer steering. STEER_TEST_MOE_MODE selects
+eager, split, or in_graph when rerunning the semantic checks in another mode.
 
 Coverage:
   - a mixed layer config (activate_ids + deactivate_ids) forces the
@@ -26,8 +27,10 @@ import os
 
 import numpy as np
 import pytest
+import torch
 from vllm import SamplingParams
-from vllm.capture import deserialize_captured
+
+from easysteer.hidden_states import capture
 
 from helpers import MOE_MODEL, steering_spec
 
@@ -42,6 +45,7 @@ ALL_LAYERS = [str(layer) for layer in range(NUM_LAYERS)]
 ENGINE_PROFILE = "olmoe_eager"
 ENGINE_KWARGS = dict(
     model=MODEL,
+    worker_extension_cls="moe.worker_extension.RouterProbeWorkerExtension",
     enable_steer_vector=True,
     steer_algorithms=["moe_router"],
     enforce_eager=True,
@@ -51,16 +55,21 @@ ENGINE_KWARGS = dict(
     gpu_memory_utilization=0.4,
     max_model_len=4096,
 )
+_MODE = os.environ.get("STEER_TEST_MOE_MODE")
+if _MODE is not None:
+    if _MODE not in ("eager", "split", "in_graph"):
+        raise ValueError("STEER_TEST_MOE_MODE must be eager, split, or in_graph")
+    ENGINE_PROFILE = f"olmoe_mode_{_MODE}"
+    ENGINE_KWARGS.update(
+        enforce_eager=_MODE == "eager",
+        steer_graph_mode="split" if _MODE == "eager" else _MODE,
+    )
 
 ACT = [25]  # disjoint from DEACT: on overlap, deactivation wins
 DEACT = list(range(20))
 X = list(range(20))
 Y = list(range(20, 40))
 Z = list(range(40, 60))
-
-
-def rpc(llm, method, *args, **kwargs):
-    return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
 
 
 def moe_json_spec(dirpath, name, layer_cfgs, **kwargs):
@@ -96,14 +105,12 @@ def generate(llm, prompts_ids, specs, max_tokens=32):
 
 def captured(llm, prompts_ids, specs, max_tokens=1):
     """Post-steering router logits {layer: (rows, n_experts) float32}."""
-    rpc(llm, "start_capture", "router_logits")
-    try:
-        generate(llm, prompts_ids, specs, max_tokens=max_tokens)
-        raw = rpc(llm, "fetch_captured", "router_logits")
-    finally:
-        rpc(llm, "stop_capture", "router_logits")
-    out = deserialize_captured(raw)[0]
-    return {lid: t.float().numpy() for lid, t in out.items()}
+    result = capture(
+        llm, [{"prompt_token_ids": ids} for ids in prompts_ids],
+        stream="router_logits", max_tokens=max_tokens, temperature=0.0,
+        steering=specs,
+    )
+    return {lid: t.float().numpy() for lid, t in result.layers.items()}
 
 
 def signature(rows, ids):
@@ -205,6 +212,45 @@ class TestModeSemantics:
             rows = np.flatnonzero(signature(logits[lid], DEACT)).tolist()
             assert rows == trig, f"L{lid}: steered rows {rows} != {trig}"
 
+    @pytest.mark.parametrize("mode", ["soft", "soft_topk"])
+    def test_soft_modes_apply_logit_spread_only_at_selected_rows(
+        self, llm, ids_a, mode
+    ):
+        """First-layer logits expose the requested delta without recurrence."""
+        token = llm.get_tokenizer().encode(" the", add_special_tokens=False)[0]
+        options = dict(
+            stream="router_logits", layers=[0], max_tokens=4,
+            ignore_eos=True, allowed_token_ids=[token],
+        )
+        prompts = [{"prompt_token_ids": ids_a}]
+        baseline = capture(llm, prompts, steering=False, **options)
+        before = baseline.sample(0)[0]
+        experts = [int(before[0].argmax())]
+        experts += before[0].topk(2, largest=False).indices.tolist()
+        strength = 1.5
+        spec = steering_spec(
+            source=None, algorithm="moe_router", scale=1.0, layers=[0],
+            params={
+                "mode": mode, "expert_ids": experts,
+                "lambda": strength, "topk": TOP_K,
+            },
+            prompt_positions=[0, -1], generation="all",
+        )
+        result = capture(llm, prompts, steering=spec, **options)
+        assert result.sample_positions(0) == baseline.sample_positions(0)
+        assert result.sample_token_ids(0) == baseline.sample_token_ids(0)
+        after = result.sample(0)[0]
+        eligible = torch.zeros_like(before, dtype=torch.bool)
+        eligible[:, experts] = True
+        if mode == "soft_topk":
+            eligible.scatter_(1, before.topk(TOP_K, dim=-1).indices, False)
+        eligible[1:len(ids_a) - 1] = False
+        expected = before + eligible * before.std(dim=-1, keepdim=True) * strength
+        tolerance = max(1e-5, 2 * torch.finfo(before.dtype).eps)
+        torch.testing.assert_close(after, expected, rtol=tolerance, atol=tolerance)
+        assert torch.equal(after[~eligible], before[~eligible])
+        assert (after[eligible] > before[eligible]).all()
+
 
 class TestSlotRouting:
     """Per-request (slot-routed) gate steering in mixed batches.
@@ -251,8 +297,8 @@ class TestSlotRouting:
         spec_z = deact_spec(tmp_path, "deact-z", Z)
         generate(llm, [ids_b], [spec_z], max_tokens=4)  # use and finish
         generate(llm, [ids_b], [None], max_tokens=4)  # post-release step
-        live = rpc(llm, "list_steer_vectors")
-        assert not live, f"live={live}"
+        live = llm.llm_engine.collective_rpc("list_steer_vectors")
+        assert all(not configs for configs in live), f"live={live}"
         logits = captured(llm, [ids_a], [None])
         residual = [
             (lid, ids[0])
@@ -267,3 +313,33 @@ class TestSlotRouting:
         spec_x = deact_spec(tmp_path, "deact-x", X)
         outs = generate(llm, [ids_a, ids_a], [spec_x, None], max_tokens=48)
         assert outs[0] != outs[1], f"steered == unsteered: {outs[0]!r}"
+
+
+def test_random_expert_choices_match_across_tensor_parallel_ranks(llm, ids_a):
+    """Observe the actual gate op on every rank during prefill and decode."""
+    if llm.llm_engine.vllm_config.steer_vector_config.graph_mode == "in_graph":
+        pytest.skip("soft_random requires eager or split execution")
+
+    # Exercise the engine's normal sampling path before installing the observer.
+    llm.generate(
+        [{"prompt_token_ids": ids_a}],
+        SamplingParams(temperature=0.8, max_tokens=3, ignore_eos=True),
+        steering=False, use_tqdm=False,
+    )
+    spec = steering_spec(
+        source=None, algorithm="moe_router", layers=[0],
+        params={"mode": "soft_random", "expert_ids": [0, 1, 2], "lambda": 1.5},
+    )
+    try:
+        ranks = llm.collective_rpc("router_test_observe")
+        generate(llm, [ids_a, ids_a], [spec, None], max_tokens=5)
+    finally:
+        records = llm.collective_rpc("router_test_collect")
+    tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+    assert sorted(ranks) == list(range(tp_size))
+    assert records[0], "the real router steering op was not observed"
+    for rank, actual in zip(ranks, records):
+        assert actual == records[0], f"random expert choices differ on TP rank {rank}"
+    counts = [sum(row) for batch in records[0] for row in batch]
+    assert 0 in counts and 3 in counts, "expected both steered and unsteered rows"
+    assert set(counts) == {0, 3}, "each selected token must change three experts"

@@ -161,6 +161,78 @@ class TestGraphMaskStorage:
         attention.clear_graph_row(1)
         assert attention.graph_tables["additive"]["V"].count_nonzero() == 0
 
+    @pytest.mark.parametrize("mode", ["split", "in_graph"])
+    @pytest.mark.parametrize("tp_rank", [0, 1])
+    def test_attention_tp_admission_slices_global_direction(
+        self, monkeypatch, mode, tp_rank
+    ):
+        """Both installation paths add each rank's slice only on selected rows."""
+        import torch
+        from vllm.config import SteerVectorConfig
+        from vllm.model_hooks.components.registry import (
+            ATTENTION_HEADS,
+            ComponentTarget,
+        )
+        from vllm.model_hooks.steering.validation import validate_request_model
+        from vllm.model_hooks.steering.worker_manager import WorkerSteeringState
+
+        worker = WorkerSteeringState(
+            torch.device("cpu"),
+            SteerVectorConfig(
+                algorithms=["attention_add"], graph_mode=mode,
+                steer_vector_dtype="float32", max_steer_vectors=2,
+            ),
+            hidden_size=8,
+        )
+        if mode == "in_graph":
+            worker.enable_graph_mode(8, torch.float32, 2)
+        target = ComponentTarget(
+            "attention", 0, torch.nn.Identity(), width=12, num_heads=4, head_size=3,
+            tp_rank=tp_rank, tp_size=2,
+        )
+        worker.attach_steering_hooks({ATTENTION_HEADS: (target,)})
+        request = _request(
+            data=DirectionVector({0: np.arange(24, dtype=np.float32)}),
+            algorithm="attention_add", scale=0.5,
+        )
+        try:
+            assert worker.model_info() == {ATTENTION_HEADS: {0: 24}}
+            validate_request_model(request, 8, worker.model_info())
+            invalid = _request(
+                data=DirectionVector({0: np.ones(12)}), algorithm="attention_add",
+            )
+            with pytest.raises(ValueError, match="component width 24"):
+                validate_request_model(invalid, 8, worker.model_info())
+            slot = worker.acquire_config("sample", request)
+            controller, = worker._controller_manager.controllers.values()
+            original = torch.arange(24.).reshape(2, 12)
+            actual = original.clone()
+            if mode == "in_graph":
+                worker.token_rows_buf[0] = slot + 1
+                controller.graph_mask[0] = 1
+                actual = controller.process_output_hook(None, (), actual)
+            else:
+                group = controller.slot_position_groups[slot]
+                context = SimpleNamespace(
+                    steer_active_slots=[slot],
+                    steer_slot_positions={(slot, group, 0): torch.tensor([0])},
+                )
+                monkeypatch.setattr(
+                    "vllm.model_hooks.steering.controllers.base.get_forward_context",
+                    lambda: context,
+                )
+                controller.apply_steering(actual)
+            expected = original.clone()
+            expected[0] += (
+                torch.arange(24.)[12 * tp_rank:12 * (tp_rank + 1)] * 0.5
+            )
+            torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+            assert torch.equal(actual[1], original[1])
+            canonical = worker.payload_cache.get(request.vectors[0].payload)[0]
+            torch.testing.assert_close(canonical, torch.arange(24.))
+        finally:
+            worker.close()
+
     def test_normalize_has_distinct_identity_and_persistent_row_state(self):
         import torch
         from vllm.model_hooks.steering.payloads import DirectionVector

@@ -155,7 +155,8 @@ Full walkthrough (including where the vector comes from): [Quickstart](https://z
 
 - **Steering spec language** (phases, positions, multi-vector, conflict policies, CUDA graphs): [Steering guide](https://zju-real.github.io/EasySteer/latest/user-guide/steering/)
 - **OpenAI-compatible HTTP server** (per-request and server-level steering): [Server guide](https://zju-real.github.io/EasySteer/latest/user-guide/openai-server/)
-- **Capturing hidden states** and MoE router logits: [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
+- **Capturing hidden states, attention heads, and MoE router logits**, including ordinary tensor parallelism: [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
+- **Attention-head steering** with global head directions and TP support: [Attention guide](https://zju-real.github.io/EasySteer/latest/user-guide/attention/)
 - **Extracting vectors** (DiffMean, PCA, LAT, linear probe, SAE): [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/)
 - **Training interventions** (ReFT / LoReFT / LM-Steer): [ReFT training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
 - **API reference**: [zju-real.github.io/EasySteer/latest/api-reference/](https://zju-real.github.io/EasySteer/latest/api-reference/)

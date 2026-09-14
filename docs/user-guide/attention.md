@@ -8,15 +8,18 @@ attention scores, attention probabilities, or stored keys and values directly.
 
 ## Supported component
 
-Use standard decoder MHA or GQA with `tensor_parallel_size=1`. MLA, encoder
-attention, and cross-attention are outside this component's current scope.
+Standard decoder MHA and GQA support ordinary tensor parallelism, including
+`tensor_parallel_size=2` on two GPUs. Use `PP=DP=1` with context, sequence, and
+expert parallelism disabled. MLA, encoder attention, and cross-attention are
+outside this component's current scope.
 The engine discovers attention modules from the model itself and checks that
 the hook target is available.
 
 For a layer with `H` query heads and value-output dimension `D`, the captured
 and steered tensor has shape `(rows, H * D)`. This width need not equal the
 residual hidden size. GQA still uses the **query** head count at this point,
-not the number of KV heads.
+not the number of KV heads. Public capture results and steering vectors use
+all query heads in the model's global head order, independent of TP size.
 
 ## Capture the representation
 
@@ -56,9 +59,10 @@ the paper's prompt format.
 
 ## Apply selected head directions
 
-Use a concatenated `DirectionVector` or an EasySteer direction GGUF. Leave
-unselected head slices zero. The same per-request `ApplySpec`, prefix caching,
-and graph rules apply:
+Use a concatenated `DirectionVector` or an EasySteer direction GGUF with the
+full global width `H * D`, including with TP. Leave unselected head slices zero;
+the engine handles distribution across workers. The same per-request
+`ApplySpec`, prefix caching, and graph rules apply:
 
 ```python
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
@@ -81,7 +85,10 @@ decode forward passes. To steer all prompt processing as well, use
 
 `attention_add` supports eager, `split`, and `in_graph`; a single-vector
 declaration selects `in_graph` under the default `auto` mode. Normalization is
-not supported, so keep `normalize=False`.
+not supported, so keep `normalize=False`. These steering modes also support TP.
+Capture on `TP>1` can replay a separate FULL CUDA graph with `in_graph` steering;
+other capture batches use eager execution. See
+[capture execution](hidden-state-capture.md#graph-execution).
 
 ## ITI example
 

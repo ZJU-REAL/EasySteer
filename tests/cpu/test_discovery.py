@@ -355,6 +355,54 @@ def test_attention_capture_preserves_query_head_layout_and_global_layer(monkeypa
         session.detach()
 
 
+@pytest.mark.parametrize(
+    "tp_rank, tp_size, wrapped", [(1, 2, False), (1, 2, True), (0, 1, False)]
+)
+def test_attention_head_layout_uses_owning_projection_tp(
+    monkeypatch, tp_rank, tp_size, wrapped
+):
+    """Output-head layout follows the layer's TP, including disabled TP and LoRA."""
+    from vllm.model_executor.layers.linear import RowParallelLinear
+
+    monkeypatch.setattr("vllm.distributed.model_parallel_is_initialized", lambda: True)
+    monkeypatch.setattr(
+        "vllm.distributed.get_tensor_model_parallel_world_size", lambda: 4
+    )
+    decoder = Decoder()
+    decoder.attention = attention_module()
+    projection = RowParallelLinear.__new__(RowParallelLinear)
+    nn.Module.__init__(projection)
+    projection.tp_rank, projection.tp_size = tp_rank, tp_size
+    projection.input_is_parallel = True
+    projection.input_size_per_partition = 12
+    projection.input_size = 12 * tp_size
+    if wrapped:
+        decoder.projection = nn.Module()
+        decoder.projection.base_layer = projection
+    else:
+        decoder.projection = projection
+
+    target, = discover_components(Stack([decoder]))[ATTENTION_HEADS]
+    assert (target.width, target.num_heads, target.head_size) == (12, 4, 3)
+    assert (target.tp_rank, target.tp_size) == (tp_rank, tp_size)
+    assert (target.global_width, target.global_num_heads, target.feature_start) == (
+        12 * tp_size, 4 * tp_size, 12 * tp_rank,
+    )
+
+
+def test_attention_heads_with_unknown_distributed_layout_are_unavailable(monkeypatch):
+    """Do not interpret unknown TP layouts as replicated local-width payloads."""
+    monkeypatch.setattr("vllm.distributed.model_parallel_is_initialized", lambda: True)
+    monkeypatch.setattr(
+        "vllm.distributed.get_tensor_model_parallel_world_size", lambda: 2
+    )
+    decoder = Decoder()
+    decoder.attention = attention_module()
+    components = discover_components(Stack([decoder]))
+    assert components[ATTENTION_HEADS] == ()
+    assert len(components[HIDDEN_STATES]) == 1
+
+
 @pytest.mark.parametrize("kind", ["encoder", "encoder_only", "encoder_decoder", "mla"])
 def test_attention_heads_excludes_non_decoder_and_latent_attention(kind):
     decoder = Decoder()

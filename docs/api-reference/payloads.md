@@ -40,9 +40,10 @@ encoding of those bytes.
 
 `layers` maps true decoder-layer IDs to one-dimensional vectors. Widths may
 differ across layers when the model component does. For `attention_add`, each
-vector contains concatenated head outputs; obtain their dimensions from capture
-layouts. The constructor returns a `DirectionVector`; algorithms determine how
-its directions are applied.
+vector contains all query-head outputs in global head order; obtain their
+dimensions from capture layouts. Supply this same full-width vector with TP;
+the engine handles its distribution. The constructor returns a
+`DirectionVector`; algorithms determine how its directions are applied.
 
 ::: model_hooks.steering.payloads.DirectionVector
     options:

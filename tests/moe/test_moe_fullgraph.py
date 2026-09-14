@@ -105,7 +105,7 @@ def test_file_config_runs_in_graph(llm, tmp_path):
 
 def test_router_capture_replays_full_graph_with_steering(llm):
     """Default, disabled and overridden router payloads share capture graphs."""
-    from vllm.capture import deserialize_captured, match_capture_request_id
+    from vllm.capture import assemble_captured, match_capture_request_id
     from vllm.steer_vectors import (
         ApplySpec, RouterConfig, SelectSpec, SteeringSpec, VectorSpec,
     )
@@ -117,9 +117,10 @@ def test_router_capture_replays_full_graph_with_steering(llm):
         )])
 
     def rpc(method, *args, **kwargs):
-        return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)[0]
+        return llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)
 
     stream = "router_logits"
+    tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
     before = rpc("capture_status", stream)
     llm.set_default_steering(router_spec("deactivate", DEACT))
     rpc(
@@ -141,10 +142,15 @@ def test_router_capture_replays_full_graph_with_steering(llm):
         rpc("stop_capture", stream)
         llm.set_default_steering(None)
 
-    assert after["graph_ready"] and after["graph_buffer_bytes"] > 0
-    assert after["graph_replays"] >= before["graph_replays"] + 3
-    assert after["meta_complete"] and after["tokens_dropped"] == 0
-    tensors, meta = deserialize_captured(raw)
+    assert len(before) == len(after) == len(raw) == tp_size
+    replay_counts = []
+    for rank, (previous, status) in enumerate(zip(before, after)):
+        assert status["graph_ready"], f"TP rank {rank} capture graph not ready"
+        assert (status["graph_buffer_bytes"] > 0) == (rank == 0)
+        replay_counts.append(status["graph_replays"] - previous["graph_replays"])
+        assert status["meta_complete"] and status["tokens_dropped"] == 0
+    assert len(set(replay_counts)) == 1 and replay_counts[0] >= 3
+    tensors, meta, _ = assemble_captured(raw, tp_size=tp_size)
     assert set(tensors) == {0} and set(meta) == {0}
     logits, labels = tensors[0], meta[0]
     assert tuple(logits.shape) == (9, _hf_cfg["num_experts"])

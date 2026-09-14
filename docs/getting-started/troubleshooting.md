@@ -81,8 +81,9 @@ should be steered.
 
 ## Capture
 
-- **Unsupported runner or worker count:** capture uses the V2 GPU runner and the
-  public client helper requires one worker. Keep `tensor_parallel_size=1`.
+- **Unsupported runner or parallelism:** capture uses the V2 GPU runner and
+  supports ordinary TP with `PP=DP=1`. Disable context, sequence, and expert
+  parallelism. A multiworker fetch must contain one complete TP group.
 - **Empty rows:** confirm the token selection matches a forward pass. With
   `max_tokens=1`, there are prompt rows but no decode-forward rows for a
   generation-only selector.

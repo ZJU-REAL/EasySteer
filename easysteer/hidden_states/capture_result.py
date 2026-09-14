@@ -37,11 +37,21 @@ class CaptureResult:
         if not isinstance(meta, dict) or set(meta) != set(layers):
             raise ValueError("capture requires row labels for every captured layer")
         self._meta = meta
+        first = next(iter(meta.values()), None)
         for lid, m in meta.items():
             if len(m) != layers[lid].shape[0]:
                 raise RuntimeError(
                     f"layer {lid}: {len(m)} row labels for "
                     f"{layers[lid].shape[0]} rows — engine/client label desync"
+                )
+            if (
+                m.req_ids != first.req_ids
+                or not torch.equal(m.positions, first.positions)
+                or not torch.equal(m.token_ids, first.token_ids)
+            ):
+                raise RuntimeError(
+                    f"layer {lid}: capture row labels differ between layers; "
+                    "sample rows cannot be aligned"
                 )
         self._sample_rows = self._index_samples()
 
@@ -161,8 +171,9 @@ def capture(
     """Capture intermediate state for a batch of prompts.
 
     Args:
-        llm: Single-worker vLLM LLM instance (compiled or eager,
-            prefix caching on or off). Tensor-parallel capture is not supported.
+        llm: vLLM LLM instance (compiled or eager, prefix caching on or off).
+            Ordinary tensor parallelism is supported; capture batches run eagerly
+            with multiple workers. Other parallel layouts are not supported.
         prompts: prompt list (text or multimodal dicts).
         max_tokens: tokens to generate (1 = prompt-only forward).
         layers: layer-id subset (None = all hooked layers).
@@ -183,21 +194,32 @@ def capture(
         CaptureResult with exact per-sample views.
     """
     from vllm import SamplingParams
-    from vllm.capture import deserialize_captured
+    from vllm.capture import (
+        SelectSpec,
+        StreamConfig,
+        assemble_captured,
+        validate_capture_topology,
+    )
+
+    if stream not in ("hidden_states", "router_logits", "attention_heads"):
+        raise ValueError(f"Unknown capture stream: {stream}")
 
     def to_wire(spec):
-        if spec is None or isinstance(spec, dict):
-            return spec
-        return spec.to_wire()
+        if spec is None:
+            return None
+        wire = spec if isinstance(spec, dict) else spec.to_wire()
+        return SelectSpec.from_wire(wire).to_wire()
+
+    tp_size = None
 
     def rpc(method, *args, **kwargs):
         results = llm.llm_engine.collective_rpc(method, args=args, kwargs=kwargs)
-        if len(results) != 1:
-            raise RuntimeError(
-                f"capture expects a single worker, got {len(results)} "
-                "RPC results — tensor-parallel capture would return "
-                "per-rank shards and is not supported"
-            )
+        if tp_size is not None and len(results) != tp_size:
+            raise RuntimeError(f"Capture {method} returned an incomplete worker group")
+        if method in ("start_capture", "stop_capture") and not all(
+            result is True for result in results
+        ):
+            raise RuntimeError(f"Capture {method} was not acknowledged by every worker")
         return results
 
     enable_kwargs: dict[str, Any] = {}
@@ -209,6 +231,8 @@ def capture(
         enable_kwargs["select"] = to_wire(select)
     if budget_bytes is not None:
         enable_kwargs["budget_bytes"] = budget_bytes
+    # Reject invalid selections and storage configuration before any worker RPC.
+    StreamConfig(**enable_kwargs)
 
     capture_select = None
     if per_prompt_selects is not None:
@@ -227,6 +251,7 @@ def capture(
         **generate_kwargs,
     )
 
+    tp_size = validate_capture_topology(rpc("capture_status", stream))
     try:
         rpc("start_capture", stream, **enable_kwargs)
         outputs = llm.generate(
@@ -236,18 +261,29 @@ def capture(
             steering=steering,
             use_tqdm=False,
         )
-        status = rpc("capture_status", stream)[0]
-        if status["tokens_dropped"]:
+        statuses = rpc("capture_status", stream)
+        validate_capture_topology(statuses)
+        dropped = [
+            (status.get("topology", {}).get("tp_rank", 0), status["tokens_dropped"])
+            for status in statuses if status["tokens_dropped"]
+        ]
+        if dropped:
             raise RuntimeError(
-                f"Capture discarded {status['tokens_dropped']} rows; "
+                f"Capture discarded rows on TP workers (rank, count): {dropped}; "
                 "a complete result is required. Reduce the capture batch "
                 "or increase its storage budget."
             )
-        raw = rpc("fetch_captured", stream, clear=True)[0]
-    finally:
+        tensors, meta, layouts = assemble_captured(
+            rpc("fetch_captured", stream, clear=True), tp_size=tp_size
+        )
+    except BaseException as error:
+        try:
+            rpc("stop_capture", stream)
+        except BaseException as cleanup_error:
+            raise error from cleanup_error
+        raise
+    else:
         rpc("stop_capture", stream)
-    tensors, meta = deserialize_captured(raw)
-    layouts = {lid: info["layout"] for lid, info in raw.items() if "layout" in info}
     return CaptureResult(tensors, meta, outputs, layouts=layouts)
 
 

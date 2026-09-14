@@ -8,6 +8,8 @@ step (final prompt chunk + each decode step), not one per chunk,
 including the 1-token-prompt edge case.
 """
 
+import os
+
 import pytest
 from vllm import SamplingParams
 from vllm.inputs import TokensPrompt
@@ -19,7 +21,8 @@ from helpers import DENSE_MODEL
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
     enforce_eager=True,
-    enable_prefix_caching=False,
+    tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
+    enable_prefix_caching=True,
     enable_chunked_prefill=True,
     max_num_batched_tokens=64,
     max_num_seqs=4,
@@ -63,3 +66,28 @@ def test_capture_rows_under_chunked_prefill(llm, prompt_ids, reduce, expected):
     assert rows == expected, (
         f"reduce={reduce!r} captured {rows} rows, want {expected}"
     )
+
+
+@pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
+def test_public_capture_selects_chunk_boundaries_with_warm_prefix(llm, stream):
+    """Warm cached blocks cannot omit selected rows across 64-token chunks."""
+    from easysteer.hidden_states import capture
+    from vllm.steer_vectors import SelectSpec
+
+    prompt = TokensPrompt(prompt_token_ids=list(PROMPT_LONG))
+    warmup = SamplingParams(temperature=0, max_tokens=1, ignore_eos=True)
+    llm.generate(prompt, warmup, use_tqdm=False)
+    selected_prompt = [0, 63, 64, 127, 128]
+    result = capture(
+        llm, [prompt], stream=stream, layers=[0], max_tokens=4, ignore_eos=True,
+        select=SelectSpec(prompt_positions=selected_prompt, generation="all"),
+    )
+    output = result.outputs[0]
+    assert output.num_cached_tokens == 0
+    assert result.sample_positions(0) == selected_prompt + [129, 130, 131]
+    expected_tokens = [PROMPT_LONG[pos] for pos in selected_prompt]
+    expected_tokens += list(output.outputs[0].token_ids)[:-1]
+    assert result.sample_token_ids(0) == expected_tokens
+    assert result.rows(0).shape[0] == len(expected_tokens)
+    warm = llm.generate(prompt, warmup, use_tqdm=False)[0]
+    assert warm.num_cached_tokens > 0, "capture must leave reusable prefix blocks"

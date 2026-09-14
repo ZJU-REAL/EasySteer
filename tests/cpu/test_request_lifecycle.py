@@ -227,3 +227,38 @@ def test_runner_reattachment_detaches_previous_model_hooks(mode):
         runner._close_steering()
     assert not new._forward_hooks
     assert key not in ops._CONTROLLERS
+
+
+@pytest.mark.parametrize("algorithm", ["direct", "moe_router"])
+def test_sequence_parallel_moe_rejects_router_but_keeps_decoder_steering(algorithm):
+    """MoE gate rows are sharded before routing; decoder outputs are gathered."""
+    import torch
+    from vllm.config import SteerVectorConfig
+    from vllm.model_hooks.components.registry import HIDDEN_STATES, ComponentTarget
+    from vllm.v1.worker.steer_vector_model_runner_mixin import (
+        SteerVectorModelRunnerMixin,
+    )
+
+    runner = SteerVectorModelRunnerMixin()
+    runner.device = torch.device("cpu")
+    runner.vllm_config = SimpleNamespace(
+        steer_vector_config=SteerVectorConfig(
+            algorithms=[algorithm], graph_mode="split",
+            steer_vector_dtype="float32", max_steer_vectors=2,
+        ),
+        parallel_config=SimpleNamespace(use_sequence_parallel_moe=True),
+        model_config=SimpleNamespace(get_hidden_size=lambda: 4),
+    )
+    module = torch.nn.Identity()
+    components = {HIDDEN_STATES: (ComponentTarget("decoder", 0, module),)}
+    try:
+        if algorithm == "moe_router":
+            with pytest.raises(ValueError, match="requires replicated token rows"):
+                runner._attach_steering_hooks(components)
+            assert runner.steer_vector_manager is None
+            assert not module._forward_hooks
+        else:
+            runner._attach_steering_hooks(components)
+            assert runner.steer_vector_manager.model_info() == {HIDDEN_STATES: {0: 4}}
+    finally:
+        runner._close_steering()

@@ -103,9 +103,13 @@ and resumed-prefill prompt/generation boundaries need dedicated validation.
 A baseline pass also does not certify every MoE model, parallelism setting,
 conditional graph payload or a performance improvement.
 
-Capture uses `vllm.capture`. Eligible single-worker FULL batches use a separate
-capture graph; other steps needing rows dispatch eagerly, while empty selections
-keep normal execution. `capture_status` exposes actual graph replay and eager
+Capture uses `vllm.capture` and supports ordinary TP with `PP=DP=1`, without
+context, sequence, or expert parallelism. The capture suites accept
+`STEER_TEST_TP=2` with two GPUs; see the
+[test guide](https://github.com/ZJU-REAL/EasySteer/blob/main/tests/README.md#tensor-parallel-capture-and-steering).
+Eligible FULL batches use a separate capture graph, including at `TP>1`.
+Other steps needing rows dispatch eagerly, while empty selections keep normal
+execution. `capture_status` exposes actual graph replay and eager
 forward counters. Admission skips prefix-cache reads only when a hit could omit
 selected prompt rows, preserving normal cache writes. Requests already admitted
 before capture starts fail at fetch if selected rows were skipped.

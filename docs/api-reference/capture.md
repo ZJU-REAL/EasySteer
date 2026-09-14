@@ -13,8 +13,10 @@ from vllm.capture import (
     ROUTER_LOGITS,
     CaptureMeta,
     SelectSpec,
+    assemble_captured,
     deserialize_captured,
     match_capture_request_id,
+    validate_capture_topology,
 )
 ```
 
@@ -52,7 +54,35 @@ sequence positions order rows within a sample.
 `serialized_data` is the per-layer dictionary returned by a worker's
 `fetch_captured` RPC. The function returns `(tensors, meta)`, both keyed by true
 layer ID. Optional attention layout metadata stays in the original wire
-dictionary; the application helper attaches it to `CaptureResult.layouts`.
+dictionary. With TP, this function decodes one worker's local values; use
+`assemble_captured()` to obtain complete tensors and global layouts.
+
+::: model_hooks.capture.serialization.assemble_captured
+    options:
+      heading: vllm.capture.assemble_captured
+
+Pass the complete list of `fetch_captured` worker results and `tp_size`. The
+function returns `(tensors, meta, layouts)`, keyed by true layer ID. Replicated
+hidden states and router logits are exported only by TP rank 0; other workers
+return no layer data for those streams. Attention workers export feature shards
+with local `layout` and explicit `shard` metadata: `kind`, `tp_rank`, `tp_size`,
+`feature_start`, and `global_width`.
+
+Assembly validates shard coverage and matching request IDs, positions, and
+token IDs, then joins attention values in global query-head order. Worker reply
+order does not determine head order. The application helper uses this function
+and attaches the resulting global layouts to `CaptureResult.layouts`.
+
+::: model_hooks.capture.serialization.validate_capture_topology
+    options:
+      heading: vllm.capture.validate_capture_topology
+
+Call this with all worker `capture_status` results before starting a raw session.
+It returns the TP size after checking that replies form one complete TP group:
+`PP=DP=1`, prefill/decode context parallelism disabled, and no sequence or expert
+parallelism. Stream lifecycle RPCs still run on every worker, including workers
+that do not export replicated values. Check every worker's result and status;
+selecting only the first reply can miss a capture error.
 
 ::: model_hooks.capture.serialization.match_capture_request_id
     options:
@@ -76,11 +106,15 @@ use `capture()` instead of creating or attaching a second `CaptureSession`.
 | `reduce` | `"all"` retains rows; `"last"` or `"mean"` reduces within a request. |
 | `select` | A `SelectSpec.to_wire()` dictionary; requires `reduce="all"`. |
 | `budget_rows` | Optional nonnegative row limit per layer. |
-| `budget_bytes` | Optional limit across all layers on raw CPU values/labels and pending transfers. Overflow is reported at fetch; it does not fail the model forward. |
+| `budget_bytes` | Optional raw CPU values/labels and pending-transfer limit. `start_capture` treats it as a total across layers and workers. Overflow is reported at fetch; it does not fail the model forward. |
 
-The constructor validates the selection and resolves dtype/layer storage. These
-low-level reduction and budget arguments are not arguments to the high-level
-`hs.capture()` helper, which returns selected rows without a reduction.
+The constructor validates the selection and resolves dtype/layer storage. With
+TP, the session divides an attention stream's byte budget equally among workers,
+including each worker's labels, rounding down to whole bytes. Replicated streams
+retain the full budget on their owner. A worker's `StreamConfig` and status show
+its assigned limit, so this is a conservative total bound with no redistribution
+of unused capacity. The high-level `hs.capture()` accepts `budget_bytes` but not
+`budget_rows` or `reduce`; it returns selected rows without a reduction.
 
 ::: model_hooks.capture.store.StreamConfig
     options:
@@ -101,11 +135,16 @@ management, the relevant operations are:
 | `disable_stream(stream)` | Disable collection for that stream. |
 | `fetch_stream(stream, clear=True, layers=None, req_ids=None)` | Return serialized rows, labels, and available layouts; optionally clear the selected data. |
 | `clear_stream(stream)` | Clear retained rows and errors. |
-| `stream_status(stream)` | Return enablement, hooked layers, layouts, storage counters, and capture-graph execution counters. |
+| `stream_status(stream)` | Return enablement, hooked layers, local layouts, storage counters, and capture-graph execution counters. |
 
 The supported RPCs (`start_capture`, `stop_capture`, `fetch_captured`,
 `clear_captured`, `capture_status`) delegate to these operations in the worker.
-The high-level helper also coordinates prefix-cache read policy before admission.
+The worker adds topology metadata to `capture_status`. The high-level helper
+also coordinates prefix-cache read policy before admission. Eligible FULL
+batches use a separate capture graph at both `TP=1` and `TP>1`, with steering
+disabled or `in_graph` and without LoRA or speculative decoding. Other selected
+steps use eager forwards. Graph replay counters advance on every TP rank,
+including non-owners with no local capture buffers.
 
 ::: model_hooks.capture.session.CaptureSession
     options:
