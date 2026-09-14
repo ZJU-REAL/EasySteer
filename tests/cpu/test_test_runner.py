@@ -8,6 +8,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import ModuleType, SimpleNamespace
+from unittest.mock import patch
+
+from helpers import CaptureGraphWorkerExtension, TraceOracle, read_trace, trace_cursor
 
 
 TESTS = Path(__file__).resolve().parents[1]
@@ -74,11 +78,11 @@ class TestIsolatedRunner(unittest.TestCase):
             fake_python.chmod(0o755)
             env = dict(os.environ, STEER_TEST_PYTHON=str(fake_python),
                        STEER_TEST_MOE_MODEL=directory, STEER_TEST_MODEL=directory,
+                       STEER_TEST_QWEN3=directory,
                        RUNNER_PROBE_LOG=str(calls), STEER_TEST_GPU_PAUSE="0")
             env.pop("STEER_TEST_RESULTS_DIR", None)
-            env.pop("STEER_TEST_QWEN3", None)
-            for group, count in [("cpu", 1), ("kernels", 1), ("baseline", 9), ("moe-core", 3),
-                                 ("extended", 1)]:
+            for group, count in [("cpu", 1), ("kernels", 2), ("baseline", 10),
+                                 ("moe-core", 3), ("extended", 1), ("all", None)]:
                 with self.subTest(group=group):
                     calls.write_text("")
                     run_env = dict(env)
@@ -91,7 +95,29 @@ class TestIsolatedRunner(unittest.TestCase):
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     invocations = [json.loads(line) for line in calls.read_text().splitlines()]
-                    self.assertEqual(len(invocations), count)
+                    if count is not None:
+                        self.assertEqual(len(invocations), count)
+                    selected = {
+                        arg.split("::", 1)[0]
+                        for invocation in invocations
+                        for arg in invocation
+                        if arg.startswith(("kernels/", "e2e/", "moe/"))
+                    }
+                    kernels = {
+                        str(path.relative_to(TESTS))
+                        for path in (TESTS / "kernels").glob("test_*.py")
+                    }
+                    if group in {"kernels", "baseline", "all"}:
+                        self.assertLessEqual(kernels, selected)
+                    if group == "all":
+                        maintained_gpu = {
+                            str(path.relative_to(TESTS))
+                            for folder in ("kernels", "e2e", "moe")
+                            for path in (TESTS / folder).glob("test_*.py")
+                        }
+                        # Recorded hardware-specific text is an explicit opt-in.
+                        maintained_gpu.remove("e2e/test_golden_sentiment.py")
+                        self.assertEqual(selected, maintained_gpu)
                     if group == "moe-core":
                         self.assertIn("moe/test_moe.py", invocations[0])
                         self.assertIn("moe/test_steermoe.py", invocations[0])
@@ -117,6 +143,182 @@ class TestIsolatedRunner(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("already exists", result.stderr)
             self.assertEqual(record.read_text(), "previous run\n")
+
+
+class TestTraceOracle(unittest.TestCase):
+    """Trace regressions need neither Torch nor a model engine."""
+
+    @staticmethod
+    def write_worker(path, step=1, positions=(0, 1, 2), layer=10):
+        records = [{
+            "type": "step", "step": step, "req_ids": ["request"],
+            "query_start_loc": [0, 3], "num_computed": [0], "num_output": [0],
+        }]
+        if positions is not None:
+            records.append({
+                "type": "apply", "step": step, "layer": layer,
+                "positions": positions,
+            })
+        with path.open("a") as stream:
+            for record in records:
+                stream.write(json.dumps(record) + "\n")
+
+    @staticmethod
+    def oracle(directory, tp=2):
+        config = SimpleNamespace(parallel_config=SimpleNamespace(tensor_parallel_size=tp))
+        return TraceOracle(SimpleNamespace(llm_engine=SimpleNamespace(vllm_config=config)),
+                           directory)
+
+    def test_new_worker_steps_are_not_hidden_by_old_workers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_worker(root / "old.jsonl", step=100)
+            self.write_worker(root / "current.jsonl", step=1)
+            cursor = trace_cursor(directory)
+            self.write_worker(root / "current.jsonl", step=2)
+            self.write_worker(root / "new.jsonl", step=1)
+            steps, applies = read_trace(directory, cursor, (10,))
+            self.assertEqual(set(steps), {("current.jsonl", 2), ("new.jsonl", 1)})
+            self.assertEqual(len(applies), 2)
+
+    def test_tp_workers_keep_independent_geometry_and_exact_positions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for rank in range(2):
+                self.write_worker(root / f"worker{rank}.jsonl")
+            steps, applies = read_trace(directory, 0, (10,))
+            oracle = self.oracle(directory)
+            self.assertEqual(len(steps), 2)
+            self.assertEqual(oracle._positions_by_worker(steps, applies, (10,)),
+                             {10: [(0, True), (1, True), (2, True)]})
+            self.assertEqual(len(oracle.last_by_worker), 2)
+            # A peer with different geometry must not be joined to rank zero.
+            steps[("worker1.jsonl", 1)]["num_computed"] = [5]
+            with self.assertRaises(AssertionError):
+                oracle._positions_by_worker(steps, applies, (10,))
+
+    def test_missing_peer_and_missing_peer_applications_fail(self):
+        for missing_worker in (True, False):
+            with self.subTest(missing_worker=missing_worker):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    self.write_worker(root / "worker0.jsonl")
+                    if not missing_worker:
+                        self.write_worker(root / "worker1.jsonl", positions=None)
+                    steps, applies = read_trace(directory, 0, (10,))
+                    with self.assertRaises(AssertionError):
+                        self.oracle(directory)._positions_by_worker(steps, applies, (10,))
+
+    def test_only_explicit_off_allows_absent_trace_and_rejects_any_apply(self):
+        cases = (
+            ("implicit missing", {}, (), False),
+            ("steered missing", {"steering": object()}, (), False),
+            ("off missing", {"steering": False}, (), True),
+            ("off geometry", {"steering": False}, ((None, 10),) * 2, True),
+            ("off missing peer", {"steering": False}, ((None, 10),), False),
+            ("off apply", {"steering": False}, (((0,), 10),) * 2, False),
+            ("off other layer", {"steering": False}, (((0,), 12),) * 2, False),
+        )
+        inputs = ModuleType("vllm.inputs")
+        inputs.TokensPrompt = dict
+        for name, kwargs, records, succeeds in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                oracle = self.oracle(directory)
+                # A no-trace run must not retain an earlier worker observation.
+                oracle.last_by_worker = {"previous": {10: [(0, True)]}}
+
+                def generate(prompt, sampling_params, **passed):
+                    self.assertEqual(passed, dict(kwargs, use_tqdm=False))
+                    for rank, (positions, layer) in enumerate(records):
+                        self.write_worker(
+                            Path(directory) / f"worker{rank}.jsonl",
+                            positions=positions, layer=layer,
+                        )
+                    return ["output"]
+
+                oracle.llm.generate = generate
+                with patch.dict(sys.modules, {"vllm.inputs": inputs}):
+                    if succeeds:
+                        self.assertEqual(
+                            oracle.run([100], None, **kwargs),
+                            ("output", {10: []}),
+                        )
+                        self.assertEqual(len(oracle.last_by_worker), len(records))
+                    else:
+                        with self.assertRaises(AssertionError):
+                            oracle.run([100], None, **kwargs)
+                        self.assertEqual(oracle.last_by_worker, {})
+
+
+class TestGraphReplayProbe(unittest.TestCase):
+    def test_native_replays_classify_and_restore_cached_breakable_methods(self):
+        calls = []
+
+        class Graph:
+            def replay(self):
+                calls.append(self)
+
+        full, piecewise, cached, lazy, capture_only = [Graph() for _ in range(5)]
+        def eager():
+            calls.append("eager")
+
+        cached_segments = [cached.replay, eager]
+        entries = {
+            0: SimpleNamespace(capture=SimpleNamespace(segments=cached_segments)),
+        }
+        mode = SimpleNamespace(PIECEWISE="piecewise")
+        modules = {name: ModuleType(name) for name in (
+            "torch", "vllm", "vllm.compilation", "vllm.config",
+            "vllm.compilation.cuda_graph", "vllm.compilation.breakable_cudagraph",
+            "vllm.config.compilation",
+        )}
+        modules["torch"].cuda = SimpleNamespace(CUDAGraph=Graph)
+        modules["vllm.config.compilation"].CUDAGraphMode = mode
+        modules["vllm.compilation.cuda_graph"].CUDAGraphWrapper = SimpleNamespace(
+            _all_instances=[SimpleNamespace(
+                runtime_mode=mode.PIECEWISE,
+                concrete_cudagraph_entries={0: SimpleNamespace(cudagraph=piecewise)},
+            )],
+        )
+        modules["vllm.compilation.breakable_cudagraph"].BreakableCUDAGraphWrapper = (
+            SimpleNamespace(_all_instances=[SimpleNamespace(entries=entries)])
+        )
+        worker = CaptureGraphWorkerExtension()
+        worker.model_runner = SimpleNamespace(
+            cudagraph_manager=SimpleNamespace(graphs={0: full}),
+            capture_graph_manager=SimpleNamespace(graphs={0: capture_only}),
+            capture_status=lambda stream: {"topology": {"tp_rank": 0}},
+        )
+        original = Graph.replay
+        with patch.dict(sys.modules, modules):
+            try:
+                worker.graph_test_start()
+                full.replay()
+                full.replay()
+                piecewise.replay()
+                for segment in cached_segments:
+                    segment()
+                lazy_segments = [lazy.replay]
+                entries[1] = SimpleNamespace(
+                    capture=SimpleNamespace(segments=lazy_segments)
+                )
+                lazy_segments[0]()
+                capture_only.replay()
+                self.assertEqual(worker.graph_test_read(), {
+                    "rank": 0, "full_replays": 2, "piecewise_replays": 3,
+                })
+                self.assertEqual(calls.count("eager"), 1)
+            finally:
+                worker.graph_test_stop()
+            self.assertIs(Graph.replay, original)
+            self.assertIs(cached_segments[0].__func__, original)
+            self.assertIs(lazy_segments[0].__func__, original)
+            self.assertIs(cached_segments[1], eager)
+            cached_segments[0]()
+            lazy_segments[0]()
+            self.assertEqual(calls.count(cached), 2)
+            self.assertEqual(calls.count(lazy), 2)
+            self.assertTrue(worker.graph_test_stop())
 
 
 if __name__ == "__main__":

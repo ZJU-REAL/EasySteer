@@ -8,7 +8,7 @@ triggers/routing are computed host-side each step. Covers: full
 cudagraphs kept (no piecewise downgrade); direct steering fires with
 scale-0 no-op behavior and mixed-batch completion/effect; every non-direct
 kernel family (erase, replace,
-concept_replace, loreft — the replication emoji checkpoint — and
+concept_replace, loreft — the replication checkpoint — and
 lm_steer) steers under full graphs; normalized steering is effective and
 over-rank payloads reject with an actionable error. Fixed-input kernel
 tests cover exact replay and row isolation.
@@ -18,9 +18,10 @@ kernel path eagerly (skipping the cudagraph-mode check).
 """
 
 import os
+from contextlib import nullcontext
 
 import pytest
-from helpers import DENSE_MODEL, steering_spec
+from helpers import DENSE_MODEL, graph_replay, steering_spec
 from vllm import SamplingParams
 
 EAGER = os.environ.get("STEER_TEST_EAGER", "0") == "1"
@@ -47,6 +48,7 @@ ENGINE_KWARGS = dict(
     enable_prefix_caching=False,
     gpu_memory_utilization=0.25,
     max_model_len=2048,
+    worker_extension_cls="helpers.CaptureGraphWorkerExtension",
 )
 if EAGER:
     # Eager debug path: in_graph on a non-compiled engine is normally
@@ -197,7 +199,7 @@ def test_attention_head_delta_is_isolated(llm, num_prompts, max_tokens):
 
 
 def test_attention_steering_runs_in_ordinary_decode_graphs(llm, outs):
-    """Generation-only head steering exercises graph replay without capture."""
+    """Generation-only head steering exercises measured ordinary graph replay."""
     import numpy as np
     from vllm.model_hooks.steering.payloads import DirectionVector
 
@@ -214,7 +216,8 @@ def test_attention_steering_runs_in_ordinary_decode_graphs(llm, outs):
 
     # Prompt processing stays unsteered; any difference must arise during decode.
     nonzero = _data_spec(payload, "attention_add", 16.0, generation="all")
-    mixed = gen(llm, [TEXT, TEXT], steering=[nonzero, False])
+    with nullcontext() if EAGER else graph_replay(llm, "full"):
+        mixed = gen(llm, [TEXT, TEXT], steering=[nonzero, False])
     assert len(mixed) == 2 and all(mixed)
     assert mixed[0] != mixed[1], "attention steering had no effect during decode"
 
@@ -274,24 +277,38 @@ def test_concept_replace_steers(llm, outs):
     assert swapped != outs["plain"], "concept_replace did not change output"
 
 
-def test_loreft_emoji(llm):
-    """Low-rank family: the replication emoji checkpoint (rank 4,
-    layer 8, last prompt position) makes the model answer in emojis
-    under full CUDA graphs."""
+def test_loreft_decode_effect_and_replay(llm):
+    """The checkpoint changes fixed decode rows and runs in ordinary FULL graphs."""
+    import torch
+
+    from easysteer.hidden_states import capture
     from easysteer.vectors import from_pyreft
 
     prompt = "<|im_start|>user\nWho are you?<|im_end|>\n<|im_start|>assistant\n"
-    sp = SamplingParams(temperature=0.0, max_tokens=16)
+    token = llm.get_tokenizer().encode(" the", add_special_tokens=False)[0]
+    options = dict(temperature=0.0, max_tokens=4, ignore_eos=True,
+                   allowed_token_ids=[token])
     spec = _data_spec(from_pyreft(LOREFT_WEIGHT), "loreft", 1.0,
-                      layers=[8], prompt_positions=[-1])
-    plain = llm.generate(prompt, sampling_params=sp,
-                         use_tqdm=False)[0].outputs[0].text
-    steered = llm.generate(prompt, sampling_params=sp, use_tqdm=False,
-                           steering=spec)[0].outputs[0].text
-    assert steered != plain, "loreft did not change the output"
-    assert any(ord(ch) >= 0x1F300 for ch in steered), (
-        f"loreft output carries no emoji: {steered!r}"
+                      layers=[8], generation="all")
+    plain = capture(llm, [prompt], layers=[8], steering=False, **options)
+    steered = capture(llm, [prompt], layers=[8], steering=spec, **options)
+    plen = len(plain.outputs[0].prompt_token_ids)
+    assert steered.sample_positions(0) == plain.sample_positions(0)
+    assert steered.sample_positions(0) == list(range(plen + 3))
+    assert steered.sample_token_ids(0) == plain.sample_token_ids(0)
+    before, after = plain.rows(8), steered.rows(8)
+    assert torch.equal(before[:plen], after[:plen]), (
+        "decode-only steering changed prefill"
     )
+    assert not torch.allclose(before[plen:], after[plen:]), (
+        "LoReFT decode rows are unchanged"
+    )
+    with nullcontext() if EAGER else graph_replay(llm, "full", minimum=3):
+        output = llm.generate(
+            prompt, sampling_params=SamplingParams(**options), steering=spec,
+            use_tqdm=False,
+        )[0]
+    assert list(output.outputs[0].token_ids) == [token] * 4
 
 
 def test_lm_steer_projection_and_zero_scale(llm, outs):
@@ -319,13 +336,23 @@ def test_normalized_steering_is_effective(llm, outs):
 
 
 def test_over_rank_payload_rejected(llm):
-    """Runs last: over-rank payloads reject with an actionable error
-    (exception wrapping varies, any raise counts)."""
+    """Frontend rank rejection leaves the same engine usable."""
     import numpy as np
+    from vllm.exceptions import VLLMClientError
     from vllm.model_hooks.steering.payloads import LowRankProjector
 
-    big = np.zeros((HIDDEN, 64), dtype=np.float32)
-    with pytest.raises(Exception):
+    limit = llm.llm_engine.vllm_config.steer_vector_config.graph_max_rank
+    rank = limit + 1
+    big = np.zeros((HIDDEN, rank), dtype=np.float32)
+    with pytest.raises(
+        VLLMClientError,
+        match=f"payload rank {rank} above steer_graph_max_rank {limit}",
+    ):
         gen(llm, [TEXT],
             steering=_data_spec(LowRankProjector(big, big), "lm_steer",
                                 1.0, LAYERS))
+    output = llm.generate(
+        TEXT, sampling_params=SamplingParams(max_tokens=2, ignore_eos=True),
+        steering=happy_spec(), use_tqdm=False,
+    )[0].outputs[0]
+    assert output.finish_reason == "length" and len(output.token_ids) == 2

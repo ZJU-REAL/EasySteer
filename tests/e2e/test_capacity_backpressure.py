@@ -13,7 +13,7 @@ import os
 
 from vllm import SamplingParams
 
-from helpers import DENSE_MODEL, read_trace, steering_spec
+from helpers import DENSE_MODEL, read_trace, steering_spec, trace_cursor
 
 STEER_TEST_TRACE = True  # direct read_trace calls need tracing before boot
 
@@ -23,6 +23,7 @@ ENGINE_KWARGS = dict(
     steer_algorithms=["direct"],
     max_steer_vectors=2,
     enforce_eager=True,
+    tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,
     enable_prefix_caching=False,
     gpu_memory_utilization=0.3,
@@ -56,11 +57,11 @@ def test_overflow_completes_and_respects_capacity(llm):
     complete, and no scheduler step carries more than 2 distinct
     slots."""
     trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
-    steps_before, _ = read_trace(trace_dir, 0, ())
-    start = max(steps_before, default=0)
+    start = trace_cursor(trace_dir)
 
     steering = [distinct_spec(i) for i in range(6)] + [None, None]
     outs = gen(llm, [PROMPT] * 8, steering)
+    assert len(outs) == 8
     assert all(len(o.outputs[0].token_ids) == 32 for o in outs), (
         "some request did not run to completion under slot backpressure"
     )
@@ -77,11 +78,32 @@ def test_overflow_completes_and_respects_capacity(llm):
 
 def test_steering_still_fires_under_backpressure(llm):
     """A real-scale config queued behind capacity still steers."""
-    plain = gen(llm, [PROMPT], None)[0].outputs[0].text
+    from vllm.capture import match_capture_request_id
+
     steering = [distinct_spec(i) for i in range(4)] + [
         steering_spec(scale=2.0, layers=LAYERS)
     ]
+    trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
+    start = trace_cursor(trace_dir)
     outs = gen(llm, [PROMPT] * 5, steering)
-    assert outs[4].outputs[0].text != plain, (
-        "the throttled real-scale config did not steer"
-    )
+    assert len(outs) == 5 and all(len(out.outputs[0].token_ids) == 32 for out in outs)
+    steps, applies = read_trace(trace_dir, start, (LAYERS[0],))
+    workers = {key[0] for key in steps}
+    seen = {worker: [] for worker in workers}
+    target = outs[4]
+    for rec in applies:
+        step = steps[rec["step"]]
+        for index, request_id in enumerate(step["req_ids"]):
+            if not match_capture_request_id(request_id, target.request_id):
+                continue
+            begin, end = step["query_start_loc"][index:index + 2]
+            selected = [pos for pos in rec["positions"] if begin <= pos < end]
+            if selected:
+                assert rec["slot"] == step["slots"][index]
+                seen[rec["worker"]].extend(
+                    pos - begin + step["num_computed"][index] for pos in selected
+                )
+    tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+    assert len(workers) == tp_size
+    expected = list(range(len(target.prompt_token_ids) + 31))
+    assert all(sorted(positions) == expected for positions in seen.values()), seen

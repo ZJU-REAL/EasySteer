@@ -15,6 +15,8 @@ steered absolute positions, covering:
 - multi-vector specs with independent per-vector apply clauses.
 """
 
+import os
+
 from vllm import SamplingParams
 
 from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
@@ -25,6 +27,7 @@ ENGINE_KWARGS = dict(
     steer_algorithms=["direct"],
     steer_multi_vector=True,
     enforce_eager=True,
+    tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_prefix_caching=False,
     enable_chunked_prefill=True,
     max_num_batched_tokens=64,
@@ -185,7 +188,8 @@ class TestBatchedPerRequestPositions:
     def test_every_request_steers_its_own_positions(self, trace):
         from vllm.inputs import TokensPrompt
 
-        from helpers import read_trace
+        from helpers import read_trace, trace_cursor
+        from vllm.capture import match_capture_request_id
 
         prompts, params, steering, expected = [], [], [], []
         for i, (length, mt, apply_kwargs, expect) in enumerate(self.CASES):
@@ -200,28 +204,38 @@ class TestBatchedPerRequestPositions:
             )
             expected.append(expect(length, mt))
 
-        start = trace._max_step()
+        start = trace_cursor(trace.trace_dir)
         outs = trace.llm.generate(prompts, params, steering=steering,
                                   use_tqdm=False)
         steps, applies = read_trace(trace.trace_dir, start, (10,))
 
-        per_req = {out.request_id: set() for out in outs}
+        workers = {key[0] for key in steps}
+        tp_size = trace.llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+        assert len(workers) == tp_size
+        per_worker = {
+            worker: {out.request_id: [] for out in outs} for worker in workers
+        }
         for rec in applies:
             step = steps[rec["step"]]
             qsl = step["query_start_loc"]
             for pos in rec["positions"]:
                 ri = next(i for i in range(len(qsl) - 1)
                           if qsl[i] <= pos < qsl[i + 1])
-                # Engine req ids carry a uniquifying suffix
-                # ("11-893e12e8"); RequestOutput.request_id is the prefix.
-                rid = step["req_ids"][ri].split("-", 1)[0]
-                assert rid in per_req, f"trace names unknown request {rid}"
-                per_req[rid].add(pos - qsl[ri] + step["num_computed"][ri])
+                matches = [out.request_id for out in outs if match_capture_request_id(
+                    step["req_ids"][ri], out.request_id
+                )]
+                assert len(matches) == 1, (
+                    f"trace names unknown request {step['req_ids'][ri]}"
+                )
+                per_worker[rec["worker"]][matches[0]].append(
+                    pos - qsl[ri] + step["num_computed"][ri]
+                )
 
-        for i, out in enumerate(outs):
-            got = per_req[out.request_id]
-            assert got == expected[i], (
-                f"request {i} (len={self.CASES[i][0]}, "
-                f"spec={self.CASES[i][2]}): steered positions {sorted(got)} "
-                f"!= expected {sorted(expected[i])}"
-            )
+        for worker, per_req in per_worker.items():
+            for i, out in enumerate(outs):
+                got = sorted(per_req[out.request_id])
+                assert got == sorted(expected[i]), (
+                    f"worker {worker}, request {i} (len={self.CASES[i][0]}, "
+                    f"spec={self.CASES[i][2]}): steered positions {got} "
+                    f"!= expected {sorted(expected[i])}"
+                )

@@ -74,6 +74,9 @@ check actual FULL graph replay on every rank, capture ownership, graph lifecycle
 and eager fallback for ineligible batches. Attention steering retains its normal
 graph modes.
 
+The piecewise, large-capacity, backpressure, apply-semantics, routing and preload
+suites also honor `STEER_TEST_TP`; their trace checks retain every worker's rows.
+
 Set `STEER_TEST_CAPTURE_GRAPH_MODE=FULL` when running `test_capture_unified.py`
 to include graph capture of eligible prefill batches. Set
 `STEER_TEST_ATTENTION_BACKEND=TRITON_ATTN` when the default backend supports
@@ -129,6 +132,7 @@ suite starts and stops its own service as before.
 | --- | --- |
 | `cpu/` | Schema, loaders, selection, storage and graph-related unit tests. |
 | `kernels/test_graph_additive.py` | Fixed-input graph replay, additive no-op and row isolation. |
+| `kernels/test_graph_router.py` | Router modes, expert selection and top-k ties on actual CUDA graph replay. |
 | `e2e/test_vanilla_parity.py` | Unsteered traffic with steering enabled versus a vanilla engine. |
 | `e2e/test_apply_semantics.py` | Exact eager steering positions and chunked-prefill selectors. |
 | `e2e/test_routing.py::TestMultiVector` | Nonzero steering, multi-vector routing and request isolation. |
@@ -175,6 +179,11 @@ Trace is enabled before engine startup for tests using the `trace` fixture and
 modules declaring `STEER_TEST_TRACE = True` for direct trace reads. Other groups
 avoid trace synchronization and JSONL output. An explicitly supplied
 `VLLM_STEER_TRACE_DIR` still enables tracing for debugging.
+Readers snapshot offsets per worker file, so reusing a trace directory across
+engines does not discard a new worker's low step numbers. Position oracles check
+every expected TP worker before comparing results. Representative full and split
+tests also count native CUDA graph replays on every worker; capture-session graphs
+do not satisfy the ordinary steering replay checks.
 
 The default dense sweep uses scales 0, 1, 2 and 5; `extended` uses 51 scales.
 The sequential reference stops once scale 0 is checked and the required number

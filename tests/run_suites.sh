@@ -16,7 +16,7 @@ if [ "$GROUP" = --help ] || [ "$GROUP" = -h ]; then
 fi
 
 CPU_SUITES=(cpu)
-KERNEL_SUITES=(kernels/test_graph_additive.py)
+KERNEL_SUITES=(kernels/test_graph_additive.py kernels/test_graph_router.py)
 # Small migration baseline: use the existing behavioral tests and avoid
 # hardware-specific goldens, the 51-scale sweep, and extra MoE checkpoints.
 BASELINE_SUITES=(

@@ -208,8 +208,8 @@ class TestSourceSideSelection:
             "greedy runs diverged; row-for-row comparison is meaningless"
         )
         idx = [i for i, t in enumerate(encoded_ids(full_out)) if t == target]
-        assert torch.allclose(
-            selected[10], full[10][idx], atol=0
+        assert torch.equal(
+            selected[10], full[10][idx]
         ), "selected rows must be byte-identical to the full capture's rows"
 
     def test_selection_rejects_reduction_combination(self, llm):

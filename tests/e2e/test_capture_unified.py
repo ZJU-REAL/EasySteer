@@ -90,7 +90,7 @@ def test_capture_on_compiled_engine(llm):
     import easysteer.hidden_states as hs
 
     result = hs.capture(
-        llm, ["The capital of France is", PROMPT], max_tokens=4
+        llm, ["The capital of France is", PROMPT], max_tokens=4, ignore_eos=True
     )
     assert result.labelled
     assert len(result.layer_ids) > 20, "all decoder layers hooked"

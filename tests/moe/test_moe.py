@@ -13,8 +13,8 @@ Coverage:
   - the no-file spec path (params expert_ids/mode, no JSON) steers all
     rows at the target layers
   - position-conditioned gate steering steers exactly those token rows
-  - two requests with disjoint deactivation sets in ONE batch: every
-    captured row bears exactly one signature (XOR), row counts match
+  - two requests with disjoint deactivation sets in ONE batch: each
+    request's labeled rows bear only its own signature
   - steered + unsteered co-batch: zero contamination of the unsteered
     request
   - slots release after completion: config list drains and a subsequent
@@ -104,13 +104,12 @@ def generate(llm, prompts_ids, specs, max_tokens=32):
 
 
 def captured(llm, prompts_ids, specs, max_tokens=1):
-    """Post-steering router logits {layer: (rows, n_experts) float32}."""
-    result = capture(
+    """Labeled post-steering router logits from the public capture helper."""
+    return capture(
         llm, [{"prompt_token_ids": ids} for ids in prompts_ids],
         stream="router_logits", max_tokens=max_tokens, temperature=0.0,
         steering=specs,
     )
-    return {lid: t.float().numpy() for lid, t in result.layers.items()}
 
 
 def signature(rows, ids):
@@ -124,6 +123,7 @@ def signature(rows, ids):
     with probability ~1/C(64,20), so the signature still attributes
     rows unambiguously.
     """
+    rows = rows.float().numpy()
     others = np.setdiff1d(np.arange(N_EXPERTS), ids)
     return rows[:, ids].max(axis=-1) <= rows[:, others].min(axis=-1)
 
@@ -169,10 +169,10 @@ class TestModeSemantics:
                 for layer in ALL_LAYERS
             },
         )
-        logits = captured(llm, [ids_a], [spec])
+        logits = captured(llm, [ids_a], [spec]).layers
         assert sorted(logits) == list(range(NUM_LAYERS)), sorted(logits)
         for lid in sorted(logits):
-            order = np.argsort(logits[lid], axis=-1)[:, -TOP_K:]
+            order = np.argsort(logits[lid].float().numpy(), axis=-1)[:, -TOP_K:]
             act_in = bool(np.isin(order, ACT).any(axis=-1).all())
             deact_out = not np.isin(order, DEACT).any()
             assert act_in and deact_out, (
@@ -188,7 +188,7 @@ class TestModeSemantics:
             layers=list(range(NUM_LAYERS)),
             params={"expert_ids": DEACT, "mode": "deactivate"},
         )
-        logits = captured(llm, [ids_a], [spec])
+        logits = captured(llm, [ids_a], [spec]).layers
         assert sorted(logits) == list(range(NUM_LAYERS)), sorted(logits)
         for lid in sorted(logits):
             sig = signature(logits[lid], DEACT)
@@ -206,7 +206,7 @@ class TestModeSemantics:
             },
             prompt_positions=trig,
         )
-        logits = captured(llm, [ids_a], [spec])
+        logits = captured(llm, [ids_a], [spec]).layers
         assert sorted(logits) == list(range(NUM_LAYERS)), sorted(logits)
         for lid in sorted(logits):
             rows = np.flatnonzero(signature(logits[lid], DEACT)).tolist()
@@ -242,9 +242,26 @@ class TestModeSemantics:
         after = result.sample(0)[0]
         eligible = torch.zeros_like(before, dtype=torch.bool)
         eligible[:, experts] = True
-        if mode == "soft_topk":
-            eligible.scatter_(1, before.topk(TOP_K, dim=-1).indices, False)
         eligible[1:len(ids_a) - 1] = False
+        if mode == "soft_topk":
+            graph_mode = llm.llm_engine.vllm_config.steer_vector_config.graph_mode
+            if graph_mode == "in_graph":
+                order = before.argsort(dim=-1, descending=True, stable=True)
+                eligible.scatter_(1, order[:, :TOP_K], False)
+            else:
+                # CPU/GPU topk may choose different experts at tied boundaries.
+                threshold = before.topk(TOP_K, dim=-1).values[:, -1:]
+                ties = before == threshold
+                targeted_ties = eligible & ties
+                changed_ties = targeted_ties & (after != before)
+                tied_slots = TOP_K - (before > threshold).sum(dim=-1)
+                targets = targeted_ties.sum(dim=-1)
+                changed = changed_ties.sum(dim=-1)
+                assert (changed >= (targets - tied_slots).clamp(min=0)).all()
+                assert (changed <= torch.minimum(
+                    targets, ties.sum(dim=-1) - tied_slots,
+                )).all()
+                eligible = (eligible & (before < threshold)) | changed_ties
         expected = before + eligible * before.std(dim=-1, keepdim=True) * strength
         tolerance = max(1e-5, 2 * torch.finfo(before.dtype).eps)
         torch.testing.assert_close(after, expected, rtol=tolerance, atol=tolerance)
@@ -256,41 +273,37 @@ class TestSlotRouting:
     """Per-request (slot-routed) gate steering in mixed batches.
 
     A steermoe deactivation leaves a detectable signature (see
-    `signature`), so captured post-steering router logits attribute
-    every token row to its config with no scheduler-order assumptions.
+    `signature`); public capture labels assign each row to its request
+    without scheduler-order assumptions.
     """
 
     def test_disjoint_configs_route_per_request(self, llm, ids_a, ids_b, tmp_path):
-        """Each row bears exactly one of two disjoint signatures (XOR)."""
+        """Each request's labeled rows bear only its own intervention."""
         spec_x = deact_spec(tmp_path, "deact-x", X)
         spec_y = deact_spec(tmp_path, "deact-y", Y)
-        logits = captured(llm, [ids_a, ids_b], [spec_x, spec_y])
-        la, lb = len(ids_a), len(ids_b)
-        assert sorted(logits) == list(range(NUM_LAYERS)), sorted(logits)
-        for lid in sorted(logits):
-            sig_x = signature(logits[lid], X)
-            sig_y = signature(logits[lid], Y)
-            assert (
-                bool(np.all(sig_x ^ sig_y))
-                and int(sig_x.sum()) == la
-                and int(sig_y.sum()) == lb
-            ), (
-                f"L{lid}: X-rows={int(sig_x.sum())}/{la} "
-                f"Y-rows={int(sig_y.sum())}/{lb} "
-                f"xor={bool(np.all(sig_x ^ sig_y))}"
-            )
+        result = captured(llm, [ids_a, ids_b], [spec_x, spec_y])
+        assert result.layer_ids == list(range(NUM_LAYERS))
+        for sample, (ids, own, other) in enumerate(((ids_a, X, Y), (ids_b, Y, X))):
+            assert result.sample_positions(sample) == list(range(len(ids)))
+            assert result.sample_token_ids(sample) == ids
+            for lid, rows in result.sample(sample).items():
+                assert rows.shape == (len(ids), N_EXPERTS)
+                assert signature(rows, own).all(), f"sample {sample}, L{lid}"
+                assert not signature(rows, other).any(), f"sample {sample}, L{lid}"
 
     def test_unsteered_cobatch_request_untouched(self, llm, ids_a, ids_b, tmp_path):
         """Exactly the steered request's rows bear the signature."""
         spec_x = deact_spec(tmp_path, "deact-x", X)
-        logits = captured(llm, [ids_a, ids_b], [spec_x, None])
-        la, lb = len(ids_a), len(ids_b)
-        for lid in sorted(logits):
-            sig_x = signature(logits[lid], X)
-            assert int(sig_x.sum()) == la and logits[lid].shape[0] == la + lb, (
-                f"L{lid}: X-rows={int(sig_x.sum())}/{la} "
-                f"total={logits[lid].shape[0]}/{la + lb}"
-            )
+        result = captured(llm, [ids_a, ids_b], [spec_x, None])
+        assert result.layer_ids == list(range(NUM_LAYERS))
+        for sample, ids in enumerate((ids_a, ids_b)):
+            assert result.sample_positions(sample) == list(range(len(ids)))
+            assert result.sample_token_ids(sample) == ids
+            for lid, rows in result.sample(sample).items():
+                assert rows.shape == (len(ids), N_EXPERTS)
+                assert (signature(rows, X) == (sample == 0)).all(), (
+                    f"sample {sample}, L{lid}: wrong request's intervention"
+                )
 
     def test_slots_drain_after_completion(self, llm, ids_a, ids_b, tmp_path):
         """Config list drains and no residual steering survives release."""
@@ -299,7 +312,7 @@ class TestSlotRouting:
         generate(llm, [ids_b], [None], max_tokens=4)  # post-release step
         live = llm.llm_engine.collective_rpc("list_steer_vectors")
         assert all(not configs for configs in live), f"live={live}"
-        logits = captured(llm, [ids_a], [None])
+        logits = captured(llm, [ids_a], [None]).layers
         residual = [
             (lid, ids[0])
             for lid in sorted(logits)

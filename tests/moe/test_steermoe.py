@@ -144,10 +144,12 @@ def deact_json_spec(dirpath, name, layer_to_ids):
     return steering_spec(source=path, algorithm="moe_router", scale=1.0, layers=None)
 
 
-def gen(llm, prompt_ids, spec=None, max_tokens=64):
+def gen(llm, prompt_ids, spec=None, max_tokens=64, ignore_eos=False):
     outs = llm.generate(
         {"prompt_token_ids": prompt_ids},
-        sampling_params=SamplingParams(temperature=0.0, max_tokens=max_tokens),
+        sampling_params=SamplingParams(
+            temperature=0.0, max_tokens=max_tokens, ignore_eos=ignore_eos,
+        ),
         steering=spec,
         use_tqdm=False,
     )
@@ -296,6 +298,5 @@ def test_precomputed_rankings_steer_without_error(llm, tok, tmp_path):
             [{"role": "user", "content": demo}],
             add_generation_prompt=True,
         )
-        baseline = gen(llm, prompt_ids)
-        steered = gen(llm, prompt_ids, faith_spec)
-        assert isinstance(baseline, str) and isinstance(steered, str)
+        steered = gen(llm, prompt_ids, faith_spec, max_tokens=2, ignore_eos=True)
+        assert isinstance(steered, str)

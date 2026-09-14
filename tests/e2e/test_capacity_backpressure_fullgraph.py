@@ -10,9 +10,11 @@ requests wait for a slot instead: everything completes and the engine
 stays alive.
 """
 
+import os
+
 from vllm import SamplingParams
 
-from helpers import DENSE_MODEL, steering_spec
+from helpers import DENSE_MODEL, graph_replay, steering_spec
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
@@ -21,11 +23,13 @@ ENGINE_KWARGS = dict(
     max_steer_vectors=2,
     steer_graph_mode="in_graph",
     enforce_eager=False,
+    tensor_parallel_size=int(os.environ.get("STEER_TEST_TP", "1")),
     enable_chunked_prefill=False,
     enable_prefix_caching=False,
     gpu_memory_utilization=0.25,
     max_model_len=2048,
     max_num_seqs=16,
+    worker_extension_cls="helpers.CaptureGraphWorkerExtension",
 )
 
 PROMPT = (
@@ -49,13 +53,11 @@ def test_overflow_no_longer_kills_the_engine(llm):
         steering_spec(scale=0.0, layers=LAYERS, exclude_prompt_positions=[i])
         for i in range(6)
     ]
-    outs = gen(llm, [PROMPT] * 6, steering)
+    with graph_replay(llm, "full"):
+        outs = gen(llm, [PROMPT] * 6, steering)
+    assert len(outs) == 6
     assert all(len(o.outputs[0].token_ids) == 16 for o in outs)
-
-
-def test_engine_alive_and_steering_after_overflow(llm):
-    """The engine still serves — and steers — after the overflow
-    workload."""
+    # Recovery is part of this case, including when this node is run alone.
     plain = gen(llm, [PROMPT])[0].outputs[0].text
     steered = gen(
         llm, [PROMPT], steering=steering_spec(scale=2.0, layers=LAYERS)

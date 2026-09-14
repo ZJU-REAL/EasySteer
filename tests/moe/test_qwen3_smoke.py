@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Qwen3-MoE architecture smoke test (single GPU, eager).
+"""Qwen3-MoE architecture smoke test (eager, configurable tensor parallelism).
 
 Second structural-discovery case beyond OLMoE: Qwen3-MoE passes its gate
 into FusedMoE (internal-router path — the gate module is invoked inside

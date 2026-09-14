@@ -8,7 +8,7 @@ persistent expert toggle tables, so MoE models keep full CUDA graphs
 while steering. Covers: full cudagraphs kept under the pinned
 in-graph tier; a deactivation config changes the output; mixed traffic
 completes with a steering effect; soft, soft_topk and file-based configs
-are accepted. Random sampling remains split-only. Fixed-input kernel tests
+are accepted. Random sampling uses eager or split mode. Fixed-input kernel tests
 check the exact transforms while this suite checks real model integration.
 """
 
@@ -85,7 +85,11 @@ def test_soft_modes_run_in_graph(llm, mode):
         source=None, algorithm="moe_router", scale=1.0, layers=[0],
         params={"expert_ids": [1, 3], "mode": mode, "lambda": 1.5, "topk": 3},
     )
-    assert gen(llm, [PROMPT], steering=spec)[0]
+    outputs = llm.generate(
+        [PROMPT], SamplingParams(temperature=0.0, max_tokens=2, ignore_eos=True),
+        steering=spec, use_tqdm=False,
+    )
+    assert len(outputs) == 1 and len(outputs[0].outputs[0].token_ids) == 2
 
 
 def test_file_config_runs_in_graph(llm, tmp_path):
@@ -122,12 +126,12 @@ def test_router_capture_replays_full_graph_with_steering(llm):
     stream = "router_logits"
     tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
     before = rpc("capture_status", stream)
-    llm.set_default_steering(router_spec("deactivate", DEACT))
-    rpc(
-        "start_capture", stream, layers=[0],
-        select=SelectSpec(generation="all").to_wire(),
-    )
     try:
+        llm.set_default_steering(router_spec("deactivate", DEACT))
+        rpc(
+            "start_capture", stream, layers=[0],
+            select=SelectSpec(generation="all").to_wire(),
+        )
         outputs = llm.generate(
             [PROMPT] * 3,
             sampling_params=SamplingParams(
@@ -139,8 +143,10 @@ def test_router_capture_replays_full_graph_with_steering(llm):
         after = rpc("capture_status", stream)
         raw = rpc("fetch_captured", stream, clear=True)
     finally:
-        rpc("stop_capture", stream)
-        llm.set_default_steering(None)
+        try:
+            rpc("stop_capture", stream)
+        finally:
+            llm.set_default_steering(None)
 
     assert len(before) == len(after) == len(raw) == tp_size
     replay_counts = []

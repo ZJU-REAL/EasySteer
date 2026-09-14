@@ -9,7 +9,7 @@ steering trace.
 Coverage:
   - the engine boots compiled (no enforce_eager) with a moe_router
     config and generates; steered output differs from unsteered
-  - the steering trace records gate applies at every MoE layer, with
+  - worker traces agree on gate applies at every MoE layer, with
     full prompt coverage on the prefill step
   - an unsteered generate leaves no apply records (routing off)
 """
@@ -85,9 +85,10 @@ def test_only_router_steering_splits_compiled_graph(llm):
 
 
 def test_steered_output_and_trace_cover_all_layers(trace, prompt_ids, deact_spec):
-    """Steering changes the output and applies at every MoE layer with
-    full prompt coverage on the prefill step."""
-    baseline, baseline_layers = trace.run(prompt_ids, SP, layers=ALL_LAYERS)
+    """All workers agree on full prompt coverage at every MoE layer."""
+    baseline, baseline_layers = trace.run(
+        prompt_ids, SP, layers=ALL_LAYERS, steering=False
+    )
     applied = sorted(lid for lid, pos in baseline_layers.items() if pos)
     assert not applied, f"applies without steering at layers {applied}"
     steered, by_layer = trace.run(

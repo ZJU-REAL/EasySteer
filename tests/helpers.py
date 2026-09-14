@@ -7,9 +7,10 @@ and the flat positions each steered layer applied to. `TraceOracle`
 wraps generate() and returns the steered absolute positions.
 """
 
-import glob
 import json
 import os
+from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 
 # run_suites.sh checks only the models needed by the selected group.
@@ -25,6 +26,89 @@ DENSE_VECTOR = str(Path(os.environ.get(
 
 class CaptureGraphWorkerExtension:
     """Named test RPCs for an eager oracle and capture-buffer diagnostics."""
+
+    @staticmethod
+    def _graph_test_breakable_segments():
+        import torch
+        from vllm.compilation.breakable_cudagraph import BreakableCUDAGraphWrapper
+
+        for wrapper in list(BreakableCUDAGraphWrapper._all_instances):
+            for entry in wrapper.entries.values():
+                if entry.capture is None:
+                    continue
+                segments = entry.capture.segments
+                for index, segment in enumerate(segments):
+                    graph = getattr(segment, "__self__", None)
+                    if isinstance(graph, torch.cuda.CUDAGraph):
+                        yield segments, index, graph
+
+    def graph_test_start(self):
+        """Count native replays during a test, without changing graph dispatch."""
+        from unittest.mock import patch
+
+        import torch
+
+        assert not hasattr(self, "_graph_test_patch"), "replay probe already active"
+        self._graph_test_replays = Counter()
+        original = torch.cuda.CUDAGraph.replay
+
+        def replay(graph):
+            result = original(graph)
+            self._graph_test_replays[id(graph)] += 1
+            return result
+
+        self._graph_test_patch = patch.object(torch.cuda.CUDAGraph, "replay", replay)
+        self._graph_test_original_replay = original
+        self._graph_test_replay = replay
+        self._graph_test_patch.start()
+        # Breakable capture caches bound methods before this probe is installed.
+        for segments, index, graph in self._graph_test_breakable_segments():
+            segments[index] = graph.replay
+        return True
+
+    def graph_test_read(self):
+        from vllm.compilation.cuda_graph import CUDAGraphWrapper
+        from vllm.config.compilation import CUDAGraphMode
+
+        assert hasattr(self, "_graph_test_patch"), "replay probe is not active"
+        runner = self.model_runner
+        # The ordinary manager owns FULL graphs. Capture-session graphs belong
+        # to a separate manager and must not satisfy ordinary steering tests.
+        full = {id(graph) for graph in runner.cudagraph_manager.graphs.values()}
+        piecewise = {
+            id(entry.cudagraph)
+            for wrapper in list(CUDAGraphWrapper._all_instances)
+            if wrapper.runtime_mode == CUDAGraphMode.PIECEWISE
+            for entry in wrapper.concrete_cudagraph_entries.values()
+            if entry.cudagraph is not None
+        }
+        piecewise.update(
+            id(graph) for _, _, graph in self._graph_test_breakable_segments()
+        )
+        counts = self._graph_test_replays
+        return {
+            "rank": runner.capture_status("hidden_states")["topology"]["tp_rank"],
+            "full_replays": sum(counts[key] for key in full),
+            "piecewise_replays": sum(counts[key] for key in piecewise),
+        }
+
+    def graph_test_stop(self):
+        if hasattr(self, "_graph_test_patch"):
+            try:
+                # Include segments first captured while the probe was active.
+                for segments, index, graph in self._graph_test_breakable_segments():
+                    replay = getattr(segments[index], "__func__", None)
+                    if replay is self._graph_test_replay:
+                        segments[index] = self._graph_test_original_replay.__get__(
+                            graph, type(graph)
+                        )
+            finally:
+                self._graph_test_patch.stop()
+                del self._graph_test_patch
+                del self._graph_test_replays
+                del self._graph_test_original_replay
+                del self._graph_test_replay
+        return True
 
     def capture_test_set_eager(self, enabled):
         from vllm.config.compilation import CUDAGraphMode
@@ -63,6 +147,27 @@ class CaptureGraphWorkerExtension:
         }
 
 
+@contextmanager
+def graph_replay(llm, mode, minimum=1):
+    """Require native ordinary-graph replay on every TP worker in this interval."""
+    assert mode in ("full", "piecewise")
+    rpc = llm.llm_engine.collective_rpc
+    tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+    try:
+        started = rpc("graph_test_start")
+        assert len(started) == tp_size and all(started)
+        yield
+        results = rpc("graph_test_read")
+        assert len(results) == tp_size
+        assert {row["rank"] for row in results} == set(range(tp_size)), results
+        counts = [row[f"{mode}_replays"] for row in results]
+        assert all(count >= minimum for count in counts), results
+        assert len(set(counts)) == 1, results
+    finally:
+        stopped = rpc("graph_test_stop")
+        assert len(stopped) == tp_size and all(stopped)
+
+
 _INCLUDE_KWARGS = (
     "prompt", "generation", "prompt_tokens", "prompt_positions",
     "prompt_window", "generation_tokens", "generation_positions",
@@ -95,18 +200,40 @@ def steering_spec(source=DENSE_VECTOR, scale=0.5, layers=(10,),
     return SteeringSpec(vectors=[vec, *extra_vectors], conflict=conflict)
 
 
-def read_trace(trace_dir, min_step, layers):
-    """Trace records with step id > min_step; applies filtered to layers."""
+def trace_cursor(trace_dir):
+    """Snapshot each worker's file independently, including replaced files."""
+    return {
+        path.name: (stat.st_ino, stat.st_size)
+        for path in Path(trace_dir).glob("*.jsonl")
+        for stat in [path.stat()]
+    }
+
+
+def read_trace(trace_dir, cursor, layers):
+    """Read records appended since a cursor (or 0 for the entire trace).
+
+    Step keys include the worker filename, so TP peers cannot overwrite each
+    other's geometry. Apply records use the same keys for direct step lookup.
+    Passing layers=None includes applies from every layer.
+    """
     steps, applies = {}, []
-    for path in glob.glob(os.path.join(trace_dir, "*.jsonl")):
-        with open(path) as f:
+    if cursor == 0:
+        cursor = {}
+    for path in sorted(Path(trace_dir).glob("*.jsonl")):
+        with path.open("rb") as f:
+            stat = os.fstat(f.fileno())
+            inode, offset = cursor.get(path.name, (stat.st_ino, 0))
+            if inode == stat.st_ino and offset <= stat.st_size:
+                f.seek(offset)
             for line in f:
                 rec = json.loads(line)
-                if rec["step"] <= min_step:
-                    continue
+                rec["worker"] = path.name
+                rec["step"] = (path.name, rec["step"])
                 if rec["type"] == "step":
                     steps[rec["step"]] = rec
-                elif rec["type"] == "apply" and rec["layer"] in layers:
+                elif rec["type"] == "apply" and (
+                    layers is None or rec["layer"] in layers
+                ):
                     applies.append(rec)
     return steps, applies
 
@@ -117,37 +244,60 @@ class TraceOracle:
     Single-request batches only (asserts): positions are offset by the
     request's computed-token count at each step, so results are exact
     absolute sequence positions regardless of chunking.
+    last_by_worker contains this run's validated observations, or {} when
+    no trace was emitted or validation failed.
     """
 
     def __init__(self, llm, trace_dir):
         self.llm = llm
         self.trace_dir = trace_dir
+        self.last_by_worker = {}
 
-    def _max_step(self):
-        steps, _ = read_trace(self.trace_dir, 0, ())
-        return max(steps, default=0)
+    def snapshot(self):
+        return trace_cursor(self.trace_dir)
 
-    def run(self, prompt_ids, sampling_params, layers=(10,), **gen_kwargs):
-        """Returns (output, {layer: [(abs_pos, is_prefill_step), ...]})."""
-        from vllm.inputs import TokensPrompt
-
-        start = self._max_step()
-        out = self.llm.generate(
-            TokensPrompt(prompt_token_ids=list(prompt_ids)),
-            sampling_params,
-            use_tqdm=False,
-            **gen_kwargs,
-        )[0]
-        steps, applies = read_trace(self.trace_dir, start, layers)
-        by_layer = {layer: [] for layer in layers}
+    def _positions_by_worker(self, steps, applies, layers):
+        workers = {step["worker"] for step in steps.values()}
+        expected = self.llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+        assert len(workers) == expected, (workers, expected)
+        by_worker = {
+            worker: {layer: [] for layer in layers} for worker in sorted(workers)
+        }
         for rec in applies:
             step = steps[rec["step"]]
             assert len(step["req_ids"]) == 1, "oracle expects single-request batches"
             num_computed = step["num_computed"][0]
             is_prefill = step["num_output"][0] == 0
             for pos in rec["positions"]:
-                by_layer[rec["layer"]].append((pos + num_computed, is_prefill))
-        return out, by_layer
+                by_worker[rec["worker"]][rec["layer"]].append(
+                    (pos + num_computed, is_prefill)
+                )
+        reference = next(iter(by_worker.values()))
+        assert all(value == reference for value in by_worker.values()), by_worker
+        self.last_by_worker = by_worker
+        return reference
+
+    def run(self, prompt_ids, sampling_params, layers=(10,), **gen_kwargs):
+        """Return output and applies; explicit steering=False may emit no trace."""
+        from vllm.inputs import TokensPrompt
+
+        self.last_by_worker = {}
+        start = self.snapshot()
+        out = self.llm.generate(
+            TokensPrompt(prompt_token_ids=list(prompt_ids)),
+            sampling_params,
+            use_tqdm=False,
+            **gen_kwargs,
+        )[0]
+        steering_off = gen_kwargs.get("steering") is False
+        steps, applies = read_trace(
+            self.trace_dir, start, None if steering_off else layers
+        )
+        if steering_off:
+            assert not applies, f"applies with steering=False: {applies}"
+            if not steps:
+                return out, {layer: [] for layer in layers}
+        return out, self._positions_by_worker(steps, applies, layers)
 
     def positions(self, prompt_ids, sampling_params, layer=10, **gen_kwargs):
         """Sorted steered absolute positions for one layer."""

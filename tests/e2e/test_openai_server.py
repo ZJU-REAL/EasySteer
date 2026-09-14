@@ -111,7 +111,7 @@ def server(request, tmp_path_factory):
         log_file.close()
 
 
-def completion(base, steering=None, max_tokens=128):
+def completion(base, steering=None, max_tokens=128, **options):
     body = {
         "model": SERVED_MODEL,
         "prompt": (
@@ -120,6 +120,7 @@ def completion(base, steering=None, max_tokens=128):
         ),
         "max_tokens": max_tokens,
         "temperature": 0,
+        **options,
     }
     if steering is not None:
         body["steering"] = steering
@@ -208,17 +209,39 @@ class TestManagementEndpoints:
 
     def test_default_can_be_set_overridden_disabled_and_cleared(self, server):
         endpoint = f"{server}/v1/steering"
+        first, second = steering_body(2.0), steering_body(-2.0)
+
+        def tokens(choice, count=48):
+            response = completion(
+                server, choice, max_tokens=count, ignore_eos=True,
+                return_token_ids=True, seed=0,
+            )
+            assert response.ok, response.text
+            choices = response.json()["choices"]
+            assert len(choices) == 1 and len(choices[0]["token_ids"]) == count
+            return choices[0]["token_ids"]
+
+        # Prime each effective cache key, then compare equally warm controls.
+        for choice in (False, first, second):
+            tokens(choice, count=1)
+        plain, explicit_first, explicit_second = (
+            tokens(choice) for choice in (False, first, second)
+        )
+        assert explicit_first != plain, "default control must actually steer"
+        assert explicit_second != explicit_first, "override control must differ"
         update = requests.post(
-            endpoint, json={"spec": steering_body(1.0)}, timeout=60,
+            endpoint, json={"spec": first}, timeout=60,
         )
         assert update.ok, update.text
         try:
             assert requests.get(endpoint, timeout=10).json()["active"]
-            for choice in (None, False, steering_body(-1.0)):
-                response = completion(server, choice, max_tokens=4)
-                assert response.ok, response.text
-                assert len(response.json()["choices"]) == 1
+            assert tokens(None) == explicit_first, "omission must inherit the default"
+            assert tokens(False) == plain, "False must bypass the default"
+            assert tokens(second) == explicit_second, (
+                "request must override the default"
+            )
         finally:
             cleared = requests.post(endpoint, json={"spec": None}, timeout=60)
             assert cleared.ok, cleared.text
         assert requests.get(endpoint, timeout=10).json() == {"active": False}
+        assert tokens(None) == plain, "clearing the default must restore plain traffic"

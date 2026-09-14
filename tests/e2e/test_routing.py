@@ -14,6 +14,8 @@ Isolation is checked through steering traces. async_scheduling is pinned
 off to keep request scheduling consistent.
 """
 
+import os
+
 import pytest
 from helpers import DENSE_MODEL, DENSE_VECTOR, steering_spec
 from vllm import SamplingParams
@@ -24,6 +26,7 @@ ENGINE_KWARGS = {
     "steer_algorithms": ["direct"],
     "steer_multi_vector": True,
     "enforce_eager": True,
+    "tensor_parallel_size": int(os.environ.get("STEER_TEST_TP", "1")),
     "enable_chunked_prefill": False,
     "enable_prefix_caching": False,
     "gpu_memory_utilization": 0.3,
@@ -78,7 +81,8 @@ def test_pt_direction_payload_through_engine(llm, plain, tmp_path):
     import easysteer.vectors as vec
 
     pt = str(tmp_path / "direction.pt")
-    torch.save(torch.randn(1536) * 0.02, pt)
+    generator = torch.Generator().manual_seed(0)
+    torch.save(torch.randn(1536, generator=generator) * 0.02, pt)
     spec = SteeringSpec(vectors=[VectorSpec(
         data=vec.from_pt_direction(pt, layers=[10]),
         scale=8.0,
@@ -130,23 +134,23 @@ class TestMultiVector:
         every applied position lies in rows routed to the apply's slot,
         and both sub-vectors fire on their layer ranges.
         """
-        import os
-
-        from helpers import read_trace
+        from helpers import read_trace, trace_cursor
 
         trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
-        steps_before, _ = read_trace(trace_dir, 0, ())
-        start = max(steps_before, default=0)
+        start = trace_cursor(trace_dir)
         outs = gen(llm, [PROMPT, PROMPT], [two_vector_spec, None])
         assert outs[0] != outs[1], "multi-vector request did not steer"
         steps, applies = read_trace(trace_dir, start, (10, 18))
         assert applies, "mixed batch produced no steering applies"
-        seen_layers = set()
+        workers = {key[0] for key in steps}
+        tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+        assert len(workers) == tp_size
+        seen_layers = {worker: set() for worker in workers}
         for rec in applies:
             step = steps[rec["step"]]
             qsl = step["query_start_loc"]
             slots = step["slots"]
-            seen_layers.add(rec["layer"])
+            seen_layers[rec["worker"]].add(rec["layer"])
             for pos in rec["positions"]:
                 req_idx = next(
                     i for i in range(len(qsl) - 1)
@@ -157,9 +161,9 @@ class TestMultiVector:
                     f"{rec['slot']} lies in request {req_idx} routed to "
                     f"slot {slots[req_idx]}"
                 )
-        assert seen_layers == {10, 18}, (
+        assert all(layers == {10, 18} for layers in seen_layers.values()), (
             f"both sub-vectors must fire on their layer ranges, saw "
-            f"{sorted(seen_layers)}"
+            f"{seen_layers}"
         )
 
 
@@ -174,9 +178,7 @@ def _scale_spec(scale):
 
 @pytest.fixture(scope="module")
 def sweep(llm, request):
-    import os
-
-    from helpers import read_trace
+    from helpers import read_trace, trace_cursor
 
     scales = (
         EXTENDED_SCALES if request.config.getoption("--steer-extended")
@@ -191,8 +193,7 @@ def sweep(llm, request):
         if 0.0 in ref and len(set(ref.values())) >= minimum_distinct:
             break
     trace_dir = os.environ["VLLM_STEER_TRACE_DIR"]
-    steps_before, _ = read_trace(trace_dir, 0, ())
-    start = max(steps_before, default=0)
+    start = trace_cursor(trace_dir)
     batch = dict(zip(scales, gen(
         llm, [PROMPT] * len(scales),
         [_scale_spec(s) for s in scales], max_tokens=64,
@@ -224,6 +225,10 @@ class TestScaleSweep:
             llm.llm_engine.vllm_config.steer_vector_config.max_steer_vectors
         )
         assert applies, "batched sweep produced no steering applies"
+        workers = {key[0] for key in steps}
+        tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
+        assert len(workers) == tp_size
+        assert {rec["worker"] for rec in applies} == workers
         distinct_slots = set()
         for rec in applies:
             step = steps[rec["step"]]

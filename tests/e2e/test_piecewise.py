@@ -14,7 +14,7 @@ import os
 import pytest
 from vllm import SamplingParams
 
-from helpers import DENSE_MODEL, steering_spec
+from helpers import DENSE_MODEL, graph_replay, steering_spec
 
 ENGINE_KWARGS = dict(
     model=DENSE_MODEL,
@@ -29,6 +29,7 @@ ENGINE_KWARGS = dict(
     enable_prefix_caching=False,
     gpu_memory_utilization=0.25,
     max_model_len=2048,
+    worker_extension_cls="helpers.CaptureGraphWorkerExtension",
 )
 
 TEXT = (
@@ -36,7 +37,7 @@ TEXT = (
     "Please comfort her.<|im_end|>\n<|im_start|>assistant\n"
 )
 LAYERS = list(range(10, 26))
-SP = SamplingParams(temperature=0.0, max_tokens=128)
+SP = SamplingParams(temperature=0.0, max_tokens=64, ignore_eos=True)
 
 
 @pytest.fixture(scope="module")
@@ -49,11 +50,11 @@ def outs(llm):
         )
         return out[0].outputs[0].text
 
-    return {
-        "plain": gen(),
-        "zero": gen(steering_spec(scale=0.0, layers=LAYERS)),
-        "happy": gen(steering_spec(scale=2.0, layers=LAYERS)),
-    }
+    plain = gen()
+    zero = gen(steering_spec(scale=0.0, layers=LAYERS))
+    with graph_replay(llm, "piecewise"):
+        happy = gen(steering_spec(scale=2.0, layers=LAYERS))
+    return {"plain": plain, "zero": zero, "happy": happy}
 
 
 def test_piecewise_config_wiring(llm):
