@@ -206,6 +206,13 @@ def test_http_requests_allow_override_inherit_off_and_reject_true(chat, processo
     for choice in (None, False):
         request = request_cls(**kwargs, steering=choice)
         assert GenerateBaseServing._maybe_get_steer_vector(serving, request) is False
+    processor.set_default_steering(make_spec(scale=2))
+    for request in (request_cls(**kwargs), request_cls(**kwargs, steering=None)):
+        inherited = GenerateBaseServing._maybe_get_steer_vector(serving, request)
+        assert inherited.vectors[0].scale == 2
+    assert GenerateBaseServing._maybe_get_steer_vector(
+        serving, request_cls(**kwargs, steering=False)
+    ) is False
     request = request_cls(**kwargs, steering=make_spec())
     assert (
         GenerateBaseServing._maybe_get_steer_vector(serving, request).vectors[0].scale

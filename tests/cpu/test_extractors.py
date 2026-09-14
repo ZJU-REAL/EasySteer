@@ -144,14 +144,11 @@ class TestNegativeDerivationRule:
 class TestExplicitOptionValidation:
     def test_unknown_regularization_raises(self):
         nested = make_nested(offset_indices=(0, 1, 2))
-        with pytest.raises(ValueError, match="ridge"):
+        with pytest.raises(ValueError, match="ridge") as error:
             LinearProbeExtractor.extract(
                 nested, [0, 1, 2], regularization="ridge"
             )
-        with pytest.raises(ValueError, match="elasticnet"):
-            LinearProbeExtractor.extract(
-                nested, [0, 1, 2], regularization="ridge"
-            )
+        assert "elasticnet" in str(error.value)
 
     def test_effective_penalty_recorded(self):
         nested = make_nested(offset_indices=(0, 1, 2))

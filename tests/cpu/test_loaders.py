@@ -136,6 +136,7 @@ class TestPayloadAdapters:
         payload = vec.from_pt_direction(path, layers=[7])
         out = materialize(payload.to_wire(), "cpu", torch.float32, None)
         assert set(out) == {7}
+        torch.testing.assert_close(out[7], torch.arange(8, dtype=torch.float32))
         with pytest.raises(ValueError, match="layers"):
             vec.from_pt_direction(path, layers=[])
 
@@ -158,18 +159,22 @@ class TestPayloadAdapters:
         import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "linear.pkl")
+        weight = np.arange(16, dtype=np.float32).reshape(4, 4)
+        bias = np.array([0.5, -1.0, 2.0, -3.0], dtype=np.float32)
         with open(path, "wb") as f:
             pickle.dump(
                 {
-                    "A_": np.eye(4, dtype=np.float32),
-                    "B_": np.zeros(4, dtype=np.float32),
+                    "A_": weight,
+                    "B_": bias,
                 },
                 f,
             )
         payload = vec.from_linear_transport(path)
         out = materialize(payload.to_wire(), "cpu", torch.float32, [1, 2])
         assert set(out) == {1, 2}
-        assert out[1]["weight"].shape == (4, 4)
+        for layer in (1, 2):
+            torch.testing.assert_close(out[layer]["weight"], torch.from_numpy(weight))
+            torch.testing.assert_close(out[layer]["bias"], torch.from_numpy(bias))
 
         bad = os.path.join(tmp_path, "bad.pkl")
         with open(bad, "wb") as f:
@@ -183,35 +188,35 @@ class TestPayloadAdapters:
         import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "lms.pt")
-        torch.save(
-            {"projector1": torch.ones(8, 2), "projector2": torch.ones(8, 2)}, path
-        )
+        state = {
+            "projector1": torch.arange(16, dtype=torch.float32).reshape(8, 2),
+            "projector2": -torch.arange(16, dtype=torch.float32).reshape(8, 2) - 1,
+        }
+        torch.save(state, path)
         out = materialize(vec.from_lm_steer(path).to_wire(), "cpu", torch.float32, [3])
         assert set(out) == {3}
+        for key, expected in state.items():
+            torch.testing.assert_close(out[3][key], expected)
 
         gpt2_style = os.path.join(tmp_path, "lms_list.pt")
-        torch.save(
-            [None, {"projector1": torch.ones(8, 2), "projector2": torch.ones(8, 2)}],
-            gpt2_style,
-        )
+        torch.save([None, state], gpt2_style)
         out = materialize(
             vec.from_lm_steer(gpt2_style).to_wire(), "cpu", torch.float32, [0]
         )
         assert set(out) == {0}
+        for key, expected in state.items():
+            torch.testing.assert_close(out[0][key], expected)
 
     def test_lm_steer_multivector_index_is_explicit(self, tmp_path):
         import easysteer.vectors as vec
 
         path = os.path.join(tmp_path, "stack.pt")
-        torch.save(
-            {
-                "projector1": torch.ones(2, 8, 2),
-                "projector2": torch.ones(2, 8, 2),
-            },
-            path,
-        )
+        first = torch.arange(32, dtype=torch.float32).reshape(2, 8, 2)
+        second = -first - 1
+        torch.save({"projector1": first, "projector2": second}, path)
         payload = vec.from_lm_steer(path, vector_index=1)
-        assert payload.projector1.shape == (8, 2)
+        np.testing.assert_array_equal(payload.projector1, first[1].numpy())
+        np.testing.assert_array_equal(payload.projector2, second[1].numpy())
         with pytest.raises(ValueError, match="out of range"):
             vec.from_lm_steer(path, vector_index=5)
 

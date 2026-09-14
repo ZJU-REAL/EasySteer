@@ -67,28 +67,28 @@ class TestFromMoments:
         )
 
     def test_pca_standard_direction_matches_covariance_eig(self):
-        base = RNG.normal(size=(N, DIM))
-        stretch = np.zeros(DIM)
-        stretch[0] = 3.0
-        x = base + RNG.normal(size=(N, 1)) * stretch
+        # The two axes are orthogonal; the leading eigenvector is [3, 4] / 5.
+        direction = np.array([0.6, 0.8])
+        other = np.array([-0.8, 0.6])
+        x = np.vstack([3 * direction, -3 * direction, other, -other])
         acc = MomentsAccumulator(track_second_moment=True)
-        for part in chunks(x):
+        for part in chunks(x, k=3):
             acc.update(2, part)
         v = PCAExtractor.from_moments(acc).directions[2]
-        # Dominant variance is along axis 0.
-        assert abs(v[0]) > 0.8
-        assert np.isclose(np.linalg.norm(v), 1.0, atol=1e-5)
+        np.testing.assert_allclose(v * np.sign(v @ direction), direction, atol=1e-6)
 
     def test_pca_sign_correction_from_category_means(self):
-        x = RNG.normal(size=(N, DIM))
-        x[:, 1] *= 4.0
+        direction = np.array([0.6, 0.8])
+        x = np.array([-3, -1, 1, 3])[:, None] * direction
         acc = MomentsAccumulator(track_second_moment=True)
         acc.update(0, x)
         pos, neg = MomentsAccumulator(), MomentsAccumulator()
-        pos.update(0, x + np.eye(DIM)[1] * 2)
-        neg.update(0, x - np.eye(DIM)[1] * 2)
-        v = PCAExtractor.from_moments(acc, pos_moments=pos, neg_moments=neg)
-        assert v.directions[0][1] > 0, "sign must point neg -> pos"
+        pos.update(0, x + direction)
+        neg.update(0, x - direction)
+        forward = PCAExtractor.from_moments(acc, pos_moments=pos, neg_moments=neg)
+        reverse = PCAExtractor.from_moments(acc, pos_moments=neg, neg_moments=pos)
+        np.testing.assert_allclose(forward.directions[0], direction, atol=1e-6)
+        np.testing.assert_allclose(reverse.directions[0], -direction, atol=1e-6)
 
 
 class TestTopKCounts:
