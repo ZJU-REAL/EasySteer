@@ -4,6 +4,8 @@ Analysis-based extraction of steering vectors from captured hidden states.
 
 ## Unified extraction interface
 
+::: easysteer.extraction.extract
+
 ::: easysteer.extraction.extract_statistical_control_vector
 
 ::: easysteer.extraction.extract_diffmean_control_vector

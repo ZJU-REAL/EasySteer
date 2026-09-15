@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from ._utils import _metadata, correct_sign, l2_normalize
 from .base import BaseExtractor
 from .result import StatisticalControlVector
-from .selection import derive_negative_indices
+from .selection import validate_sample_groups
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,12 @@ class PCAExtractor(BaseExtractor):
         Args:
             pos_rows (np.ndarray): Positive activations, `(n_pos, dim)`.
             neg_rows (np.ndarray | None): Negative activations,
-                `(n_neg, dim)`; None for the "standard" variant.
+                `(n_neg, dim)`; optional for the "standard" variant.
             layer (int): Layer key, used for logging.
             method (str): PCA variant: "standard", "diff" or "center".
             correct_direction (bool): Flip the component if needed so
                 it points from the negative toward the positive
-                samples (variants with negatives only).
+                samples when negatives are available.
 
         Returns:
             tuple[np.ndarray, dict]: The component and its explained
@@ -103,11 +103,12 @@ class PCAExtractor(BaseExtractor):
         positive_indices,
         negative_indices=None,
         n_components: int = 1,
-        method: str = "standard",  # "standard", "diff", or "center"
+        method: str | None = None,
         correct_direction: bool = True,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs,
+        *,
+        variant: str | None = None,
     ) -> StatisticalControlVector:
         """Extract control vectors using the PCA method.
 
@@ -124,7 +125,16 @@ class PCAExtractor(BaseExtractor):
 
         Returns:
             StatisticalControlVector: The extracted control vector.
+
+        ``variant`` selects "standard", "diff", or "center". The old
+        ``method`` argument remains an alias. Standard PCA fits positives
+        only; negatives, when supplied or derivable, determine its sign.
         """
+        if method is not None and variant is not None and method != variant:
+            raise ValueError("PCA method and variant must agree when both are supplied")
+        method = variant if variant is not None else method
+        if method is None:
+            method = "standard"
         supported_methods = ("standard", "diff", "center")
         if method not in supported_methods:
             raise ValueError(
@@ -138,19 +148,19 @@ class PCAExtractor(BaseExtractor):
                 f"component (n_components=1)"
             )
 
-        if method in ("diff", "center"):
-            if negative_indices is None:
-                negative_indices = derive_negative_indices(
-                    len(all_hidden_states), positive_indices
-                )
-            if len(negative_indices) == 0:
-                raise ValueError(
-                    f"PCA method {method!r} requires negative samples, "
-                    f"but none were provided or derivable"
-                )
-            extraction_negatives = None  # Extract the negatives too.
-        else:
-            extraction_negatives = []  # "standard" ignores negatives.
+        positive_indices, negative_indices = validate_sample_groups(
+            len(all_hidden_states),
+            positive_indices,
+            negative_indices,
+            require_negative=method != "standard",
+        )
+        if method == "standard" and len(positive_indices) < 2:
+            raise ValueError("standard PCA requires at least two positive samples")
+        if method == "diff" and max(len(positive_indices), len(negative_indices)) < 2:
+            raise ValueError("difference PCA requires at least two sample pairs")
+        extraction_negatives = (
+            negative_indices if method != "standard" or correct_direction else []
+        )
 
         return PCAExtractor._extract_template(
             all_hidden_states,
@@ -163,6 +173,7 @@ class PCAExtractor(BaseExtractor):
             extra_metadata={
                 "n_components": 1,
                 "method": method,
+                "variant": method,
                 "correct_direction": correct_direction,
             },
             method=f"pca_{method}",

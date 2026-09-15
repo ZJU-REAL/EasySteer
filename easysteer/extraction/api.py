@@ -53,14 +53,20 @@ def _dispatch(method, all_hidden_states, positive_indices, negative_indices, kwa
 
 
 def extract_statistical_control_vector(
-    method: str, all_hidden_states, positive_indices, negative_indices=None, **kwargs
+    algorithm: str | None = None,
+    all_hidden_states=None,
+    positive_indices=None,
+    negative_indices=None,
+    **kwargs,
 ) -> StatisticalControlVector:
     """Unified control vector extraction interface.
 
     Args:
-        method (str): Method name; one of "diffmean", "pca", "lat",
+        algorithm (str): Method name; one of "diffmean", "pca", "lat",
             "linear_probe", "iti". ITI also requires validation captures,
-            validation labels and query head counts.
+            validation labels, and query head counts when capture layouts
+            are unavailable. The old ``method`` keyword remains accepted
+            when ``algorithm`` is omitted.
         all_hidden_states (list | CaptureResult): Nested
             `[sample][layer][token]` hidden states, or a CaptureResult
             from easysteer.capture.
@@ -70,13 +76,19 @@ def extract_statistical_control_vector(
             ``positive_indices`` becomes a negative, in ascending
             sample order.
         **kwargs (Any): Method-specific options. Unknown options raise
-            ValueError naming the accepted ones for ``method``.
+            ValueError naming the accepted ones for ``algorithm``.
 
     Returns:
         StatisticalControlVector: The extracted control vector.
     """
+    # Preserve the old keyword selector while leaving `method` available as
+    # PCA's historical variant option when the algorithm is given explicitly.
+    if algorithm is None:
+        algorithm = kwargs.pop("method", None)
+    if all_hidden_states is None or positive_indices is None:
+        raise ValueError("all_hidden_states and positive_indices are required")
     return _dispatch(
-        method, all_hidden_states, positive_indices, negative_indices, kwargs
+        algorithm, all_hidden_states, positive_indices, negative_indices, kwargs
     )
 
 
@@ -122,7 +134,7 @@ def extract_pca_control_vector(
             ``positive_indices`` becomes a negative, in ascending
             sample order.
         **kwargs (Any): Options accepted by PCAExtractor:
-            `method` (str, default "standard") selects the PCA variant
+            `variant` (str, default "standard") selects the PCA variant
             ("standard" uses only positive samples, "diff" runs PCA
             over positive/negative differences, "center" over
             pair-centered samples); `correct_direction` (bool, default
@@ -130,7 +142,8 @@ def extract_pca_control_vector(
             toward positive samples; `n_components` (int, must be 1);
             `normalize` (bool, default True); `token_pos` (int | str,
             default -1, the last token). Unknown
-            options raise ValueError.
+            options raise ValueError. `method` remains a compatibility alias
+            for `variant`.
 
     Returns:
         StatisticalControlVector: The PCA control vector.
@@ -139,19 +152,19 @@ def extract_pca_control_vector(
         >>> # Plain PCA over positive samples only
         >>> pca_vector = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices,
-        ...     method="standard"
+        ...     variant="standard"
         ... )
         >>>
         >>> # PCA over pair differences with direction correction
         >>> pca_diff_vector = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
-        ...     method="diff", correct_direction=True
+        ...     variant="diff", correct_direction=True
         ... )
         >>>
         >>> # PCA over pair differences without direction correction
         >>> pca_diff_no_correct = extract_pca_control_vector(
         ...     all_hidden_states, positive_indices, negative_indices,
-        ...     method="diff", correct_direction=False
+        ...     variant="diff", correct_direction=False
         ... )
     """
     return _dispatch(

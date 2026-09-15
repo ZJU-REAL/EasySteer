@@ -3,7 +3,10 @@
 
 import pytest
 import torch
-from vllm.model_hooks.capture.serialization import deserialize_captured
+from vllm.model_hooks.capture.serialization import (
+    assemble_captured,
+    deserialize_captured,
+)
 from vllm.model_hooks.capture.session import CaptureSession
 from vllm.model_hooks.capture.store import StreamConfig, StreamStore
 from vllm.model_hooks.components.registry import COMPONENTS
@@ -40,6 +43,24 @@ def test_every_accepted_storage_dtype_roundtrips_without_upcasting(dtype):
     assert labels[0].req_ids == ["a"] * 3
     assert labels[0].positions.tolist() == [0, 1, 2]
     assert labels[0].token_ids.tolist() == [10, 11, 12]
+
+
+def test_replicated_capture_width_metadata_does_not_require_attention_heads():
+    store = StreamStore(StreamConfig())
+    values = append_rows(store)
+    raw = store.serialize()
+    raw[0]["layout"] = {"width": 2}
+    raw[0]["shard"] = {
+        "kind": "replicated",
+        "tp_rank": 0,
+        "tp_size": 2,
+        "feature_start": 0,
+        "global_width": 2,
+    }
+    tensors, labels, layouts = assemble_captured([{}, raw], tp_size=2)
+    torch.testing.assert_close(tensors[0], values)
+    assert labels[0].positions.tolist() == [0, 1, 2]
+    assert layouts == {0: {"width": 2}}
 
 
 @pytest.mark.parametrize("dtype", ["bool", "int16", "complex64", "missing"])
@@ -86,6 +107,147 @@ def test_per_request_drain_releases_budget_and_preserves_other_rows():
     assert labels[0].req_ids == ["b", "b", "c", "c"]
     assert tensors[0][:, 0].tolist() == [2, 2, 3, 3]
     assert store.tokens_stored == 4
+
+
+def test_paged_fetch_preserves_offsets_and_releases_partial_chunk_storage():
+    store = StreamStore(StreamConfig(staging_bytes=64))
+    values = torch.arange(22.0).reshape(11, 2)
+    append_rows(store, values=values)
+    original_bytes = store.storage_bytes
+    preview, labels = deserialize_captured(store.serialize(max_rows=4, row_offset=2))
+    torch.testing.assert_close(preview[0], values[2:6])
+    assert labels[0].positions.tolist() == [2, 3, 4, 5]
+    assert store.storage_bytes == original_bytes
+
+    pages, positions = [], []
+    while raw := store.serialize(max_rows=2, clear_selected=True):
+        tensors, labels = deserialize_captured(raw)
+        pages.append(tensors[0])
+        positions.extend(labels[0].positions.tolist())
+        for chunk in store.chunks.get(0, {}).values():
+            # Partial drains must not retain the original page's backing store.
+            assert chunk.tensor.untyped_storage().nbytes() == (
+                chunk.tensor.numel() * chunk.tensor.element_size()
+            )
+            assert not chunk.tensor.is_pinned() and not chunk.meta.is_pinned()
+    torch.testing.assert_close(torch.cat(pages), values)
+    assert positions == list(range(11))
+    assert store.storage_bytes == 0 and store.req_table == {}
+
+
+def test_paging_filters_requests_before_applying_each_layers_row_limit():
+    session = CaptureSession()
+    session.attach(torch.nn.Identity(), dict.fromkeys(COMPONENTS, ()))
+    session._available_layers["hidden_states"] = {0, 1, 2}
+    session.enable_stream("hidden_states", staging_bytes=64)
+    store = session._streams["hidden_states"]
+    for layer in (0, 1):
+        append_rows(store, layer=layer, request="a", values=torch.ones(3, 2))
+        append_rows(store, layer=layer, request="b", values=torch.full((2, 2), 2.0))
+        append_rows(store, layer=layer, request="a", values=torch.full((3, 2), 3.0))
+    raw = session.fetch_stream("hidden_states", req_ids=["a"], max_rows=4)
+    tensors, labels = deserialize_captured(raw)
+    for layer in (0, 1):
+        assert labels[layer].req_ids == ["a"] * 4
+        assert tensors[layer][:, 0].tolist() == [1, 1, 1, 3]
+    status = session.stream_status("hidden_states")
+    assert status["layer_rows"] == {0: 4, 1: 4, 2: 0}
+    assert status["pending_bytes"] == status["staging_allocation_bytes"] == 0
+    tensors, labels = deserialize_captured(session.fetch_stream("hidden_states"))
+    assert tensors[0][:, 0].tolist() == [2, 2, 3, 3]
+    assert labels[0].req_ids == ["b", "b", "a", "a"]
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"max_rows": 0},
+        {"max_rows": 1.5},
+        {"row_offset": -1},
+        {"row_offset": True},
+        {"row_offset": 1, "clear_selected": True},
+    ],
+)
+def test_invalid_pages_fail_before_draining(options):
+    store = StreamStore(StreamConfig())
+    values = append_rows(store)
+    with pytest.raises(ValueError, match="max_rows|row_offset"):
+        store.serialize(**options)
+    tensors, _ = deserialize_captured(store.serialize())
+    torch.testing.assert_close(tensors[0], values)
+
+
+def test_device_budget_rejects_rows_before_materialization():
+    store = StreamStore(StreamConfig(device_budget_bytes=59))
+    assert store.limit_rows(0, 3, row_bytes=20, device_bytes=60) == 0
+    assert store.pending_bytes == store.storage_bytes == 0
+    with pytest.raises(RuntimeError, match="device staging budget.*exceeded"):
+        store.serialize()
+    store.clear()
+    assert store.limit_rows(0, 2, row_bytes=20, device_bytes=40) == 2
+    store.device_reserved_bytes = 20
+    assert store.limit_rows(0, 2, row_bytes=20, device_bytes=40) == 0
+    with pytest.raises(RuntimeError, match="device staging budget.*exceeded"):
+        store.serialize()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"staging_bytes": 0},
+        {"staging_bytes": True},
+        {"device_budget_bytes": -1},
+        {"device_budget_bytes": 1.5},
+        {"budget_rows": 1.5},
+    ],
+)
+def test_invalid_memory_controls_fail_when_enabling_capture(options):
+    with pytest.raises(
+        ValueError, match="staging_bytes|device_budget_bytes|budget_rows"
+    ):
+        StreamConfig(**options)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA D2H transfers")
+def test_cuda_flush_reuses_bounded_pinned_page_and_keeps_corpus_pageable():
+    store = StreamStore(StreamConfig(staging_bytes=256))
+    values = torch.arange(160.0, device="cuda").reshape(40, 4)
+    append_rows(store, values=values)
+    staging = store._staging.data_ptr()
+    assert store.staging_allocation_bytes == 256
+    assert store.pending_device_bytes == 0
+    for chunk in store.chunks[0].values():
+        assert not chunk.tensor.is_pinned() and not chunk.meta.is_pinned()
+        assert chunk.tensor.shape[0] * store.row_bytes(chunk.tensor) <= 256
+    tensors, _ = deserialize_captured(store.serialize(clear_selected=True))
+    torch.testing.assert_close(tensors[0], values.cpu())
+    append_rows(store, request="next", values=values[:3])
+    assert store._staging.data_ptr() == staging
+    tensors, _ = deserialize_captured(store.serialize())
+    torch.testing.assert_close(tensors[0], values[:3].cpu())
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA staging")
+def test_device_budget_flushes_previous_layers_before_next_selection():
+    store = StreamStore(StreamConfig(device_budget_bytes=112, staging_bytes=256))
+    index = store.req_index("a")
+    values = torch.ones((2, 4), device="cuda")
+    labels = torch.tensor(
+        [[index, 0, 10], [index, 1, 11]], device="cuda", dtype=torch.int32
+    )
+    store.append(0, values, labels, "layer.0")
+    assert store.pending_device_bytes == 56
+    next_index = store.req_index("b")
+    assert store.limit_rows(1, 3, row_bytes=28, device_bytes=84) == 3
+    assert store.pending_device_bytes == 0
+    assert store.req_table[next_index] == "b"
+    next_labels = labels.clone()
+    next_labels[:, 0] = next_index
+    store.append(1, values, next_labels, "layer.1")
+    store.flush()
+    tensors, metadata = deserialize_captured(store.serialize())
+    torch.testing.assert_close(tensors[0], values.cpu())
+    assert metadata[1].req_ids == ["b", "b"]
 
 
 @pytest.mark.parametrize("shape,budget", [((2, 2), 64), ((2, 2, 2), 80)])

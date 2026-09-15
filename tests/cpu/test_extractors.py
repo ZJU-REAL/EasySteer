@@ -96,9 +96,7 @@ class TestNegativeDerivationRule:
             nested, [1, 3, 5], negative_indices=[0, 2, 4]
         )
         for layer in derived.directions:
-            assert np.allclose(
-                derived.directions[layer], explicit.directions[layer]
-            )
+            assert np.allclose(derived.directions[layer], explicit.directions[layer])
         assert derived.metadata["n_negative"] == 3
 
     def test_derived_equals_explicit_complement_pca_diff(self):
@@ -108,9 +106,7 @@ class TestNegativeDerivationRule:
             nested, [1, 3, 5], negative_indices=[0, 2, 4], method="diff"
         )
         for layer in derived.directions:
-            assert np.allclose(
-                derived.directions[layer], explicit.directions[layer]
-            )
+            assert np.allclose(derived.directions[layer], explicit.directions[layer])
 
     def test_derived_equals_explicit_complement_linear_probe(self):
         nested = make_nested(offset_indices=(1, 3, 5))
@@ -119,41 +115,33 @@ class TestNegativeDerivationRule:
             nested, [1, 3, 5], negative_indices=[0, 2, 4]
         )
         for layer in derived.directions:
-            assert np.allclose(
-                derived.directions[layer], explicit.directions[layer]
-            )
+            assert np.allclose(derived.directions[layer], explicit.directions[layer])
 
     def test_derived_equals_explicit_complement_lat(self):
         nested = make_nested(offset_indices=(1, 3, 5))
         np.random.seed(0)
-        derived = LATExtractor.extract(
-            nested, [1, 3, 5], use_positive_only=False
-        )
+        derived = LATExtractor.extract(nested, [1, 3, 5], use_positive_only=False)
         np.random.seed(0)
         explicit = LATExtractor.extract(
-            nested, [1, 3, 5], negative_indices=[0, 2, 4],
+            nested,
+            [1, 3, 5],
+            negative_indices=[0, 2, 4],
             use_positive_only=False,
         )
         for layer in derived.directions:
-            assert np.allclose(
-                derived.directions[layer], explicit.directions[layer]
-            )
+            assert np.allclose(derived.directions[layer], explicit.directions[layer])
 
 
 class TestExplicitOptionValidation:
     def test_unknown_regularization_raises(self):
         nested = make_nested(offset_indices=(0, 1, 2))
         with pytest.raises(ValueError, match="ridge") as error:
-            LinearProbeExtractor.extract(
-                nested, [0, 1, 2], regularization="ridge"
-            )
+            LinearProbeExtractor.extract(nested, [0, 1, 2], regularization="ridge")
         assert "elasticnet" in str(error.value)
 
     def test_effective_penalty_recorded(self):
         nested = make_nested(offset_indices=(0, 1, 2))
-        vec = LinearProbeExtractor.extract(
-            nested, [0, 1, 2], regularization="none"
-        )
+        vec = LinearProbeExtractor.extract(nested, [0, 1, 2], regularization="none")
         assert vec.metadata["regularization"] == "none"
 
     def test_unknown_pca_method_raises(self):
@@ -252,32 +240,26 @@ class TestTokenReducers:
 
     def test_reducer_table_names(self):
         assert sorted(_TOKEN_REDUCERS) == [
-            "first", "last", "max", "mean", "min",
+            "first",
+            "last",
+            "max",
+            "mean",
+            "min",
         ]
 
     def test_int_and_positional_names(self):
         assert np.allclose(extract_token_from_sequence(self.SEQ, 1), [0.0, 3.0])
-        assert np.allclose(
-            extract_token_from_sequence(self.SEQ, -1), [2.0, 2.0]
-        )
-        assert np.allclose(
-            extract_token_from_sequence(self.SEQ, "first"), [1.0, 0.0]
-        )
-        assert np.allclose(
-            extract_token_from_sequence(self.SEQ, "last"), [2.0, 2.0]
-        )
+        assert np.allclose(extract_token_from_sequence(self.SEQ, -1), [2.0, 2.0])
+        assert np.allclose(extract_token_from_sequence(self.SEQ, "first"), [1.0, 0.0])
+        assert np.allclose(extract_token_from_sequence(self.SEQ, "last"), [2.0, 2.0])
 
     def test_mean_max_min(self):
         assert np.allclose(
             extract_token_from_sequence(self.SEQ, "mean"), [1.0, 5.0 / 3.0]
         )
         # L2 norms are [1, 3, sqrt(8)]: max picks [0, 3], min [1, 0].
-        assert np.allclose(
-            extract_token_from_sequence(self.SEQ, "max"), [0.0, 3.0]
-        )
-        assert np.allclose(
-            extract_token_from_sequence(self.SEQ, "min"), [1.0, 0.0]
-        )
+        assert np.allclose(extract_token_from_sequence(self.SEQ, "max"), [0.0, 3.0])
+        assert np.allclose(extract_token_from_sequence(self.SEQ, "min"), [1.0, 0.0])
 
     def test_unsupported_position_raises(self):
         with pytest.raises(ValueError, match="token_pos"):
@@ -293,9 +275,7 @@ class TestUnifiedMetadata:
             LinearProbeExtractor.extract(nested, [1, 3, 5]),
         ]
         np.random.seed(0)
-        vectors.append(
-            LATExtractor.extract(nested, [1, 3, 5], use_positive_only=False)
-        )
+        vectors.append(LATExtractor.extract(nested, [1, 3, 5], use_positive_only=False))
         for vec in vectors:
             keys = set(vec.metadata)
             assert UNIFIED_METADATA_KEYS <= keys
@@ -363,15 +343,24 @@ class TestITIExtraction:
     @staticmethod
     def captures():
         # Head 0 predicts training labels but reverses on validation.
-        train = np.array([
-            [4, 0, 3, 0], [2, 0, 1, 0], [-4, 0, -3, 0], [-2, 0, -1, 0],
-        ])
-        validation = np.array([
-            [-4, 0, 5, 0], [-2, 0, 3, 0], [4, 0, -5, 0], [2, 0, -3, 0],
-        ])
+        train = np.array(
+            [
+                [4, 0, 3, 0],
+                [2, 0, 1, 0],
+                [-4, 0, -3, 0],
+                [-2, 0, -1, 0],
+            ]
+        )
+        validation = np.array(
+            [
+                [-4, 0, 5, 0],
+                [-2, 0, 3, 0],
+                [4, 0, -5, 0],
+                [2, 0, -3, 0],
+            ]
+        )
         return tuple(
-            FakeCapture([[[row]] for row in rows], [10])
-            for rows in (train, validation)
+            FakeCapture([[[row]] for row in rows], [10]) for rows in (train, validation)
         )
 
     def test_validation_ranking_development_scale_and_head_layout(self):
@@ -415,3 +404,265 @@ class TestITIExtraction:
                 validation_positive_indices=[0, 1],
                 num_heads={10: 2},
             )
+
+
+class TestSampleValidation:
+    @pytest.mark.parametrize(
+        ("positives", "negatives", "message"),
+        [
+            ([], [1, 2], "positive_indices must be nonempty"),
+            ([0, 0], [1, 2], "unique"),
+            ([0, 1], [2, 2], "unique"),
+            ([0, 1], [1, 2], "disjoint"),
+            ([-1, 0], [1, 2], "integer indices"),
+            ([0, 6], [1, 2], "integer indices"),
+            ([False, 1], [2, 3], "integer indices"),
+            ([0.0, 1], [2, 3], "integer indices"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "extractor",
+        [DiffMeanExtractor, PCAExtractor, LATExtractor, LinearProbeExtractor],
+    )
+    def test_invalid_groups_rejected_before_fitting(
+        self, positives, negatives, message, extractor
+    ):
+        with pytest.raises(ValueError, match=message):
+            extractor.extract(make_nested(), positives, negatives)
+
+    @pytest.mark.parametrize(
+        ("extractor", "options"),
+        [
+            (DiffMeanExtractor, {}),
+            (PCAExtractor, {"variant": "diff"}),
+            (LATExtractor, {"use_positive_only": False}),
+            (LinearProbeExtractor, {}),
+        ],
+    )
+    def test_required_negatives_cannot_be_empty(self, extractor, options):
+        with pytest.raises(ValueError, match="negative_indices must be nonempty"):
+            extractor.extract(make_nested(), list(range(N_SAMPLES)), **options)
+
+    @pytest.mark.parametrize("token_pos", [-1, "mean"])
+    def test_missing_capture_rows_explain_sample_layer_and_selection(self, token_pos):
+        nested = make_nested()
+        nested[1][0] = []
+        captured = FakeCapture(nested, [10, 20])
+        with pytest.raises(ValueError, match="sample 1, layer 10:.*capture selection"):
+            DiffMeanExtractor.extract(captured, [0, 1, 2], token_pos=token_pos)
+
+    def test_empty_capture_layers_are_rejected(self):
+        captured = FakeCapture([[], []], [])
+        with pytest.raises(ValueError, match="capture layer"):
+            DiffMeanExtractor.extract(captured, [0], [1])
+
+    @pytest.mark.parametrize("value", [np.nan, np.inf])
+    def test_nonfinite_features_are_rejected(self, value):
+        nested = make_nested()
+        nested[1][0][-1][0] = value
+        with pytest.raises(ValueError, match="sample 1, layer 0:.*finite"):
+            DiffMeanExtractor.extract(nested, [0, 1, 2])
+
+    def test_numpy_integer_indices_are_valid(self):
+        nested = make_nested()
+        vector = DiffMeanExtractor.extract(nested, np.array([0, 1, 2], dtype=np.int64))
+        assert len(vector.directions) == 2
+
+
+class TestClassOptionValidation:
+    @pytest.mark.parametrize(
+        "extractor",
+        [DiffMeanExtractor, PCAExtractor, LATExtractor, LinearProbeExtractor],
+    )
+    def test_class_entry_points_reject_typos(self, extractor):
+        with pytest.raises(TypeError, match="normalise"):
+            extractor.extract(make_nested(), [0, 1, 2], normalise=True)
+
+
+class TestPCAVariants:
+    def test_generic_and_specific_compatibility_aliases_agree(self):
+        from easysteer.extraction import extract_pca_control_vector
+
+        nested = make_nested(offset_indices=(0, 1, 2))
+        calls = [
+            lambda: PCAExtractor.extract(nested, [0, 1, 2], variant="diff"),
+            lambda: extract_pca_control_vector(nested, [0, 1, 2], method="diff"),
+            lambda: extract_statistical_control_vector(
+                "pca", nested, [0, 1, 2], method="diff"
+            ),
+            lambda: extract_statistical_control_vector(
+                algorithm="pca",
+                all_hidden_states=nested,
+                positive_indices=[0, 1, 2],
+                variant="diff",
+            ),
+            lambda: extract_statistical_control_vector(
+                method="pca",
+                all_hidden_states=nested,
+                positive_indices=[0, 1, 2],
+                variant="diff",
+            ),
+        ]
+        results = [call() for call in calls]
+        for vector in results:
+            assert vector.metadata["variant"] == "diff"
+            for layer, expected in results[0].directions.items():
+                np.testing.assert_allclose(vector.directions[layer], expected)
+
+    def test_conflicting_aliases_are_rejected(self):
+        with pytest.raises(ValueError, match="method and variant must agree"):
+            PCAExtractor.extract(
+                make_nested(), [0, 1, 2], method="diff", variant="center"
+            )
+
+    def test_standard_uses_negatives_only_for_sign(self):
+        positive = np.array([[-3.0, 0.0], [-1.0, 0.0], [-2.0, 0.0]])
+        negative = np.array([[10.0, 8.0], [10.0, -8.0], [10.0, 0.0]])
+        nested = [[[row]] for row in np.vstack([positive, negative])]
+        uncorrected = PCAExtractor.extract(nested, [0, 1, 2], correct_direction=False)
+        corrected = PCAExtractor.extract(nested, [0, 1, 2], correct_direction=True)
+        positive_only = PCAExtractor.extract(nested, [0, 1, 2], [])
+        np.testing.assert_allclose(uncorrected.directions[0], [1, 0])
+        np.testing.assert_allclose(corrected.directions[0], [-1, 0])
+        np.testing.assert_allclose(positive_only.directions[0], [1, 0])
+        assert corrected.metadata["n_negative"] == 3
+
+
+class TestLinearProbeCoordinates:
+    @pytest.mark.parametrize("normalize", [False, True])
+    def test_standardized_probe_exports_raw_activation_normal(self, normalize):
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+
+        rng = np.random.default_rng(71)
+        rows = rng.normal(size=(80, 3)) * np.array([100.0, 0.25, 1.0])
+        rows[:, 2] = 7.0  # StandardScaler handles constant features with scale 1.
+        labels = (rows[:, 0] / 100.0 + rows[:, 1] * 4.0 > 0).astype(int)
+        positives = np.flatnonzero(labels == 1).tolist()
+        negatives = np.flatnonzero(labels == 0).tolist()
+        ordered = rows[positives + negatives]
+        ordered_labels = labels[positives + negatives]
+        scaler = StandardScaler().fit(ordered)
+        probe = LogisticRegression(max_iter=1000, random_state=42).fit(
+            scaler.transform(ordered), ordered_labels
+        )
+        raw_normal = probe.coef_[0] / scaler.scale_
+        raw_intercept = probe.intercept_[0] - scaler.mean_ @ raw_normal
+        expected = l2_normalize(raw_normal) if normalize else raw_normal
+        vector = LinearProbeExtractor.extract(
+            [[[row]] for row in rows], positives, negatives, normalize=normalize
+        )
+        np.testing.assert_allclose(vector.directions[0], expected, rtol=1e-6, atol=1e-7)
+        if not normalize:
+            np.testing.assert_allclose(
+                rows @ vector.directions[0] + raw_intercept,
+                probe.decision_function(scaler.transform(rows)),
+                rtol=1e-5,
+                atol=1e-6,
+            )
+        assert vector.metadata["coordinate_space"] == "raw_activations"
+
+
+class TestITILayouts:
+    def test_infers_heads_and_preserves_component(self):
+        train, validation = TestITIExtraction.captures()
+        for capture in (train, validation):
+            capture.layouts = {10: {"width": 4, "num_heads": 2, "head_size": 2}}
+            capture.component = "attention_heads"
+            capture.model = "test-model"
+        vector = ITIExtractor.extract(
+            train,
+            [0, 1],
+            validation_hidden_states=validation,
+            validation_positive_indices=[0, 1],
+        )
+        assert vector.metadata["num_heads"] == {10: 2}
+        assert vector.component == "attention_heads"
+        assert vector.model_type == "test-model"
+        with pytest.raises(ValueError, match="disagrees"):
+            ITIExtractor.extract(
+                train,
+                [0, 1],
+                validation_hidden_states=validation,
+                validation_positive_indices=[0, 1],
+                num_heads={10: 4},
+            )
+
+    def test_requires_attention_component(self):
+        train, validation = TestITIExtraction.captures()
+        train.component = "hidden_states"
+        with pytest.raises(ValueError, match="attention_heads"):
+            ITIExtractor.extract(
+                train,
+                [0, 1],
+                validation_hidden_states=validation,
+                validation_positive_indices=[0, 1],
+                num_heads={10: 2},
+            )
+
+    def test_visits_one_layer_per_split_then_only_selected_layers(self):
+        train, validation = TestITIExtraction.captures()
+        visits = []
+
+        class TrackedCapture(FakeCapture):
+            def __init__(self, source, split):
+                super().__init__(
+                    [[[np.ones(4)], source.sample_rows(i, 10)] for i in range(4)],
+                    [10, 20],
+                )
+                self.split = split
+
+            def token(self, sample, layer, position=-1):
+                visits.append((self.split, layer))
+                return super().token(sample, layer, position)
+
+        train, validation = (
+            TrackedCapture(train, "train"),
+            TrackedCapture(validation, "val"),
+        )
+        vector = ITIExtractor.extract(
+            train,
+            [0, 1],
+            validation_hidden_states=validation,
+            validation_positive_indices=[0, 1],
+            num_heads={10: 2, 20: 2},
+        )
+        assert list(vector.directions) == [20]
+        assert visits == [
+            visit
+            for group in [
+                ("train", 10),
+                ("val", 10),
+                ("train", 20),
+                ("val", 20),
+                ("train", 20),
+                ("val", 20),
+            ]
+            for visit in [group] * 4
+        ]
+
+
+def test_tensor_like_conversion_without_dtype_keeps_the_float_contract():
+    from easysteer.extraction.selection import _to_numpy
+
+    class TensorLike:
+        def __init__(self):
+            self.converted = False
+
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def float(self):
+            self.converted = True
+            return self
+
+        def numpy(self):
+            assert self.converted
+            return np.array([1, 2], dtype=np.float32)
+
+    value = TensorLike()
+    np.testing.assert_array_equal(_to_numpy(value), [1, 2])
+    assert value.converted

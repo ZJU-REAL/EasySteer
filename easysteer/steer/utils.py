@@ -23,9 +23,6 @@ from easysteer.extraction.selection import (
     _to_numpy as _to_numpy,
 )
 from easysteer.extraction.selection import (
-    _tokens_to_numpy as _tokens_to_numpy,
-)
-from easysteer.extraction.selection import (
     derive_negative_indices as derive_negative_indices,
 )
 from easysteer.extraction.selection import (

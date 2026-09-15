@@ -55,8 +55,10 @@ if TYPE_CHECKING:
     from .selection import (
         extract_token_hiddens as extract_token_hiddens,
     )
+    from .streaming import extract as extract
 
 _EXPORTS = {
+    "extract": "streaming",
     "MomentsAccumulator": "accumulators",
     "DiffMeanAccumulator": "accumulators",
     "TopKCountAccumulator": "accumulators",

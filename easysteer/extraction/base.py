@@ -99,4 +99,6 @@ class BaseExtractor(abc.ABC):
             method=method or cls.method,
             directions=directions,
             metadata=metadata,
+            component=getattr(all_hidden_states, "component", None),
+            model_type=getattr(all_hidden_states, "model", None) or "unknown",
         )

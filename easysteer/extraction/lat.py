@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 from ._utils import correct_sign
 from .base import BaseExtractor
 from .result import StatisticalControlVector
-from .selection import derive_negative_indices
+from .selection import validate_sample_groups
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,9 @@ class LATExtractor(BaseExtractor):
         logger.info(f"Layer {layer}: Range: {differences.min()} to {differences.max()}")
 
         norms = np.linalg.norm(differences, axis=1, keepdims=True)
-        differences = np.where(norms == 0, 0, differences / norms)
+        differences = np.divide(
+            differences, norms, out=np.zeros_like(differences), where=norms != 0
+        )
 
         pca = PCA(
             n_components=min(
@@ -83,7 +85,6 @@ class LATExtractor(BaseExtractor):
         correct_direction: bool = True,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the LAT method.
 
@@ -105,14 +106,19 @@ class LATExtractor(BaseExtractor):
         Returns:
             StatisticalControlVector: The extracted control vector.
         """
+        positive_indices, negative_indices = validate_sample_groups(
+            len(all_hidden_states),
+            positive_indices,
+            negative_indices,
+            require_negative=not use_positive_only,
+            derive_negative=not use_positive_only,
+        )
+        if type(n_components) is not int or n_components < 1:
+            raise ValueError("n_components must be a positive integer")
         if use_positive_only:
             n_samples = len(positive_indices)
             extraction_negatives = []  # Negatives never enter the pool.
         else:
-            if negative_indices is None:
-                negative_indices = derive_negative_indices(
-                    len(all_hidden_states), positive_indices
-                )
             n_samples = len(positive_indices) + len(negative_indices)
             extraction_negatives = None  # Extract the negatives too.
 

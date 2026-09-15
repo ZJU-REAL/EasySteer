@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Captured activations indexed by model layer and labelled sample."""
 
+from copy import deepcopy
 from typing import Any
 
 import torch
@@ -14,6 +15,10 @@ class CaptureResult:
         outputs: the vLLM RequestOutput list, prompt order.
         layouts: component dimensions by layer. Attention-head outputs include
             width, query num_heads, and per-head value-output head_size.
+        selection: Global capture selection. None selects every forwarded row.
+        per_prompt_selections: Optional overrides in sample order. None entries
+            use the global selection. Absolute row positions remain available
+            regardless of how each sample was selected.
     """
 
     def __init__(
@@ -22,10 +27,27 @@ class CaptureResult:
         meta: dict[int, Any],
         outputs: Any,
         layouts: dict[int, dict[str, int]] | None = None,
+        *,
+        component: str | None = None,
+        model: str | None = None,
+        selection: dict | None = None,
+        per_prompt_selections: list[dict | None] | None = None,
+        sample_indices: list[int] | None = None,
     ):
         self.layers = layers
         self.outputs = outputs
         self.layouts = layouts or {}
+        self.component = component
+        self.model = model
+        self.selection = deepcopy(selection)
+        self.per_prompt_selections = deepcopy(per_prompt_selections)
+        if per_prompt_selections is not None and len(per_prompt_selections) != len(
+            outputs
+        ):
+            raise ValueError("per_prompt_selections must match the number of samples")
+        self.sample_indices = self._validate_sample_indices(
+            sample_indices, len(outputs)
+        )
         for lid, layout in self.layouts.items():
             if lid not in layers or layers[lid].shape[-1] != layout["width"]:
                 raise ValueError(f"layer {lid}: capture layout does not match rows")
@@ -49,6 +71,19 @@ class CaptureResult:
                     "sample rows cannot be aligned"
                 )
         self._sample_rows = self._index_samples()
+
+    @staticmethod
+    def _validate_sample_indices(sample_indices, n_samples):
+        indices = (
+            list(range(n_samples)) if sample_indices is None else list(sample_indices)
+        )
+        if (
+            len(indices) != n_samples
+            or any(type(index) is not int or index < 0 for index in indices)
+            or len(set(indices)) != len(indices)
+        ):
+            raise ValueError("sample_indices must uniquely identify every sample")
+        return indices
 
     @property
     def layer_ids(self) -> list[int]:
@@ -118,6 +153,24 @@ class CaptureResult:
             return tensor[start : start + len(rows)]
         return tensor[rows]
 
+    def iter_sample_rows(self, i: int, layer: int, *, chunk_size: int = 32):
+        """Yield bounded row chunks in sequence order, even for interleaved data.
+
+        Contiguous chunks are views. Other chunks gather at most ``chunk_size``
+        rows, so pooling never needs to materialize an entire sample.
+        """
+        if type(chunk_size) is not int or chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer")
+        rows = self._sample_rows[i]
+        tensor = self.layers[layer]
+        for offset in range(0, len(rows), chunk_size):
+            selected = rows[offset : offset + chunk_size]
+            start = selected[0]
+            if all(row == start + index for index, row in enumerate(selected)):
+                yield tensor[start : start + len(selected)]
+            else:
+                yield tensor[selected]
+
     def token(self, i: int, layer: int, position: int = -1) -> torch.Tensor:
         """One captured row by sample-relative index, not absolute token position."""
         return self.layers[layer][self._sample_rows[i][position]]
@@ -148,3 +201,16 @@ class CaptureResult:
             sample = self.sample(i)
             samples.append([sample[lid] for lid in layer_ids])
         return samples
+
+    def save(self, path) -> None:
+        """Save arrays and labels without pickle; :meth:`load` maps them from disk."""
+        from .storage import save_capture
+
+        save_capture(self, path)
+
+    @classmethod
+    def load(cls, path) -> "CaptureResult":
+        """Open a saved capture with memory-mapped arrays and sample metadata."""
+        from .storage import load_capture
+
+        return load_capture(path)

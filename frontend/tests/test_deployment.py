@@ -47,24 +47,37 @@ def test_built_ui_and_job_api_share_origin(monkeypatch, tmp_path):
     assert client.get("/../app.py").status_code == 404
 
 
-@pytest.mark.parametrize("kind,algorithm", [("reft", "loreft"), ("direction", "direct")])
-def test_training_demo_uses_openai_payload(monkeypatch, payload_modules, kind, algorithm):
+@pytest.mark.parametrize(
+    "kind,algorithm", [("reft", "loreft"), ("direction", "direct")]
+)
+def test_training_demo_uses_openai_payload(
+    monkeypatch, payload_modules, kind, algorithm
+):
     module = load_module("training_demo", FRONTEND / "demo_training.py")
     payloads, vectors = payload_modules
-    payload = (payloads.ReftIntervention([[1]], [[1]], layer=8) if kind == "reft"
-               else payloads.DirectionVector({8: [1]}))
+    payload = (
+        payloads.ReftIntervention([[1]], [[1]], layer=8)
+        if kind == "reft"
+        else payloads.DirectionVector({8: [1]})
+    )
     training = ModuleType("easysteer.training")
     training.load_checkpoint = lambda path: SimpleNamespace(
         config=SimpleNamespace(prompt_template="Custom prompt: %s\nAnswer:"),
-        to_spec=lambda: SimpleNamespace(model_dump_json=lambda: json.dumps({
-            "vectors": [{
-                "data": vectors.to_json_payload(payload),
-                "algorithm": algorithm,
-                "component": "hidden_states",
-                "layers": [8],
-                "apply": {"prompt_positions": [-1]},
-            }]
-        })),
+        to_spec=lambda: SimpleNamespace(
+            model_dump_json=lambda: json.dumps(
+                {
+                    "vectors": [
+                        {
+                            "data": vectors.to_json_payload(payload),
+                            "algorithm": algorithm,
+                            "component": "hidden_states",
+                            "layers": [8],
+                            "apply": {"prompt_positions": [-1]},
+                        }
+                    ]
+                }
+            )
+        ),
     )
     monkeypatch.setitem(sys.modules, "easysteer.training", training)
     calls = []
@@ -77,7 +90,9 @@ def test_training_demo_uses_openai_payload(monkeypatch, payload_modules, kind, a
         )
 
     monkeypatch.setattr(module.requests, "post", post)
-    module.test_inference("served-model", "/checkpoint", ["Hello"], "http://example/v1/", "key")
+    module.test_inference(
+        "served-model", "/checkpoint", ["Hello"], "http://example/v1/", "key"
+    )
     url, kwargs = calls[0]
     assert url == "http://example/v1/completions"
     assert kwargs["headers"] == {"Authorization": "Bearer key"}
@@ -100,7 +115,7 @@ def test_training_demo_sends_the_current_job_request(monkeypatch):
     monkeypatch.setattr(module.requests, "post", post)
     monkeypatch.setattr(module, "monitor_training", lambda: True)
     assert module.start_training_demo("model") is True
-    request, = calls
+    (request,) = calls
     assert request["output_dir"] == "./results/demo_emoji_training"
     assert request["algorithm"] == "loreft"
     assert isinstance(request["training_examples"], list)
@@ -130,7 +145,9 @@ def test_gunicorn_restart_exits_worker_instead_of_starting_another_master(monkey
         raise SystemExit(code)
 
     monkeypatch.setattr(module.os, "_exit", exit_worker)
-    monkeypatch.setattr(module.os, "execv", lambda *args: pytest.fail("started a second master"))
+    monkeypatch.setattr(
+        module.os, "execv", lambda *args: pytest.fail("started a second master")
+    )
     with pytest.raises(SystemExit):
         callbacks[0]()
 
@@ -177,7 +194,9 @@ def extraction(monkeypatch, tmp_path):
 
         @property
         def outputs(self):
-            return [SimpleNamespace(prompt_token_ids=[10, 11, 12, 13]) for _ in self.prompts]
+            return [
+                SimpleNamespace(prompt_token_ids=[10, 11, 12, 13]) for _ in self.prompts
+            ]
 
         def rows(self, layer):
             return [[float(layer)] for _ in self.prompts]
@@ -206,18 +225,18 @@ def extraction(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "easysteer.capture", hidden_states)
     extracted = []
 
-    def extract_statistical_control_vector(
-        method, all_hidden_states, positive_indices, negative_indices=None, **kwargs
-    ):
+    consumed = []
+
+    def extract(captures, labels, *, method, **kwargs):
         activity.append("extract")
+        label_values = list(labels)
+        if method == "diffmean":
+            for batch in captures:
+                consumed.append(len(batch))
+                del batch
+            captures = None
         extracted.append(
-            dict(
-                method=method,
-                all_hidden_states=all_hidden_states,
-                positive_indices=positive_indices,
-                negative_indices=negative_indices,
-                **kwargs,
-            )
+            dict(method=method, captures=captures, labels=label_values, **kwargs)
         )
         return SimpleNamespace(
             directions={8: [1], 22: [2]},
@@ -226,26 +245,7 @@ def extraction(monkeypatch, tmp_path):
         )
 
     steer = ModuleType("easysteer.extraction")
-    steer.extract_statistical_control_vector = extract_statistical_control_vector
-    updates = []
-
-    class Accumulator:
-        pos, neg = object(), object()
-
-        def update(self, layer, rows, positive):
-            updates.append((layer, len(rows), positive))
-
-    def from_moments(pos, neg, normalize):
-        assert pos is Accumulator.pos and neg is Accumulator.neg
-        return extract_statistical_control_vector(
-            "diffmean",
-            None,
-            None,
-            normalize=normalize,
-        )
-
-    steer.DiffMeanAccumulator = Accumulator
-    steer.DiffMeanExtractor = SimpleNamespace(from_moments=from_moments)
+    steer.extract = extract
     monkeypatch.setitem(sys.modules, "easysteer.extraction", steer)
     module = load_module("extraction_backend", FRONTEND / "extraction_api.py")
     monkeypatch.chdir(tmp_path)
@@ -266,7 +266,7 @@ def extraction(monkeypatch, tmp_path):
         live_batches=live_batches,
         engine_configs=engine_configs,
         activity=activity,
-        updates=updates,
+        consumed=consumed,
         output=tmp_path / "vector.gguf",
     )
 
@@ -286,19 +286,17 @@ def test_extraction_uses_labelled_capture_and_shared_dispatch(
     job = extraction
     job.config.update(method=method, token_pos=token_pos)
     job.module.run_extraction(job.config)
-    assert [prompts for prompts, _ in job.calls] == (
-        [["happy"], ["sad"]] if method == "diffmean" else [["happy", "sad"]]
-    )
+    assert [prompts for prompts, _ in job.calls] == [["happy", "sad"]]
     for _, options in job.calls:
         assert options["max_tokens"] == 1
         assert options["select"] == {"prompt_positions": [expected]}
         assert options["budget_bytes"] > 0
     (call,) = job.extracted
     if method != "diffmean":
-        assert call["all_hidden_states"] is job.captures[-1]()
-        assert call["positive_indices"] == [0]
-        assert call["negative_indices"] == [1]
-        assert call["token_pos"] == 0
+        assert call["captures"] is job.captures[-1]()
+    assert call["labels"] == [True, False]
+    assert call["token_pos"] == 0
+    assert call["max_working_bytes"] == 256 * 1024**2
     assert call["method"] == method
     assert call["normalize"] is True
     assert job.module.extraction_status["result"]["layers_extracted"] == 2
@@ -313,25 +311,35 @@ def test_extraction_default_position_remains_last_token(extraction):
     assert extraction.calls[0][1]["select"] == {"prompt_positions": [-1]}
 
 
-@pytest.mark.parametrize("token_pos", [True, False, 0.5, 1.0, "1.5", "1_0", "bad", "", None, []])
+@pytest.mark.parametrize(
+    "token_pos", [True, False, 0.5, 1.0, "1.5", "1_0", "bad", "", None, []]
+)
 def test_invalid_token_position_fails_before_cuda_or_capture(extraction, token_pos):
     job = extraction
     job.config["token_pos"] = token_pos
     job.module.run_extraction(job.config)
-    assert "token_pos must be an integer position" in job.module.extraction_status["error_message"]
+    assert (
+        "token_pos must be an integer position"
+        in job.module.extraction_status["error_message"]
+    )
     assert job.module.extraction_status["is_extracting"] is False
     assert not job.activity
     assert not job.output.exists()
 
 
-@pytest.mark.parametrize("changes,error", [
-    ({"gpu_devices": ""}, "GPU IDs or UUIDs"),
-    ({"gpu_devices": "0, "}, "GPU IDs or UUIDs"),
-    ({"gpu_devices": "0,0"}, "duplicate devices"),
-    ({"gpu_devices": None}, "GPU IDs or UUIDs"),
-    ({"method": "linear_probe"}, "Unsupported extraction method"),
-])
-def test_unsupported_job_configuration_fails_before_model_load(extraction, changes, error):
+@pytest.mark.parametrize(
+    "changes,error",
+    [
+        ({"gpu_devices": ""}, "GPU IDs or UUIDs"),
+        ({"gpu_devices": "0, "}, "GPU IDs or UUIDs"),
+        ({"gpu_devices": "0,0"}, "duplicate devices"),
+        ({"gpu_devices": None}, "GPU IDs or UUIDs"),
+        ({"method": "linear_probe"}, "Unsupported extraction method"),
+    ],
+)
+def test_unsupported_job_configuration_fails_before_model_load(
+    extraction, changes, error
+):
     job = extraction
     job.config.update(changes)
     job.module.run_extraction(job.config)
@@ -355,21 +363,37 @@ def test_extraction_passes_multiple_devices_to_the_engine(extraction, devices):
 def test_diffmean_consumes_batches_without_retaining_the_whole_capture(extraction):
     extraction.config["positive_samples"] = ["happy"] * 129
     extraction.module.run_extraction(extraction.config)
-    batch_sizes = [32, 32, 32, 32, 1, 1]
+    batch_sizes = [32, 32, 32, 32, 2]
     assert [len(prompts) for prompts, _ in extraction.calls] == batch_sizes
-    assert extraction.updates == [
-        (layer, size, index < len(batch_sizes) - 1)
-        for index, size in enumerate(batch_sizes)
-        for layer in (8, 22)
-    ]
+    assert extraction.consumed == batch_sizes
+    assert extraction.extracted[0]["labels"] == [True] * 129 + [False]
     assert max(extraction.live_batches) <= 2
     assert all(reference() is None for reference in extraction.captures)
 
 
 @pytest.mark.parametrize("token_pos", [4, -5])
-def test_out_of_range_position_fails_even_when_selection_clamps_to_a_valid_row(extraction, token_pos):
+def test_out_of_range_position_fails_even_when_selection_clamps_to_a_valid_row(
+    extraction, token_pos
+):
     extraction.config["token_pos"] = token_pos
     extraction.module.run_extraction(extraction.config)
     assert "outside prompt" in extraction.module.extraction_status["error_message"]
     assert not extraction.extracted
     assert not extraction.output.exists()
+
+
+@pytest.mark.parametrize("budget", [None, False, 0, -1, "256"])
+def test_extraction_rejects_invalid_working_budget_before_loading(extraction, budget):
+    extraction.config["max_working_bytes"] = budget
+    extraction.module.run_extraction(extraction.config)
+    assert (
+        "max_working_bytes must be a positive integer"
+        in extraction.module.extraction_status["error_message"]
+    )
+    assert not extraction.activity
+
+
+def test_extraction_forwards_explicit_working_memory_budget(extraction):
+    extraction.config["max_working_bytes"] = 32 * 1024**2
+    extraction.module.run_extraction(extraction.config)
+    assert extraction.extracted[0]["max_working_bytes"] == 32 * 1024**2

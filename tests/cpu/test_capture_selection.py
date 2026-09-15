@@ -1,7 +1,7 @@
 """Capture plans reuse metadata without reusing another layer or step's values."""
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -77,8 +77,11 @@ def test_tp_replica_exports_once_and_keeps_dispatch_after_owner_budget(context, 
         raw = sessions[0].fetch_stream("hidden_states")
         assert raw[0]["shape"] == [1, 4]
         assert raw[0]["shard"] == {
-            "kind": "replicated", "tp_rank": 0, "tp_size": 2,
-            "feature_start": 0, "global_width": 4,
+            "kind": "replicated",
+            "tp_rank": 0,
+            "tp_size": 2,
+            "feature_start": 0,
+            "global_width": 4,
         }
     for session in sessions:
         session.disable_stream("hidden_states")
@@ -93,8 +96,14 @@ def test_tp_attention_budget_bounds_combined_worker_storage(context):
         components = dict.fromkeys(COMPONENTS, ())
         components["attention_heads"] = (
             ComponentTarget(
-                "attention.0", 0, model[0], width=4, num_heads=2, head_size=2,
-                tp_rank=rank, tp_size=2,
+                "attention.0",
+                0,
+                model[0],
+                width=4,
+                num_heads=2,
+                head_size=2,
+                tp_rank=rank,
+                tp_size=2,
             ),
         )
         session = CaptureSession(tp_rank=rank, tp_size=2)
@@ -131,6 +140,79 @@ def test_layers_share_labels_but_own_rows_and_exclude_padding(context):
     snapshot = rows1.clone()
     first.add_(1000)
     torch.testing.assert_close(rows1, snapshot)
+
+
+@pytest.mark.parametrize("budget", [19, 20])
+def test_capture_selects_residual_rows_before_allocating_their_promoted_sum(context, budget):
+    from torch.utils._python_dispatch import TorchDispatchMode
+
+    class ResidualModel(torch.nn.Module):
+        def forward(self, hidden, residual):
+            return hidden, residual
+
+    additions = []
+
+    class TrackMatrixAdds(TorchDispatchMode):
+        def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+            if func is torch.ops.aten.add.Tensor and args[0].ndim == 2:
+                additions.append(tuple(args[0].shape))
+            return func(*args, **(kwargs or {}))
+
+    model = ResidualModel()
+    components = dict.fromkeys(COMPONENTS, ())
+    components["hidden_states"] = (ComponentTarget("layer.0", 0, model, width=2),)
+    session = CaptureSession()
+    session.attach(model, components)
+    session.enable_stream(
+        "hidden_states", select={"prompt_positions": [-1]}, budget_bytes=budget,
+    )
+    hidden = torch.arange(8, dtype=torch.bfloat16).reshape(4, 2)
+    residual = torch.full((4, 2), 0.125, dtype=torch.float32)
+    try:
+        with TrackMatrixAdds():
+            model(hidden, residual)
+        if budget < 20:
+            assert additions == []
+            with pytest.raises(RuntimeError, match="storage budget"):
+                session.fetch_stream("hidden_states")
+        else:
+            assert additions == [(1, 2)]
+            tensors, labels = deserialize_captured(session.fetch_stream("hidden_states"))
+            torch.testing.assert_close(tensors[0], hidden[2:3] + residual[2:3])
+            assert tensors[0].dtype == torch.float32
+            assert labels[0].positions.tolist() == [2]
+    finally:
+        session.detach()
+
+
+def test_residual_mean_preserves_sum_before_reduction_rounding(context):
+    context.batch_geometry = make_geometry(
+        offsets=(0, 3), computed=(0,), prompt=(3,), output=(0,),
+        req_ids=("a",), token_ids=(10, 11, 12),
+    )
+    hidden = torch.ones(3, 1, dtype=torch.bfloat16)
+    residual = torch.tensor([[0.005], [0.005], [0.0]], dtype=torch.bfloat16)
+    store = StreamStore(StreamConfig(reduce="mean"))
+    rows, _ = selection.prepare_rows(hidden, store, 0, residual=residual)
+    expected = (hidden + residual).mean(0, keepdim=True)
+    assert not torch.equal(
+        expected, hidden.mean(0, keepdim=True) + residual.mean(0, keepdim=True)
+    )
+    torch.testing.assert_close(rows, expected, rtol=0, atol=0)
+
+
+def test_graph_residual_sum_writes_promoted_preallocated_outputs():
+    state = CaptureGraphState((("hidden_states", (0,)),))
+    hidden = torch.arange(8, dtype=torch.bfloat16).reshape(4, 2)
+    residual = torch.full((4, 2), 0.125, dtype=torch.float32)
+    state.record("hidden_states", 0, hidden, "layer.0", residual=residual)
+    buffer, _ = state.buffers[("hidden_states", 0)]
+    assert buffer.dtype == torch.float32
+    torch.testing.assert_close(buffer, hidden + residual, rtol=0, atol=0)
+    pointer = buffer.data_ptr()
+    state.record("hidden_states", 0, hidden[:2], "layer.0", residual=residual[:2])
+    assert buffer.data_ptr() == pointer
+    torch.testing.assert_close(buffer[:2], hidden[:2] + residual[:2], rtol=0, atol=0)
 
 
 def test_new_step_reorders_requests_and_preserves_store_labels(context):
@@ -198,10 +280,11 @@ def test_store_and_effective_length_have_separate_plans(context):
 
 
 @pytest.mark.parametrize("reduce", ["last", "mean"])
-def test_chunked_reductions_reuse_boundaries_for_each_layers_values(context, reduce):
+def test_reductions_reuse_boundaries_for_each_layers_values(context, reduce):
     context.batch_geometry = make_geometry(
         offsets=(0, 2, 3),
         token_ids=(10, 11, 20),
+        **({"computed": (0, 0), "prompt": (2, 1)} if reduce == "mean" else {}),
     )
     store = StreamStore(StreamConfig(reduce=reduce))
     tensor = torch.tensor([[1.0, 3.0], [3.0, 5.0], [7.0, 9.0]])
@@ -220,13 +303,14 @@ def test_chunked_reductions_reuse_boundaries_for_each_layers_values(context, red
     torch.testing.assert_close(next_rows, rows + 10)
 
 
-def test_mean_keeps_empty_sample_zero_row(context):
+def test_mean_rejects_partial_prompts_instead_of_returning_chunk_means(context):
     context.batch_geometry = make_geometry(offsets=(0, 0, 2), token_ids=(20, 21))
     store = StreamStore(StreamConfig(reduce="mean"))
     tensor = torch.tensor([[2.0, 4.0], [4.0, 6.0]])
     rows, meta = selection.prepare_rows(tensor, store, 0)
-    torch.testing.assert_close(rows, torch.tensor([[0.0, 0.0], [3.0, 5.0]]))
-    assert meta.tolist() == [[0, -1, -1], [1, -1, -1]]
+    assert rows is None and meta is None
+    with pytest.raises(RuntimeError, match="unchunked prompt"):
+        store.serialize()
 
 
 def test_last_empty_segments_never_claim_another_requests_row(context):
@@ -436,12 +520,14 @@ def test_late_capture_rejects_only_scheduled_prompt_embedding_requests():
     assert session.fetch_stream("hidden_states", clear=False) == {}
 
     geometry = make_geometry(
-        offsets=(0, 1), computed=(3,), prompt=(4,), output=(0,),
-        req_ids=("embed-01234567",), token_ids=(0,),
+        offsets=(0, 1),
+        computed=(3,),
+        prompt=(4,),
+        output=(0,),
+        req_ids=("embed-01234567",),
+        token_ids=(0,),
     )
-    assert not session.needs_capture_for_batch(
-        geometry.req_ids, [3], [1], [4], [True]
-    )
+    assert not session.needs_capture_for_batch(geometry.req_ids, [3], [1], [4], [True])
     # Even an ordinary graph dispatch must record the capture failure.
     session.prepare_batch(geometry)
     with pytest.raises(RuntimeError, match="prompt embeddings"):
@@ -605,7 +691,11 @@ def capture_runner():
     runner.cudagraph_manager = SimpleNamespace(
         cudagraph_mode=CUDAGraphMode.FULL,
         dispatch=lambda *args: SimpleNamespace(cg_mode=CUDAGraphMode.FULL),
-        _capture_descs={CUDAGraphMode.FULL: (4, 2, 1)},
+        _capture_descs={
+            CUDAGraphMode.FULL: tuple(
+                SimpleNamespace(num_tokens=size) for size in (4, 2, 1)
+            )
+        },
     )
     runner.parallel_config = SimpleNamespace(world_size_across_dp=1)
     runner.speculative_config = None
@@ -613,9 +703,10 @@ def capture_runner():
     model = torch.nn.Sequential(torch.nn.Identity(), torch.nn.Identity())
     components = dict.fromkeys(COMPONENTS, ())
     components["hidden_states"] = tuple(
-        ComponentTarget(f"layer.{i}", i, layer) for i, layer in enumerate(model)
+        ComponentTarget(f"layer.{i}", i, layer, width=2)
+        for i, layer in enumerate(model)
     )
-    components["router_logits"] = (ComponentTarget("router.0", 0, model[0]),)
+    components["router_logits"] = (ComponentTarget("router.0", 0, model[0], width=2),)
     runner._attach_capture_hooks(model, components)
     runner.start_capture("hidden_states", layers=[0])
     return runner
@@ -628,12 +719,15 @@ def initialize_cpu_capture_graph(runner, state):
 
 
 def test_graph_variant_reuses_selection_changes_and_invalidates_layers_together(
-    capture_runner, monkeypatch,
+    capture_runner,
+    monkeypatch,
 ):
     from vllm.v1.worker.gpu import model_hook_utils
 
     monkeypatch.setattr(
-        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
+        model_hook_utils,
+        "_initialize_capture_graph",
+        initialize_cpu_capture_graph,
     )
     runner = capture_runner
     session = runner.capture_session
@@ -665,22 +759,116 @@ def test_graph_variant_reuses_selection_changes_and_invalidates_layers_together(
     )
 
 
+def test_lowered_device_budget_releases_cached_graph_before_eager_fallback(
+    capture_runner, monkeypatch,
+):
+    from vllm.v1.worker.gpu import model_hook_utils
+
+    runner = capture_runner
+    monkeypatch.setattr(
+        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph
+    )
+    runner.start_capture("hidden_states", layers=[0], device_budget_bytes=1024)
+    manager = model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4)
+    state = runner.capture_session.graph_state
+    assert manager is not None and state.buffers
+    runner.start_capture("hidden_states", layers=[0], device_budget_bytes=1)
+    assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4) is None
+    assert runner.capture_graph_manager is None and not state.buffers
+    assert runner.capture_session.graph_state is None
+    assert runner.capture_session._streams["hidden_states"].device_reserved_bytes == 0
+
+
+def test_unknown_output_width_declines_graph_with_finite_device_budget(
+    capture_runner, monkeypatch,
+):
+    from vllm.v1.worker.gpu import model_hook_utils
+
+    runner = capture_runner
+    runner.capture_session._layouts["hidden_states"].clear()
+    runner.start_capture("hidden_states", layers=[0], device_budget_bytes=1024)
+    initialize = Mock()
+    monkeypatch.setattr(model_hook_utils, "_initialize_capture_graph", initialize)
+    assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4) is None
+    initialize.assert_not_called()
+
+
+def test_graph_memory_admission_reserves_row_labels_and_cast_workspace(capture_runner):
+    runner = capture_runner
+    # Four rows, width two: fixed outputs alone fit, but selection/cast copies
+    # and mandatory labels must also fit before a graph is admitted.
+    runner.start_capture("hidden_states", layers=[0], device_budget_bytes=128)
+    assert runner.capture_session.graph_memory_estimate(4) is None
+
+
+@pytest.mark.parametrize("rank", [0, 1])
+@pytest.mark.parametrize("rejecting_rank", [0, 1])
+def test_tp_graph_memory_admission_falls_back_unanimously_before_recording(
+    rank, rejecting_rank, capture_runner, monkeypatch,
+):
+    from vllm.v1.worker.gpu import model_hook_utils
+
+    runner = capture_runner
+    runner.parallel_config.tensor_parallel_size = 2
+    runner.parallel_config.rank = rank
+    runner._attach_capture_hooks(
+        runner.capture_session._model, runner.capture_session._components
+    )
+    runner.start_capture("hidden_states", layers=[0], device_budget_bytes=1024)
+    runner.device = torch.device("cpu")
+    runner.cudagraph_memory_bytes = 64
+    monkeypatch.setattr(
+        torch.accelerator, "get_memory_info",
+        lambda device: (0 if rank == rejecting_rank else 4096, 8192),
+    )
+    participated = []
+
+    def agree(decisions, **kwargs):
+        participated.append(True)
+        decisions[1 - rank].copy_(decisions[rank])
+        decisions[1 - rank, 6] = (1 - rank) != rejecting_rank
+
+    monkeypatch.setattr(
+        model_hook_utils, "get_tp_group", lambda: SimpleNamespace(cpu_group=object())
+    )
+    monkeypatch.setattr(model_hook_utils.dist, "all_reduce", agree)
+    initialize = Mock()
+    monkeypatch.setattr(model_hook_utils, "_initialize_capture_graph", initialize)
+    assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4) is None
+    initialize.assert_not_called()
+    assert participated == [True]
+    assert runner.capture_graph_manager is None
+
+
 @pytest.mark.parametrize(
-    "unsupported", [
-        "pipeline_parallel_size", "data_parallel_size", "prefill_context_parallel_size",
-        "decode_context_parallel_size", "enable_sp", "use_sequence_parallel_moe",
-        "enable_expert_parallel", "spec", "lora", "split", "nonfull",
+    "unsupported",
+    [
+        "pipeline_parallel_size",
+        "data_parallel_size",
+        "prefill_context_parallel_size",
+        "decode_context_parallel_size",
+        "enable_sp",
+        "use_sequence_parallel_moe",
+        "enable_expert_parallel",
+        "spec",
+        "lora",
+        "split",
+        "nonfull",
     ],
 )
 def test_capture_graph_keeps_unsupported_execution_eager(
-    unsupported, capture_runner, monkeypatch,
+    unsupported,
+    capture_runner,
+    monkeypatch,
 ):
     from vllm.config.compilation import CUDAGraphMode
     from vllm.v1.worker.gpu import model_hook_utils
 
     runner = capture_runner
     monkeypatch.setattr(
-        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
+        model_hook_utils,
+        "_initialize_capture_graph",
+        initialize_cpu_capture_graph,
     )
     assert model_hook_utils.prepare_capture_graph(runner, 1, 4, None, 0, 4)
     if unsupported.endswith("_parallel_size"):
@@ -706,7 +894,9 @@ def test_capture_graph_keeps_unsupported_execution_eager(
 
 @pytest.mark.parametrize("rank", [0, 1])
 def test_tp_graph_reuses_and_rebuilds_global_variants_on_nonowners(
-    rank, capture_runner, monkeypatch,
+    rank,
+    capture_runner,
+    monkeypatch,
 ):
     from vllm.v1.worker.gpu import model_hook_utils
 
@@ -714,7 +904,8 @@ def test_tp_graph_reuses_and_rebuilds_global_variants_on_nonowners(
     runner.parallel_config.tensor_parallel_size = 2
     runner.parallel_config.rank = rank
     runner._attach_capture_hooks(
-        runner.capture_session._model, runner.capture_session._components,
+        runner.capture_session._model,
+        runner.capture_session._components,
     )
     runner.start_capture("hidden_states", layers=[0])
     peer_rebuild = False
@@ -723,12 +914,18 @@ def test_tp_graph_reuses_and_rebuilds_global_variants_on_nonowners(
         decisions[1 - rank].copy_(decisions[rank])
         decisions[1 - rank, 5] |= peer_rebuild
 
-    monkeypatch.setattr(model_hook_utils, "get_tp_group", lambda: SimpleNamespace(
-        cpu_group=object(),
-    ))
+    monkeypatch.setattr(
+        model_hook_utils,
+        "get_tp_group",
+        lambda: SimpleNamespace(
+            cpu_group=object(),
+        ),
+    )
     monkeypatch.setattr(model_hook_utils.dist, "all_reduce", agree)
     monkeypatch.setattr(
-        model_hook_utils, "_initialize_capture_graph", initialize_cpu_capture_graph,
+        model_hook_utils,
+        "_initialize_capture_graph",
+        initialize_cpu_capture_graph,
     )
 
     def prepare():
@@ -754,22 +951,29 @@ def test_tp_graph_reuses_and_rebuilds_global_variants_on_nonowners(
 
 
 @pytest.mark.parametrize(
-    "stream", ["hidden_states", "router_logits", "attention_heads"],
+    "stream",
+    ["hidden_states", "router_logits", "attention_heads"],
 )
 @pytest.mark.parametrize("rank", [0, 1])
 def test_tp_graph_validates_only_locally_owned_outputs(stream, rank):
     model = torch.nn.Identity()
     components = dict.fromkeys(COMPONENTS, ())
-    components[stream] = (ComponentTarget(
-        "layer.0", 0, model, width=2,
-        tp_rank=rank if stream == "attention_heads" else 0,
-        tp_size=2 if stream == "attention_heads" else 1,
-    ),)
+    components[stream] = (
+        ComponentTarget(
+            "layer.0",
+            0,
+            model,
+            width=2,
+            tp_rank=rank if stream == "attention_heads" else 0,
+            tp_size=2 if stream == "attention_heads" else 1,
+        ),
+    )
     session = CaptureSession(tp_rank=rank, tp_size=2)
     session.attach(model, components)
     session.enable_stream(stream)
     state = CaptureGraphState(
-        session.graph_signature(), session.graph_expected_outputs(),
+        session.graph_signature(),
+        session.graph_expected_outputs(),
     )
     session.graph_state = state
     with state.record_outputs(model):
@@ -786,7 +990,10 @@ def test_tp_graph_validates_only_locally_owned_outputs(stream, rank):
 @pytest.mark.parametrize("failure", ["local_hooks", "peer_hooks", "plan"])
 @pytest.mark.parametrize("local_full", [True, False])
 def test_tp_graph_preflight_rejects_every_rank_before_recording(
-    failure, local_full, capture_runner, monkeypatch,
+    failure,
+    local_full,
+    capture_runner,
+    monkeypatch,
 ):
     from unittest.mock import Mock
 
@@ -796,7 +1003,8 @@ def test_tp_graph_preflight_rejects_every_rank_before_recording(
     runner = capture_runner
     runner.parallel_config.tensor_parallel_size = 2
     runner._attach_capture_hooks(
-        runner.capture_session._model, runner.capture_session._components,
+        runner.capture_session._model,
+        runner.capture_session._components,
     )
     runner.start_capture("hidden_states", layers=[0])
     if not local_full:
@@ -815,9 +1023,13 @@ def test_tp_graph_preflight_rejects_every_rank_before_recording(
         elif failure == "plan":
             decisions[1, 0] ^= 1
 
-    monkeypatch.setattr(model_hook_utils, "get_tp_group", lambda: SimpleNamespace(
-        cpu_group=object(),
-    ))
+    monkeypatch.setattr(
+        model_hook_utils,
+        "get_tp_group",
+        lambda: SimpleNamespace(
+            cpu_group=object(),
+        ),
+    )
     monkeypatch.setattr(model_hook_utils.dist, "all_reduce", disagree)
     initialize = Mock()
     monkeypatch.setattr(model_hook_utils, "_initialize_capture_graph", initialize)
@@ -854,7 +1066,8 @@ def test_graph_rejects_duplicate_output_in_one_forward():
 
 
 def test_graph_initialization_failure_releases_state_and_same_signature_can_retry(
-    capture_runner, monkeypatch,
+    capture_runner,
+    monkeypatch,
 ):
     from vllm.v1.worker.gpu import model_hook_utils
 
@@ -984,8 +1197,10 @@ def test_capture_reattachment_releases_previous_model_and_graph(capture_runner):
 
     runner = capture_runner
     previous = None
-    for model in (torch.nn.Sequential(torch.nn.Identity()),
-                  torch.nn.Sequential(torch.nn.Identity())):
+    for model in (
+        torch.nn.Sequential(torch.nn.Identity()),
+        torch.nn.Sequential(torch.nn.Identity()),
+    ):
         components = dict.fromkeys(COMPONENTS, ())
         components["hidden_states"] = (ComponentTarget("layer.0", 0, model[0]),)
         runner._attach_capture_hooks(model, components)
@@ -1008,8 +1223,14 @@ def test_capture_reattachment_releases_previous_model_and_graph(capture_runner):
 
 
 @pytest.mark.parametrize(
-    "method", ["start_capture", "stop_capture", "fetch_captured",
-               "clear_captured", "capture_status"],
+    "method",
+    [
+        "start_capture",
+        "stop_capture",
+        "fetch_captured",
+        "clear_captured",
+        "capture_status",
+    ],
 )
 def test_worker_capture_rpc_rejects_v1_before_calling_runner(method):
     from unittest.mock import Mock

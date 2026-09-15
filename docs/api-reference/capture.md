@@ -103,10 +103,12 @@ use `capture()` instead of creating or attaching a second `CaptureSession`.
 |---|---|
 | `layers` | True layer IDs; `None` selects all available layers. |
 | `dtype` | Optional storage dtype, independent of model compute dtype. |
-| `reduce` | `"all"` retains rows; `"last"` or `"mean"` reduces within a request. |
+| `reduce` | `"all"` retains rows; `"last"` retains a request's last row per forward step after its prompt is complete; `"mean"` averages that request's rows per forward step and rejects chunked prefills. |
 | `select` | A `SelectSpec.to_wire()` dictionary; requires `reduce="all"`. |
 | `budget_rows` | Optional nonnegative row limit per layer. |
 | `budget_bytes` | Optional raw CPU values/labels and pending-transfer limit. `start_capture` treats it as a total across layers and workers. Overflow is reported at fetch; it does not fail the model forward. |
+| `device_budget_bytes` | Optional per-worker budget for fixed capture outputs and pending selection/cast data. It excludes model activations, KV cache and graph pools. |
+| `staging_bytes` | Maximum reusable pinned transfer page per worker and stream; defaults to 16 MiB. |
 
 The constructor validates the selection and resolves dtype/layer storage. With
 TP, the session divides an attention stream's byte budget equally among workers,
@@ -115,12 +117,17 @@ retain the full budget on their owner. A worker's `StreamConfig` and status show
 its assigned limit, so this is a conservative total bound with no redistribution
 of unused capacity. The high-level `hs.capture()` accepts `budget_bytes` but not
 `budget_rows` or `reduce`; it returns selected rows without a reduction.
+The low-level raw and device budgets default to `None`; both high-level capture
+helpers instead default to 256 MiB for each. These controls bound capture-owned
+allocations, not total process RSS or GPU usage. A low-level mean is not a mean
+over an entire generated sequence. Prefer retaining selected rows and pooling
+each sample with `extract(..., token_pos="mean")`.
 
 ::: model_hooks.capture.store.StreamConfig
     options:
       heading: vllm.capture.StreamConfig
       merge_init_into_class: true
-      members: [layers, dtype, reduce, select, budget_rows, budget_bytes, selects_rows]
+      members: [layers, dtype, reduce, select, budget_rows, budget_bytes, device_budget_bytes, staging_bytes, selects_rows]
       show_if_no_docstring: true
 
 ## Capture session
@@ -133,12 +140,14 @@ management, the relevant operations are:
 |---|---|
 | `enable_stream(stream, **config_kwargs)` | Validate a `StreamConfig` and start a fresh store; hooks must already be attached. |
 | `disable_stream(stream)` | Disable collection for that stream. |
-| `fetch_stream(stream, clear=True, layers=None, req_ids=None)` | Return serialized rows, labels, and available layouts; optionally clear the selected data. |
+| `fetch_stream(stream, clear=True, layers=None, req_ids=None, max_rows=None, row_offset=0)` | Return serialized rows, labels, and available layouts; optionally clear the selected data. `max_rows` caps each layer after request filtering; a nonzero `row_offset` requires `clear=False`. |
 | `clear_stream(stream)` | Clear retained rows and errors. |
-| `stream_status(stream)` | Return enablement, hooked layers, local layouts, storage counters, and capture-graph execution counters. |
+| `stream_status(stream)` | Return enablement, hooked layers, local layouts/shards, per-layer row counts, storage and staging counters, and capture-graph execution counters. |
 
 The supported RPCs (`start_capture`, `stop_capture`, `fetch_captured`,
 `clear_captured`, `capture_status`) delegate to these operations in the worker.
+`release_capture_cache` releases cached capture graphs; the client wrapper is
+`easysteer.capture.release_capture_cache(llm)`.
 The worker adds topology metadata to `capture_status`. The high-level helper
 also coordinates prefix-cache read policy before admission. Eligible FULL
 batches use a separate capture graph at both `TP=1` and `TP>1`, with steering
@@ -159,6 +168,10 @@ including non-owners with no local capture buffers.
 owns it; integrations can inspect the storage/serialization contract here.
 `serialize()` returns the per-layer wire dictionaries consumed by
 `deserialize_captured()`. Request and layer filters operate on retained data.
+Raw integrations should pass `max_rows` and a layer subset for bounded fetches;
+omitting `max_rows` serializes all matching rows. The high-level helper drains
+aligned TP pages into final RAM or memory-mapped arrays and validates labels,
+dtype and layout across pages.
 
 ::: model_hooks.capture.store.StreamStore
     options:

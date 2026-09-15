@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .base import BaseExtractor
 from .result import StatisticalControlVector
-from .selection import derive_negative_indices
+from .selection import validate_sample_groups
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +92,9 @@ class LinearProbeExtractor(BaseExtractor):
             ]
         )
 
-        if standardize:
-            features = StandardScaler().fit_transform(features)
+        scaler = StandardScaler() if standardize else None
+        if scaler is not None:
+            features = scaler.fit_transform(features)
 
         clf = _build_classifier(penalty, C)
         try:
@@ -101,8 +102,11 @@ class LinearProbeExtractor(BaseExtractor):
         except Exception as e:
             raise RuntimeError(f"linear probe fit failed for layer {layer}: {e}") from e
 
-        # The classifier weights point toward the positive class
-        direction = clf.coef_[0]  # [hidden_dim]
+        # Convert the standardized classifier normal back to raw activation
+        # coordinates: z @ w = x @ (w / scale) - mean @ (w / scale).
+        direction = clf.coef_[0]
+        if scaler is not None:
+            direction = direction / scaler.scale_
         train_score = float(clf.score(features, labels))
 
         non_zero_weights = np.count_nonzero(direction)
@@ -130,7 +134,6 @@ class LinearProbeExtractor(BaseExtractor):
         regularization: str = "l2",
         C: float = 1.0,
         standardize: bool = True,
-        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the Linear Probe method.
 
@@ -148,24 +151,16 @@ class LinearProbeExtractor(BaseExtractor):
         Returns:
             StatisticalControlVector: The extracted control vector.
         """
-        if negative_indices is None:
-            negative_indices = derive_negative_indices(
-                len(all_hidden_states), positive_indices
-            )
+        positive_indices, negative_indices = validate_sample_groups(
+            len(all_hidden_states), positive_indices, negative_indices
+        )
 
         total_samples = len(positive_indices) + len(negative_indices)
         if total_samples < 4:
             raise ValueError(
                 f"The LinearProbe method needs at least 4 samples "
-                f"(2 positive + 2 negative), but only {total_samples} "
+                f"in total, but only {total_samples} "
                 f"were provided."
-            )
-
-        if len(positive_indices) < 1 or len(negative_indices) < 1:
-            raise ValueError(
-                f"The LinearProbe method needs at least 1 positive and "
-                f"1 negative sample, but got {len(positive_indices)} "
-                f"positive and {len(negative_indices)} negative."
             )
 
         penalty_map = {
@@ -206,5 +201,6 @@ class LinearProbeExtractor(BaseExtractor):
                 "regularization": "none" if penalty is None else penalty,
                 "C": C,
                 "standardize": standardize,
+                "coordinate_space": "raw_activations",
             },
         )

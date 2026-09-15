@@ -5,7 +5,7 @@
 ``capture_batches`` yields batches for bounded processing or storage.
 """
 
-from .api import capture, capture_batches
+from .api import capture, capture_batches, release_capture_cache
 from .result import CaptureResult
 
-__all__ = ["CaptureResult", "capture", "capture_batches"]
+__all__ = ["CaptureResult", "capture", "capture_batches", "release_capture_cache"]

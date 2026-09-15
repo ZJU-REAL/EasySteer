@@ -7,7 +7,7 @@ from ._utils import _metadata
 from .accumulators import DiffMeanAccumulator
 from .base import BaseExtractor
 from .result import StatisticalControlVector
-from .selection import derive_negative_indices
+from .selection import validate_sample_groups
 
 
 class DiffMeanExtractor(BaseExtractor):
@@ -39,7 +39,6 @@ class DiffMeanExtractor(BaseExtractor):
         negative_indices=None,
         normalize: bool = True,
         token_pos: int | str = -1,
-        **kwargs,
     ) -> StatisticalControlVector:
         """Extract control vectors using the difference-of-means method.
 
@@ -57,10 +56,9 @@ class DiffMeanExtractor(BaseExtractor):
         Returns:
             StatisticalControlVector: The extracted control vector.
         """
-        if negative_indices is None:
-            negative_indices = derive_negative_indices(
-                len(all_hidden_states), positive_indices
-            )
+        positive_indices, negative_indices = validate_sample_groups(
+            len(all_hidden_states), positive_indices, negative_indices
+        )
         return DiffMeanExtractor._extract_template(
             all_hidden_states,
             positive_indices,

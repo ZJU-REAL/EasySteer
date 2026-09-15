@@ -64,8 +64,12 @@ Key arguments (full signature in the [API reference](../api-reference/hidden-sta
 | `per_prompt_selects` | One `SelectSpec` or wire dict per prompt, overriding the global selection (`None` entries keep the global one). The list length must match `prompts`. |
 | `stream` | `"hidden_states"` (default), `"router_logits"` (MoE), or `"attention_heads"` (before the attention output projection). |
 | `steering` | `SteeringSpec` or per-prompt list, as in `LLM.generate()`. Captured values include steering; use `False` to disable it even when the engine has a default. |
-| `budget_bytes` | Optional total limit on raw CPU values and row labels, including pending transfers, across the stream's layers and workers. Exceeding it fails capture instead of returning a partial result. |
+| `budget_bytes` | Total limit (256 MiB by default) on raw CPU values and row labels, including pending transfers, across the stream's layers and workers. Exceeding it fails capture instead of returning a partial result. |
+| `sample_indices` | Optional unique nonnegative input IDs, one per prompt. `capture_batches()` supplies the indices in its original prompt iterable. |
 | `**generate_kwargs` | Forwarded into `SamplingParams` (e.g. `temperature`). |
+
+Capture requires one continuation per prompt (`n=1`); multiple continuations
+are rejected before contacting workers so sample ownership stays unambiguous.
 
 ### Select rows
 
@@ -104,6 +108,11 @@ result.sample_positions(0)  # absolute sequence positions of sample 0's rows
 result.sample_token_ids(0)  # input token ids of sample 0's rows
 result.outputs            # the vLLM RequestOutput list, prompt order
 result.layouts            # per-layer component widths and attention head layout
+result.sample_indices     # original input IDs; sample methods still use local indices
+result.component          # captured stream, such as "hidden_states"
+result.model              # model identifier when available
+result.selection          # canonical global selection, or None for all rows
+result.per_prompt_selections  # optional overrides; None entries use the global selection
 result.to_nested()        # [sample][layer_pos] tensors, when explicitly needed
 ```
 
@@ -112,57 +121,99 @@ Labels are mandatory. `token()` indexes a sample's captured rows, so `-1`
 means the last selected row, which may differ from the last original prompt
 position. `sample_rows()` returns a view when those rows are contiguous;
 noncontiguous rows are gathered in sequence order.
+For bounded reads of a long sample, use
+`result.iter_sample_rows(i, layer, chunk_size=32)`. Each yielded chunk contains
+at most that many rows, including when the sample's rows are interleaved.
 
 ## Process a dataset in batches
 
-Use `capture_batches()` to consume results a batch at a time. It preserves
-prompt order and slices per-prompt steering and selection lists along the same
-boundaries. Each result uses local sample indices starting at zero. Worker
-storage is cleared before the result is yielded, and compatible capture graphs
-remain cached for the next batch.
+Use `capture_batches()` with a prompt iterable. Batches respect both
+`batch_size` and an estimate of selected-row storage. Text and token-ID inputs
+use the same position-selection rules as the workers. Unknown multimodal
+geometry is isolated into single-prompt batches, with worker admission still
+enforcing the budget. A single prompt estimated above the budget is rejected
+before generation. `sample_indices` records each sample's original input index;
+methods such as `sample_rows(i, layer)` still use local indices within a batch.
 
-For diffmean, keep running statistics rather than all captured samples:
+The iterator starts the next capture only when the consumer asks for it. It
+may read one prompt ahead to decide a byte-based batch boundary. Worker storage
+is drained before yielding. Pass the iterator directly
+to extraction to avoid retaining an entire corpus:
 
 ```python
-from easysteer.extraction import DiffMeanAccumulator, DiffMeanExtractor
+from itertools import chain
+from easysteer.extraction import extract
 
-accumulator = DiffMeanAccumulator()
-for positive, group in [(True, positive_prompts), (False, negative_prompts)]:
-    for batch in hs.capture_batches(
-        llm, group, batch_size=32, layers=[10, 11, 12],
-        select=SelectSpec(prompt_positions=[-1]),
-        budget_bytes=256 * 1024 * 1024,
-    ):
-        for layer in batch.layer_ids:
-            accumulator.update(layer, batch.rows(layer), positive=positive)
-        del batch
-
-vector = DiffMeanExtractor.from_moments(accumulator.pos, accumulator.neg)
+batches = hs.capture_batches(
+    llm, chain(positive_prompts, negative_prompts),
+    batch_size=32, layers=[10, 11, 12],
+    select=SelectSpec(prompt_positions=[-1]),
+)
+labels = chain([True] * len(positive_prompts), [False] * len(negative_prompts))
+vector = extract(batches, labels, method="diffmean")
 vector.export_gguf("direction.gguf")
 ```
 
-`positive_prompts` and `negative_prompts` use the same prompt input format as
-`capture()`. Selecting one row per prompt gives each sample equal weight. For
-full activation datasets, write each yielded batch to a separate file instead
-of retaining the iterator as a list. One large batch can still exceed the byte
-budget; reduce its size, select fewer rows/layers, or increase the limit.
+Labels are consumed in input order, one Boolean or integer 0/1 per sample.
+`extract(..., token_pos="mean")` pools each sample's selected rows before averaging samples,
+so longer prompts do not get extra weight. `method="incremental_pca"` provides
+an explicit approximate PCA option with bounded working storage. See the
+[extraction guide](extracting-vectors.md) for algorithms and memory preflight.
 
-`capture_batches()` defaults to 32 prompts and a 256 MiB raw-storage budget.
-`capture()` retains its unrestricted default, with `budget_bytes` available
-explicitly. The budget counts values and labels in worker CPU storage and
-pending transfers. It excludes model memory, CUDA graph buffers, serialization
-copies, and tensors retained by the caller; it is not a process memory limit.
-With TP, attention capture divides this budget equally among workers, including
-each worker's row labels; unused capacity on one worker cannot be borrowed by
-another. Replicated hidden states and router logits are stored by one owner,
-which keeps the full budget. The low-level `capture_status` RPC reports each
-worker's `storage_bytes` and assigned `budget_bytes`.
+Both capture helpers default to these independent controls:
 
-Per-layer extraction reads only the requested token rows and processes one
-layer at a time. Online means require space proportional to feature width.
-`MomentsAccumulator(track_second_moment=True)` also retains a square covariance
-matrix per layer; use it only when that statistic is needed. It is not a general
-memory-saving replacement for sample storage at large hidden dimensions.
+| Control | Default | Scope |
+|---|---|---|
+| `budget_bytes` | 256 MiB | Retained raw activation values and int32 labels, including pending transfers, across this stream's workers. |
+| `device_budget_bytes` | 256 MiB | Per-worker fixed capture outputs and pending selection/cast data for this stream. |
+| `staging_bytes` | 16 MiB | Reusable pinned transfer page per worker and stream. Stored datasets use pageable memory. |
+| `fetch_bytes` | 16 MiB | Target raw size per fetch page across workers; at least one row is fetched. |
+
+These are allocation controls, **not a total process RSS or GPU-memory cap**.
+Model activations, KV cache, CUDA graph pools, allocator caches, Python labels,
+RPC encoding/decoding copies and results retained by the caller add overhead.
+Paging bounds each serialization/assembly temporary; the final in-memory
+result still holds all selected rows of its batch. A single row can exceed the
+fetch target. `None` explicitly disables a raw or device budget.
+
+Attention raw budgets are divided equally across TP workers, including duplicate
+row labels; replicated hidden states and router logits have one owner. The
+`capture_status` RPC exposes per-layer row counts, storage, pending device data,
+pinned staging allocation and graph memory. Raw-budget or device-budget
+violations fail the result instead of silently returning incomplete data.
+
+To keep final activation arrays on disk, provide a new output directory:
+
+```python
+result = hs.capture(llm, prompts, layers=[10], storage_dir="captures/run-001")
+# Reopen later; arrays are memory-mapped and no pickle is loaded.
+result = hs.CaptureResult.load("captures/run-001")
+```
+
+`capture_batches(..., storage_dir="captures/dataset")` writes one directory per
+batch, named by its first global sample index. Iterate over those directories
+and load one batch at a time for extraction. Supply fresh labels in saved
+batch/sample order; extraction does not use `sample_indices` to index the labels:
+
+```python
+from pathlib import Path
+
+def saved_batches():
+    for path in sorted(Path("captures/dataset").glob("batch-*")):
+        yield hs.CaptureResult.load(path)
+
+vector = extract(saved_batches(), iter(dataset_labels), method="diffmean")
+```
+
+`dataset_labels` contains one label per saved sample in that order. A fresh
+`saved_batches()` iterator can be used for another extraction call.
+`result.save(path)` also persists an existing result. Saved captures retain the
+global selection, per-prompt overrides and sample IDs. Loaded arrays use
+copy-on-write mappings: editing a loaded tensor does not change the saved files.
+Saved outputs retain request IDs, prompt/token information and
+completion text/tokens, rather than every runtime field of `RequestOutput`.
+Memory-mapped pages are managed by the operating system; touching every page
+can increase resident memory. Keep input batches bounded even with disk storage.
 
 ## MoE router logits
 
@@ -229,7 +280,17 @@ The graph's fixed output buffers contain whole execution batches before row
 selection. Selecting fewer rows reduces retained CPU data and transfer volume,
 but does not shrink those fixed GPU buffers. Stopping capture clears the stream
 while retaining the cached graph for reuse; status reports its buffer and total
-allocation sizes separately.
+allocation sizes separately. Before recording, capture checks discovered output
+widths against the device budget and available GPU memory, including a reserve
+based on the ordinary graph allocation. If these checks fail, every TP rank
+uses eager capture. Unknown dimensions with a finite budget also use eager
+capture. Graph-pool estimates are conservative admission checks, not a guarantee
+against unrelated device allocations. Release cached capture graphs explicitly
+when the workload is finished:
+
+```python
+hs.release_capture_cache(llm)
+```
 
 For a long-running TP engine that repeatedly changes captured components or
 layers, set `disable_custom_all_reduce=True` when constructing `LLM`. vLLM's

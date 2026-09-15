@@ -1,6 +1,7 @@
 import os
 import re
 import threading
+from itertools import chain, repeat
 
 import torch
 from core import ConfigStore, project_root_on_path
@@ -11,11 +12,7 @@ from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
     from easysteer.capture import capture, capture_batches
-    from easysteer.extraction import (
-        DiffMeanAccumulator,
-        DiffMeanExtractor,
-        extract_statistical_control_vector,
-    )
+    from easysteer.extraction import extract
 
 extraction_bp = Blueprint("extraction", __name__)
 
@@ -94,6 +91,10 @@ def run_extraction(config):
         if method not in ("lat", "pca", "diffmean"):
             raise ValueError(f"Unsupported extraction method: {method}")
 
+        max_working_bytes = config.get("max_working_bytes", 256 * 1024**2)
+        if type(max_working_bytes) is not int or max_working_bytes < 1:
+            raise ValueError("max_working_bytes must be a positive integer")
+
         gpu_devices = normalize_gpu_devices(config.get("gpu_devices", "0"))
         os.environ["CUDA_VISIBLE_DEVICES"] = gpu_devices
 
@@ -122,8 +123,9 @@ def run_extraction(config):
 
         update_extraction_status("Extracting hidden states...")
         all_samples = positive_samples + negative_samples
-        positive_indices = list(range(len(positive_samples)))
-        negative_indices = list(range(len(positive_samples), len(all_samples)))
+        labels = chain(
+            repeat(True, len(positive_samples)), repeat(False, len(negative_samples))
+        )
 
         update_extraction_status(f"Using extraction method: {method.upper()}")
         # This job captures prompt rows only, so the original token_pos can be
@@ -135,32 +137,25 @@ def run_extraction(config):
         }
         normalize = config.get("normalize", True)
         if method == "diffmean":
-            accumulator = DiffMeanAccumulator()
-            for positive, samples in (
-                (True, positive_samples),
-                (False, negative_samples),
-            ):
-                for captured in capture_batches(llm, samples, **capture_kwargs):
-                    _require_prompt_rows(captured, token_pos)
-                    for layer in captured.layer_ids:
-                        accumulator.update(
-                            layer, captured.rows(layer), positive=positive
-                        )
-                    del captured
-            control_vector = DiffMeanExtractor.from_moments(
-                accumulator.pos, accumulator.neg, normalize=normalize
-            )
+
+            def checked_batches():
+                for batch in capture_batches(llm, all_samples, **capture_kwargs):
+                    _require_prompt_rows(batch, token_pos)
+                    yield batch
+                    del batch
+
+            captured = checked_batches()
         else:
             captured = capture(llm, all_samples, **capture_kwargs)
             _require_prompt_rows(captured, token_pos)
-            control_vector = extract_statistical_control_vector(
-                method=method,
-                all_hidden_states=captured,
-                positive_indices=positive_indices,
-                negative_indices=negative_indices,
-                normalize=normalize,
-                token_pos=0,
-            )
+        control_vector = extract(
+            captured,
+            labels,
+            method=method,
+            normalize=normalize,
+            token_pos=0,
+            max_working_bytes=max_working_bytes,
+        )
         control_vector.metadata["token_pos"] = token_pos
 
         output_path = config["output_path"]

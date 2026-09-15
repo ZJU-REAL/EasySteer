@@ -251,6 +251,66 @@ def test_capture_and_steering_share_discovered_indices(monkeypatch):
         session.detach()
 
 
+@pytest.mark.parametrize("source", ["layer", "rms_norm", "layer_norm", "config"])
+def test_hidden_capture_width_uses_decoder_contract_before_model_fallback(source):
+    from vllm.model_executor.layers.layernorm import RMSNorm
+
+    decoder = Decoder()
+    model = Stack([decoder])
+    model.config = SimpleNamespace(hidden_size=16)
+    if source == "layer":
+        decoder.hidden_size = 4
+    elif source == "rms_norm":
+        norm = RMSNorm.__new__(RMSNorm)
+        nn.Module.__init__(norm)
+        norm.hidden_size = 4
+        decoder.input_layernorm = norm
+    elif source == "layer_norm":
+        decoder.input_layernorm = nn.LayerNorm(4)
+    else:
+        model.config.hidden_size = 4
+    target, = discover_components(model)[HIDDEN_STATES]
+    assert target.width == target.global_width == 4
+    assert target.tp_size == 1
+
+
+def test_hidden_capture_width_stays_unknown_for_missing_or_conflicting_contracts():
+    decoder = Decoder()
+    model = Stack([decoder])
+    assert discover_components(model)[HIDDEN_STATES][0].width is None
+    decoder.hidden_size = 4
+    decoder.input_layernorm = nn.LayerNorm(8)
+    model.config = SimpleNamespace(hidden_size=4)
+    assert discover_components(model)[HIDDEN_STATES][0].width is None
+
+
+@pytest.mark.parametrize("kind", ["torch", "replicated", "wrapped", "sharded"])
+def test_router_capture_width_uses_replicated_output_contract_not_weight_shape(kind):
+    from vllm.model_executor.layers.linear import ColumnParallelLinear, ReplicatedLinear
+
+    if kind == "torch":
+        gate = nn.Linear(4, 6)
+    else:
+        gate_type = ColumnParallelLinear if kind == "sharded" else ReplicatedLinear
+        gate = gate_type.__new__(gate_type)
+        nn.Module.__init__(gate)
+        gate.output_size = 6
+        gate.output_size_per_partition = 3
+        gate.tp_size = 2
+        gate.tp_rank = 1
+        gate.weight = nn.Parameter(torch.ones(3, 4))
+        if kind == "wrapped":
+            wrapper = nn.Module()
+            wrapper.base_layer = gate
+            gate = wrapper
+    decoder = Decoder()
+    decoder.moe = nn.Module()
+    decoder.moe.experts = TinyRunner(gate)
+    target, = discover_components(Stack([decoder]))[ROUTER_LOGITS]
+    assert target.width == (None if kind == "sharded" else 6)
+    assert target.tp_size == 1
+
+
 def test_capture_installs_only_enabled_layers_and_preserves_existing_hooks(monkeypatch):
     from vllm.model_hooks.components.registry import COMPONENTS, ComponentTarget
 
