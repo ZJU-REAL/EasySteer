@@ -4,9 +4,11 @@ Run from the repository root:
     python examples/training.py --model Qwen/Qwen2.5-1.5B-Instruct --algorithm loreft
 
 Select the GPU through CUDA_VISIBLE_DEVICES before starting the process.
+For two GPUs, use torchrun --standalone --nproc-per-node=2 examples/training.py.
 """
 
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -42,6 +44,13 @@ def main():
     parser.add_argument("--layer", type=int, default=8)
     parser.add_argument("--rank", type=int, default=4)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--batch-size", type=int, default=10, help="Examples per GPU")
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
+    parser.add_argument(
+        "--apply",
+        type=json.loads,
+        help='ApplySpec JSON; defaults to {"prompt_positions": [-1]}',
+    )
     args = parser.parse_args()
     epochs = (
         args.epochs
@@ -50,25 +59,38 @@ def main():
     )
     if epochs <= 0 or args.rank <= 0 or args.layer < 0:
         parser.error("epochs and rank must be positive, and layer must be non-negative")
+    if args.batch_size <= 0 or args.gradient_accumulation_steps <= 0:
+        parser.error("batch size and gradient accumulation steps must be positive")
     save_dir = args.save_dir or Path(".local/training") / args.algorithm
+
+    import torch.distributed as dist
 
     from easysteer.training import generate, train
 
-    model, tokenizer = train(
-        model_path=args.model,
-        examples=EMOJI_EXAMPLES,
-        algorithm=args.algorithm,
-        layer=args.layer,
-        rank=args.rank,
-        device=args.device,
-        num_train_epochs=epochs,
-        save_dir=str(save_dir),
-        output_dir=str(save_dir / "training"),
-    )
-    print(generate(model, tokenizer, "Who are you?", device=args.device))
-    print(
-        f"Checkpoint saved to {save_dir}; its config records the prompt format and apply positions."
-    )
+    try:
+        model, tokenizer = train(
+            model_path=args.model,
+            examples=EMOJI_EXAMPLES,
+            algorithm=args.algorithm,
+            layer=args.layer,
+            rank=args.rank,
+            apply=args.apply,
+            device=args.device,
+            num_train_epochs=epochs,
+            per_device_train_batch_size=args.batch_size,
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
+            save_dir=str(save_dir),
+            output_dir=str(save_dir / "training"),
+        )
+        if not dist.is_initialized() or dist.get_rank() == 0:
+            print(generate(model, tokenizer, "Who are you?"))
+            print(
+                f"Checkpoint saved to {save_dir}; its config records the prompt format "
+                "and apply positions."
+            )
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
 
 
 if __name__ == "__main__":

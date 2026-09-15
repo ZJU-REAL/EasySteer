@@ -103,3 +103,18 @@ Training presets use the same fields as `POST /api/train`: `model_path`,
 `algorithm`, `output_dir`, an array of `[input, output]` pairs in
 `training_examples`, and the `steering_config` / `training_args` objects. Presets
 can therefore be sent directly to the endpoint.
+
+`steering_config.apply` accepts the same prompt/generation token selectors as
+vllm-steer. Omitting it selects the last prompt token. The Workshop selector
+editor preserves these rules through training and export to the Steer page,
+and the native checkpoint stores them for `load_checkpoint(...).to_spec()`.
+Training uses reference response tokens when matching generation selectors;
+inference uses the generated tokens. `generation_positions: [0]` transforms
+the first response token's state while predicting the second token.
+
+The web job runs on one GPU and rejects multiple IDs in `gpu_devices`. Run
+multi-GPU training from the command line with `torchrun`; see the
+[training guide](../docs/user-guide/reft-training.md#train-on-multiple-gpus).
+DDP keeps one complete base model per GPU, synchronizes adapter gradients, and
+writes checkpoints only on rank zero. It does not reduce the base model's
+per-GPU memory requirement.

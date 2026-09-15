@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Response-only supervision with one steering position per prompt."""
+"""Response-only supervision with explicit prompt lengths for token selection."""
 
 from collections.abc import Sequence
 
@@ -45,7 +45,7 @@ class SupervisedDataset(Dataset):
                 {
                     "input_ids": ids,
                     "labels": [-100] * len(prompt) + ids[len(prompt) :],
-                    "steering_positions": len(prompt) - 1,
+                    "prompt_lengths": len(prompt),
                 }
             )
 
@@ -63,14 +63,16 @@ class SupervisedCollator:
         self.pad_token_id = pad_token_id
 
     def __call__(self, rows: Sequence[dict]) -> dict[str, torch.Tensor]:
+        if not rows:
+            raise ValueError("training batch must not be empty")
         length = max(len(row["input_ids"]) for row in rows)
         shape = (len(rows), length)
         batch = {
             "input_ids": torch.full(shape, self.pad_token_id, dtype=torch.long),
             "attention_mask": torch.zeros(shape, dtype=torch.long),
             "labels": torch.full(shape, -100, dtype=torch.long),
-            "steering_positions": torch.tensor(
-                [row["steering_positions"] for row in rows], dtype=torch.long
+            "prompt_lengths": torch.tensor(
+                [row["prompt_lengths"] for row in rows], dtype=torch.long
             ),
         }
         for index, row in enumerate(rows):

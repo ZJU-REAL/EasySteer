@@ -24,7 +24,10 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Must be set before vllm/torch import (conftest imports first).
-os.environ["CUDA_VISIBLE_DEVICES"] = os.environ.get("GPU_ID", "0")
+if "GPU_ID" in os.environ:
+    os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["GPU_ID"]
+else:
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
 
 import pytest  # noqa: E402

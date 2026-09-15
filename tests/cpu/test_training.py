@@ -53,7 +53,7 @@ def batch():
         "input_ids": torch.tensor([[1, 4, 5, 6], [1, 7, 8, 0]]),
         "attention_mask": torch.tensor([[1, 1, 1, 1], [1, 1, 1, 0]]),
         "labels": torch.tensor([[-100, -100, 5, 6], [-100, 7, 8, -100]]),
-        "steering_positions": torch.tensor([1, 0]),
+        "prompt_lengths": torch.tensor([2, 1]),
     }
 
 
@@ -62,7 +62,7 @@ def test_supervision_preserves_prompt_prefix_and_masks_padding():
     assert dataset[0]["input_ids"] == [1, 20, 21, 2]
     assert dataset[0]["labels"] == [-100, -100, 21, 2]
     result = SupervisedCollator(0)([dataset[0], dataset[1]])
-    assert result["steering_positions"].tolist() == [1, 3]
+    assert result["prompt_lengths"].tolist() == [2, 4]
     assert result["input_ids"].shape == (2, 7)
     assert result["attention_mask"][0].tolist() == [1, 1, 1, 1, 0, 0, 0]
     assert result["labels"][0].tolist() == [-100, -100, 21, 2, -100, -100, -100]
@@ -98,7 +98,7 @@ def test_decoder_target_changes_only_selected_rows_and_removes_hook(family):
         model(input_ids=values["input_ids"], attention_mask=values["attention_mask"])
     expected = observed[-1]
     baseline_hook.remove()
-    with wrapper._steering(values["steering_positions"]):
+    with wrapper._steering(torch.tensor([1, 4])):
         after_hook = target.register_forward_hook(
             lambda module, args, output: observed.append(
                 (output[0] if isinstance(output, tuple) else output).detach().clone()
@@ -110,8 +110,8 @@ def test_decoder_target_changes_only_selected_rows_and_removes_hook(family):
     expected[1, 0] += wrapper.adapter.bias.detach()
     torch.testing.assert_close(observed[-1], expected)
     assert not target._forward_hooks
-    with pytest.raises(ValueError, match="outside"):
-        wrapper(**{**values, "steering_positions": torch.tensor([99, 0])})
+    with pytest.raises(ValueError, match="prompt_lengths"):
+        wrapper(**{**values, "prompt_lengths": torch.tensor([99, 0])})
     assert not target._forward_hooks
 
 
@@ -177,7 +177,11 @@ def test_native_checkpoint_round_trip_preserves_outputs_and_selection(
     restored = SteeringModel(saved_base, checkpoint.config)
     restored.load_adapter(checkpoint)
     torch.testing.assert_close(restored(**batch()).logits, expected)
-    vector = checkpoint.to_spec().vectors[0]
+    from vllm.model_hooks.steering.api import SteeringSpec, to_engine_request
+
+    spec = SteeringSpec.model_validate_json(checkpoint.to_spec().model_dump_json())
+    vector = spec.vectors[0]
+    assert to_engine_request(spec).vectors[0].payload == checkpoint.payload.to_wire()
     assert vector.algorithm == algorithm
     assert vector.apply.prompt_positions == [-1]
     assert vector.apply.generation is None
@@ -250,7 +254,7 @@ def test_projected_embeddings_use_decoder_hidden_width():
 
 
 @pytest.mark.parametrize(
-    "positions",
+    "prompt_lengths",
     [
         torch.tensor([]),
         torch.tensor([0.5, 1.0]),
@@ -258,10 +262,10 @@ def test_projected_embeddings_use_decoder_hidden_width():
         torch.tensor([1]),
     ],
 )
-def test_invalid_positions_fail_without_leaking_hooks(positions):
+def test_invalid_prompt_lengths_fail_without_leaking_hooks(prompt_lengths):
     wrapper = SteeringModel(tiny_model(), TrainingConfig(layer=0))
-    with pytest.raises(ValueError, match="positions"):
-        wrapper(**{**batch(), "steering_positions": positions})
+    with pytest.raises(ValueError, match="prompt_lengths"):
+        wrapper(**{**batch(), "prompt_lengths": prompt_lengths})
     assert not wrapper.base_model.model.layers[0]._forward_hooks
 
 
@@ -371,7 +375,7 @@ def test_generation_matches_explicit_last_prompt_steering(use_cache):
     expected = prompt
     for _ in range(result.shape[1] - prompt.shape[1]):
         logits = wrapper(
-            input_ids=expected, steering_positions=torch.tensor([2]), use_cache=False
+            input_ids=expected, prompt_lengths=torch.tensor([3]), use_cache=False
         ).logits
         expected = torch.cat(
             [expected, logits[:, -1].argmax(dim=-1, keepdim=True)], dim=1
@@ -383,7 +387,7 @@ def test_generation_matches_explicit_last_prompt_steering(use_cache):
 @pytest.mark.parametrize("mask", [[[1, 1, 0]], [[0, 0, 0]], [[1, 0, 1]]])
 def test_generation_rejects_right_padding_and_empty_prompts(mask):
     wrapper = SteeringModel(tiny_model(), TrainingConfig(layer=0))
-    with pytest.raises(ValueError, match="left-padded"):
+    with pytest.raises(ValueError, match="left-padded|nonempty|contiguous"):
         wrapper.generate(
             torch.tensor([[1, 4, 0]]),
             attention_mask=torch.tensor(mask),

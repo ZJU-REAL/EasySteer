@@ -4,7 +4,10 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from vllm.model_hooks.selection.spec import SelectSpec
 
 PROMPT_TEMPLATE = "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n"
 CHECKPOINT_NAME = "steering_adapter.json"
@@ -17,6 +20,7 @@ class TrainingConfig:
     layer: int = 8
     rank: int | None = 4
     prompt_template: str = PROMPT_TEMPLATE
+    apply: "SelectSpec | dict[str, Any] | None" = None
 
     def __post_init__(self):
         if self.algorithm not in {"direct", "loreft"}:
@@ -35,6 +39,17 @@ class TrainingConfig:
             self.prompt_template % "instruction"
         except (TypeError, ValueError) as exc:
             raise ValueError("prompt_template must contain one %s placeholder") from exc
+        from vllm.model_hooks.selection.spec import SelectSpec
+        from vllm.model_hooks.steering.api import ApplySpec
+
+        selection = self.apply
+        if selection is None:
+            selection = {"prompt_positions": [-1]}
+        elif isinstance(selection, SelectSpec):
+            selection = selection.to_wire()
+        if not isinstance(selection, dict):
+            raise TypeError("apply must be an ApplySpec, SelectSpec, or dict")
+        object.__setattr__(self, "apply", ApplySpec.from_wire(selection))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -43,7 +58,7 @@ class TrainingConfig:
             "layer": self.layer,
             "rank": self.rank,
             "prompt_template": self.prompt_template,
-            "apply": {"prompt_positions": [-1]},
+            "apply": self.apply.model_dump(mode="json", exclude_none=True),
         }
 
     @classmethod
@@ -51,9 +66,7 @@ class TrainingConfig:
         fields = {"algorithm", "component", "layer", "rank", "prompt_template", "apply"}
         if not isinstance(data, dict) or set(data) != fields:
             raise ValueError("checkpoint config has missing or unknown fields")
-        if data["apply"] != {"prompt_positions": [-1]}:
-            raise ValueError("training checkpoints require the last prompt position")
-        return cls(**{key: value for key, value in data.items() if key != "apply"})
+        return cls(**data)
 
 
 @dataclass(frozen=True)
@@ -90,15 +103,17 @@ class SteeringCheckpoint:
             )
 
     def to_spec(self):
-        from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+        from vllm.steer_vectors import SteeringSpec, VectorSpec
+
+        from easysteer.vectors import to_json_payload
 
         return SteeringSpec(
             vectors=[
                 VectorSpec(
-                    data=self.payload,
+                    data=to_json_payload(self.payload),
                     algorithm=self.config.algorithm,
                     scale=1.0,
-                    apply=ApplySpec(prompt_positions=[-1]),
+                    apply=self.config.apply.model_copy(deep=True),
                 )
             ]
         )
@@ -111,7 +126,7 @@ class SteeringCheckpoint:
             target = target / CHECKPOINT_NAME
         target.parent.mkdir(parents=True, exist_ok=True)
         data = {
-            "version": 1,
+            "version": 2,
             "config": self.config.to_dict(),
             "payload": to_json_payload(self.payload),
         }
@@ -143,8 +158,11 @@ def load_checkpoint(path: str | Path) -> SteeringCheckpoint:
     data = json.loads(target.read_text())
     if not isinstance(data, dict) or set(data) != {"version", "config", "payload"}:
         raise ValueError("invalid native steering checkpoint")
-    if type(data["version"]) is not int or data["version"] != 1:
+    if type(data["version"]) is not int or data["version"] not in (1, 2):
         raise ValueError("unsupported steering checkpoint version")
-    return SteeringCheckpoint(
-        TrainingConfig.from_dict(data["config"]), from_wire(data["payload"])
-    )
+    config = TrainingConfig.from_dict(data["config"])
+    if data["version"] == 1 and data["config"].get("apply") != {
+        "prompt_positions": [-1]
+    }:
+        raise ValueError("version 1 checkpoints require the last prompt position")
+    return SteeringCheckpoint(config, from_wire(data["payload"]))

@@ -69,6 +69,14 @@ export const workshopMessages = {
   train_component_label: { en: "Component", zh: "作用组件" },
   train_low_rank_dim_label: { en: "Low-rank dimension", zh: "低秩维度" },
   train_algorithm_label: { en: "Algorithm", zh: "算法" },
+  train_gpu_help: {
+    en: "Choose one GPU for web training. Launch multi-GPU training with torchrun from the command line.",
+    zh: "网页训练请选择一张 GPU。多卡训练请在命令行中通过 torchrun 启动。",
+  },
+  train_apply_help: {
+    en: "These selectors control steering during training and are saved for inference. Response tokens supply the loss; generation position 0 steers the first response token while predicting the second.",
+    zh: "这些选择器决定训练时的引导位置，并随检查点保存用于推理。损失仅来自回答 token；生成位置 0 对第一个回答 token 施加引导，影响第二个 token 的预测。",
+  },
   train_epochs_label: { en: "Epochs", zh: "训练轮数" },
   train_batch_size_label: { en: "Batch size", zh: "批大小" },
   train_learning_rate_label: { en: "Learning rate", zh: "学习率" },

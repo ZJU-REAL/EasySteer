@@ -5,12 +5,14 @@
  */
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
+import ApplySpecEditor from "../components/ApplySpecEditor.vue";
 import StringListEditor from "../components/StringListEditor.vue";
 import { builtinExtractionPresets, builtinTrainingPresets } from "../data/builtinConfigs";
 import { useI18n } from "../i18n";
 import * as flask from "../lib/flask";
+import { trainingApply } from "../lib/jobConfig";
 import { loadCustomSpec } from "../lib/playgroundStore";
-import { defaultApplySpec, defaultSteeringSpec } from "../lib/spec";
+import { defaultSteeringSpec, type ApplySpec } from "../lib/spec";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -38,6 +40,7 @@ const training = ref({
   layer: 8,
   component: "hidden_states",
   rank: 4,
+  apply: trainingApply(),
   num_train_epochs: 100,
   per_device_train_batch_size: 10,
   learning_rate: 0.004,
@@ -116,6 +119,7 @@ async function importPreset(): Promise<void> {
         layer: cfg.steering_config?.layer ?? 8,
         component: cfg.steering_config?.component ?? "hidden_states",
         rank: cfg.steering_config?.rank ?? 4,
+        apply: trainingApply(cfg.steering_config?.apply),
         num_train_epochs: cfg.training_args?.num_train_epochs ?? 100,
         per_device_train_batch_size: cfg.training_args?.per_device_train_batch_size ?? 10,
         learning_rate: cfg.training_args?.learning_rate ?? 0.004,
@@ -132,6 +136,12 @@ async function importPreset(): Promise<void> {
 // ---- Job submission + polling ----
 const submitting = ref(false);
 const submitError = ref("");
+const submittedTraining = ref<{
+  output_dir: string;
+  algorithm: "direct" | "loreft";
+  layer: number;
+  apply: ApplySpec;
+} | null>(null);
 const status = ref<{
   running: boolean;
   message: string;
@@ -174,7 +184,7 @@ async function pollOnce(jobKind: JobKind): Promise<void> {
         error: s.error_message || null,
         logs: s.logs ?? [],
         // The training pipeline saves native adapters into output_dir.
-        outputPath: done && !s.error_message ? training.value.output_dir : null,
+        outputPath: done && !s.error_message ? submittedTraining.value?.output_dir ?? null : null,
         extra: s.is_training ? `epoch ${s.current_epoch ?? 0}, step ${s.current_step ?? 0}` : "",
       };
       if (done) stopPolling();
@@ -224,6 +234,12 @@ async function submitTraining(): Promise<void> {
   submitting.value = true;
   submitError.value = "";
   try {
+    const target = {
+      output_dir: training.value.output_dir,
+      algorithm: training.value.algorithm,
+      layer: training.value.layer,
+      apply: trainingApply(training.value.apply),
+    };
     await flask.startTraining({
       model_path: training.value.model_path,
       gpu_devices: training.value.gpu_devices,
@@ -234,6 +250,7 @@ async function submitTraining(): Promise<void> {
         layer: training.value.layer,
         component: training.value.component,
         rank: training.value.rank,
+        apply: target.apply,
       },
       training_args: {
         num_train_epochs: training.value.num_train_epochs,
@@ -242,6 +259,7 @@ async function submitTraining(): Promise<void> {
         logging_steps: training.value.logging_steps,
       },
     });
+    submittedTraining.value = target;
     startPolling("training");
   } catch (e) {
     submitError.value = (e as Error).message;
@@ -280,16 +298,13 @@ function useInPlayground(): void {
     spec.vectors[0].source = status.value.outputPath;
     spec.vectors[0].algorithm = "direct";
   } else {
+    const target = submittedTraining.value;
+    if (!target) return;
     // Export the native training payload with its training selection.
     spec.vectors[0].data = { __inline_payload__: `vec.from_training(${JSON.stringify(status.value.outputPath)})` };
-    spec.vectors[0].algorithm = training.value.algorithm;
-    spec.vectors[0].layers = [training.value.layer];
-    spec.vectors[0].apply = {
-      ...defaultApplySpec(),
-      prompt: null,
-      generation: null,
-      prompt_positions: [-1],
-    };
+    spec.vectors[0].algorithm = target.algorithm;
+    spec.vectors[0].layers = [target.layer];
+    spec.vectors[0].apply = trainingApply(target.apply);
   }
   loadCustomSpec(spec);
   router.push("/steer");
@@ -443,9 +458,9 @@ refreshPresets();
                 v-model="training.gpu_devices"
                 type="text"
                 class="mono full"
-                :placeholder="t('gpu_devices_placeholder')"
+                placeholder="0"
               />
-              <div class="help-text">{{ t("gpu_devices_help") }}</div>
+              <div class="help-text">{{ t("train_gpu_help") }}</div>
             </div>
 
             <div class="field">
@@ -499,6 +514,10 @@ refreshPresets();
             <div class="field span-4">
               <label>{{ t("train_output_dir_label") }}</label>
               <input v-model="training.output_dir" type="text" class="mono full" />
+            </div>
+            <div class="span-4">
+              <ApplySpecEditor :apply="training.apply" />
+              <div class="help-text">{{ t("train_apply_help") }}</div>
             </div>
             <div class="field span-4">
               <label>{{ t("train_examples_label") }}</label>

@@ -121,6 +121,33 @@ def train():
             return jsonify(
                 {"error": "Training requires the hidden_states component"}
             ), 400
+        from vllm.model_hooks.selection.spec import SelectSpec
+
+        try:
+            apply = config.get("apply")
+            if apply is None:
+                apply = {"prompt_positions": [-1]}
+            if not isinstance(apply, dict):
+                raise TypeError("apply must be an object")
+            selection = SelectSpec.from_wire(apply).model_dump(
+                mode="json", exclude_none=True
+            )
+        except (TypeError, ValueError) as exc:
+            return jsonify({"error": f"Invalid training apply selection: {exc}"}), 400
+
+        gpu = data.get("gpu_devices", "0")
+        if (
+            not isinstance(gpu, str)
+            or not gpu.strip()
+            or "," in gpu
+            or gpu.strip() == "-1"
+        ):
+            return jsonify(
+                {
+                    "error": "The web training job requires one GPU; use torchrun "
+                    "with easysteer.training for multi-GPU DDP training"
+                }
+            ), 400
 
         output_dir = data.get("output_dir")
         if not output_dir:
@@ -145,7 +172,7 @@ def train():
                     {"error": f"Training example {i} must be [input, output] strings"}
                 ), 400
 
-        os.environ["CUDA_VISIBLE_DEVICES"] = data.get("gpu_devices", "0")
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpu.strip()
 
         def train_model():
             global training_status
@@ -179,6 +206,7 @@ def train():
                     layer=steering_config.get("layer", 8),
                     component=steering_config.get("component", "hidden_states"),
                     rank=steering_config.get("rank", 4),
+                    apply=selection,
                     callbacks=[TrainingProgressCallback()],
                     save_dir=output_dir,
                     output_dir=output_dir,
@@ -217,7 +245,7 @@ def train():
                 "message": "Training has started",
                 "output_dir": output_dir,
                 "training_examples_count": len(training_examples),
-                "steering_config": data.get("steering_config", {}),
+                "steering_config": {**config, "apply": selection},
                 "training_args": data.get("training_args", {}),
                 "note": "Training is running in the background. Check server logs for progress.",
             }

@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from .checkpoint import SteeringCheckpoint, TrainingConfig
+from .selection import collect_training_positions, valid_token_mask
 
 
 class DirectSteering(nn.Module):
@@ -77,6 +78,7 @@ class SteeringModel(nn.Module):
     """A frozen causal LM with one trainable hidden-state steering adapter."""
 
     accepts_loss_kwargs = False
+    loss_type = "ForCausalLM"
     main_input_name = "input_ids"
 
     def __init__(self, model: nn.Module, config: TrainingConfig):
@@ -112,22 +114,11 @@ class SteeringModel(nn.Module):
         return self
 
     @contextmanager
-    def _steering(self, positions, *, cached_generation=False, expand_batch=False):
-        if (
-            not isinstance(positions, torch.Tensor)
-            or positions.ndim != 1
-            or positions.numel() == 0
-            or positions.dtype not in (torch.int32, torch.int64)
-        ):
-            raise ValueError("steering positions must be a nonempty integer vector")
+    def _steering(self, positions):
+        """Apply the adapter to selected flat rows; resolve once per forward."""
         target = self.base_model.get_submodule(self._target_name)
-        calls = 0
 
         def hook(module, args, output):
-            nonlocal calls
-            calls += 1
-            if cached_generation and calls > 1:
-                return output
             hidden = output[0] if isinstance(output, tuple) else output
             if (
                 not isinstance(hidden, torch.Tensor)
@@ -137,19 +128,13 @@ class SteeringModel(nn.Module):
                 raise ValueError(
                     "decoder output must contain [batch, tokens, hidden_width]"
                 )
-            selected = positions.to(device=hidden.device, dtype=torch.long)
-            if hidden.shape[0] % len(selected) or (
-                not expand_batch and hidden.shape[0] != len(selected)
-            ):
-                raise ValueError(
-                    "steering positions must identify one token per batch row"
-                )
-            selected = selected.repeat_interleave(hidden.shape[0] // len(selected))
-            if ((selected < 0) | (selected >= hidden.shape[1])).any():
-                raise ValueError("steering position is outside the decoder sequence")
-            rows = torch.arange(hidden.shape[0], device=hidden.device)
-            result = hidden.clone()
-            result[rows, selected] = self.adapter(hidden[rows, selected])
+            selected = positions() if callable(positions) else positions
+            selected = selected.to(device=hidden.device, dtype=torch.long)
+            flat = hidden.reshape(-1, self._width)
+            # Keep the adapter in the autograd graph even when this batch has
+            # no matching tokens. DDP then receives zero gradients on all ranks.
+            transformed = self.adapter(flat.index_select(0, selected))
+            result = flat.index_copy(0, selected, transformed).view_as(hidden)
             return (result, *output[1:]) if isinstance(output, tuple) else result
 
         handle = target.register_forward_hook(hook)
@@ -163,12 +148,19 @@ class SteeringModel(nn.Module):
         input_ids,
         attention_mask=None,
         labels=None,
-        steering_positions=None,
+        prompt_lengths=None,
         **kwargs,
     ):
-        if steering_positions is None:
-            raise ValueError("forward requires explicit steering_positions")
-        with self._steering(steering_positions):
+        if "steering_positions" in kwargs:
+            raise ValueError("set TrainingConfig.apply instead of steering_positions")
+        if getattr(self.base_model, "is_gradient_checkpointing", False):
+            raise ValueError(
+                "steering training does not support gradient checkpointing"
+            )
+        positions = collect_training_positions(
+            input_ids, attention_mask, prompt_lengths, self.training_config.apply
+        )
+        with self._steering(positions):
             return self.base_model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -178,40 +170,85 @@ class SteeringModel(nn.Module):
 
     @torch.no_grad()
     def generate(self, input_ids, attention_mask=None, **kwargs):
-        if input_ids.ndim != 2 or min(input_ids.shape) == 0:
-            raise ValueError("generation input_ids must have shape [batch, tokens]")
-        if attention_mask is None:
-            positions = torch.full(
-                (input_ids.shape[0],), input_ids.shape[1] - 1, device=input_ids.device
+        """Apply the checkpoint's selection to prefill and every decode step.
+
+        Prompts may be left padded. Dynamic caches and uncached full-sequence
+        recomputation use the same absolute positions as teacher forcing.
+        Static caches are unsupported because they replace the token mask
+        needed for selection with a precomputed attention mask.
+        Beam search and multiple returned sequences preserve the original
+        request groups, so each expanded group retains its prompt length.
+        """
+        if any(
+            kwargs.get(key) is not None
+            for key in (
+                "inputs_embeds",
+                "past_key_values",
+                "steering_positions",
+                "prompt_lengths",
             )
-        else:
-            if (
-                attention_mask.shape != input_ids.shape
-                or ((attention_mask != 0) & (attention_mask != 1)).any()
-            ):
+        ):
+            raise ValueError(
+                "generation requires complete token prompts; cache, embedding, "
+                "and position overrides are unsupported"
+            )
+        generation_config = (
+            kwargs.get("generation_config") or self.base_model.generation_config
+        )
+        use_cache = kwargs.setdefault(
+            "use_cache", getattr(generation_config, "use_cache", True)
+        )
+        cache_implementation = kwargs.get(
+            "cache_implementation", generation_config.cache_implementation
+        )
+        if use_cache and cache_implementation in {"static", "offloaded_static"}:
+            raise ValueError(
+                "steering generation does not support static caches; "
+                "use cache_implementation='dynamic' or use_cache=False"
+            )
+        mask = valid_token_mask(input_ids, attention_mask)
+        if (
+            mask.shape != input_ids.shape
+            or not mask[:, -1].all()
+            or (mask[:, :-1] & ~mask[:, 1:]).any()
+        ):
+            raise ValueError(
+                "batched generation requires nonempty, left-padded prompts"
+            )
+        prompt_lengths = mask.sum(dim=1)
+        positions = None
+
+        def select(module, args, model_kwargs):
+            nonlocal positions
+            tokens = model_kwargs.get("input_ids")
+            if tokens is None and args:
+                tokens = args[0]
+            if tokens is None:
                 raise ValueError(
-                    "generation requires a binary attention mask matching input_ids"
+                    "generation selection requires input_ids on every forward"
                 )
-            if (
-                not attention_mask[:, -1].all()
-                or (attention_mask[:, 1:] < attention_mask[:, :-1]).any()
-            ):
-                raise ValueError(
-                    "batched generation requires nonempty, left-padded prompts"
-                )
-            tokens = torch.arange(input_ids.shape[1], device=input_ids.device)
-            positions = torch.where(attention_mask.bool(), tokens, -1).max(dim=1).values
-        use_cache = kwargs.setdefault("use_cache", True)
+            if tokens.shape[0] % len(prompt_lengths):
+                raise ValueError("generation changed the original request groups")
+            lengths = prompt_lengths.repeat_interleave(
+                tokens.shape[0] // len(prompt_lengths)
+            )
+            positions = collect_training_positions(
+                tokens,
+                model_kwargs.get("attention_mask"),
+                lengths,
+                self.training_config.apply,
+            )
+
         was_training = self.training
         self.eval()
+        handle = self.base_model.register_forward_pre_hook(select, with_kwargs=True)
         try:
-            with self._steering(
-                positions, cached_generation=use_cache, expand_batch=True
-            ):
+            with self._steering(lambda: positions):
                 return self.base_model.generate(
-                    input_ids=input_ids, attention_mask=attention_mask, **kwargs
+                    input_ids=input_ids, attention_mask=mask.long(), **kwargs
                 )
         finally:
+            handle.remove()
             self.train(was_training)
 
     def to_payload(self):

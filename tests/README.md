@@ -253,6 +253,33 @@ The optional diagnostic compares logprobs along shared token prefixes. The
 benchmark fixes the requested generation length and measures end-to-end HTTP
 throughput, including prefill, using the actual output-token count.
 
+## Native training
+
+Native training CPU tests cover shared token selection, cached generation and
+two-rank DDP updates against matched single-device global batches. The DDP
+comparison includes unequal response lengths, gradient accumulation, a rank
+with no selected tokens, synchronized adapter parameters and rank-zero saving.
+The optional GPU checks use the same numerical oracle:
+
+```bash
+# Run these two commands for each algorithm: direct and loreft.
+CUDA_VISIBLE_DEVICES=0 python tests/training/ddp_check.py \
+  --mode reference --device cuda --algorithm loreft --output /tmp/loreft-ddp
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc-per-node=2 \
+  tests/training/ddp_check.py --mode distributed --device cuda \
+  --algorithm loreft --output /tmp/loreft-ddp
+
+# Real-model custom prompt/generation selection, HF reload and TP=2 FULL graphs.
+CUDA_VISIBLE_DEVICES=0 python tests/training/selection_check.py train \
+  --model /path/to/Qwen2.5-1.5B-Instruct --output /tmp/training-selection
+CUDA_VISIBLE_DEVICES=0,1 python tests/training/selection_check.py infer \
+  --model /path/to/Qwen2.5-1.5B-Instruct --output /tmp/training-selection
+```
+
+The full emoji training recipe and ten-example evaluation are documented in
+[`replications/loreft`](../replications/loreft/README.md). These real-model checks
+are separate from ordinary CPU tests and require the training dependencies.
+
 ## Coverage limits
 
 - Capture uses `vllm.capture`. Request admission bypasses prefix-cache reads

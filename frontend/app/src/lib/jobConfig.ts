@@ -3,6 +3,8 @@
  * This module has no browser globals, so presets can also use it outside the UI.
  */
 
+import { defaultApplySpec, type ApplySpec } from "./spec";
+
 export interface ExtractionConfig {
   model_path: string;
   gpu_devices?: string;
@@ -25,11 +27,22 @@ export interface TrainingConfig {
     layer?: number;
     component?: string;
     rank?: number;
+    apply?: Partial<ApplySpec>;
   };
   training_args?: {
     num_train_epochs?: number;
     per_device_train_batch_size?: number;
     learning_rate?: number;
     logging_steps?: number;
+  };
+}
+
+/** Expand optional fields without adding selectors to the training request. */
+export function trainingApply(selection?: Partial<ApplySpec>): ApplySpec {
+  return {
+    ...defaultApplySpec(),
+    prompt: null,
+    generation: null,
+    ...JSON.parse(JSON.stringify(selection ?? { prompt_positions: [-1] })),
   };
 }
