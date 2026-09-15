@@ -74,19 +74,20 @@ A file suffix such as `.pt` does not identify the checkpoint schema. Choose
 GGUF: it contains steering tensors, not model weights.
 
 ```python
-from easysteer import vectors
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
+from easysteer.training import load_checkpoint
 
-payload = vectors.load("checkpoints/loreft", format="pyreft")
-spec = SteeringSpec(vectors=[VectorSpec(
-    data=payload,
-    algorithm="loreft",
-    scale=1.0,
-    apply=ApplySpec(prompt_positions=[-1], generation="all"),
-)])
+checkpoint = load_checkpoint("checkpoints/loreft")
+spec = checkpoint.to_spec()
+outputs = llm.generate(prompts, steering=spec)
 ```
 
-The pyreft adapter preserves the checkpoint's layer index. In general, when a
+Native checkpoints preserve the algorithm, layer and training selection in the
+returned spec. For a historical PyReFT checkpoint, load its payload explicitly
+with `vectors.load(path, format="pyreft")` and supply the original training
+selection in `VectorSpec.apply`; the old file format does not record that policy.
+The PyReFT file adapter does not import or require PyReFT.
+
+The adapter preserves the checkpoint's layer index. In general, when a
 payload records layer IDs, `VectorSpec.layers` restricts that set; it does not
 relocate the weights. A payload without layer IDs, such as a `LinearMap` or
 `LowRankProjector`, requires an explicit target-layer list.

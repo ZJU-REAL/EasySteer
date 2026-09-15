@@ -87,7 +87,7 @@ def test_engine_keeps_full_cudagraphs(llm):
 
 
 def test_capture_on_compiled_engine(llm):
-    import easysteer.hidden_states as hs
+    import easysteer.capture as hs
 
     result = hs.capture(
         llm, ["The capital of France is", PROMPT], max_tokens=4, ignore_eos=True
@@ -104,7 +104,7 @@ def test_capture_on_compiled_engine(llm):
 
 def test_repeated_capture_has_complete_labels_and_clears_stream(llm):
     """Each helper call owns one complete result and stops its capture stream."""
-    import easysteer.hidden_states as hs
+    import easysteer.capture as hs
     from vllm.capture import match_capture_request_id
 
     hidden_size = llm.llm_engine.vllm_config.model_config.hf_config.hidden_size
@@ -139,7 +139,7 @@ def test_repeated_capture_has_complete_labels_and_clears_stream(llm):
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_public_capture_matches_worker_ownership_and_global_layout(llm, stream):
     """Graph results match eager shards and labels with owner-only replicas."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from vllm.capture import deserialize_captured
     from vllm.inputs import TokensPrompt
 
@@ -225,7 +225,7 @@ def test_public_capture_matches_worker_ownership_and_global_layout(llm, stream):
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_full_capture_graph_replays_prefill_and_decode(llm, stream):
     """Exact bucket shapes isolate FULL prefill replay from decode replay."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from vllm.inputs import TokensPrompt
 
     modes = {state["idle_mode"] for state in rpc(llm, "capture_test_graph_state")}
@@ -266,7 +266,7 @@ def test_full_capture_graph_replays_prefill_and_decode(llm, stream):
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_capture_byte_budget_failure_allows_next_capture(llm, stream):
     """A failed fetch must drain worker replies and leave the engine usable."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     options = dict(stream=stream, layers=[10], max_tokens=3, ignore_eos=True)
     before = rpc(llm, "capture_status", stream)
@@ -285,7 +285,7 @@ def test_capture_byte_budget_failure_allows_next_capture(llm, stream):
 
 def test_warm_cache_capture_is_complete(llm):
     """Capture recomputes selected prompt rows even with a warm cache."""
-    import easysteer.hidden_states as hs
+    import easysteer.capture as hs
 
     llm.generate(
         LONG_PROMPT, SamplingParams(max_tokens=1), use_tqdm=False
@@ -342,7 +342,7 @@ def test_generation_only_capture_tolerates_cache_hits(llm):
 
 
 def test_helper_per_prompt_selection_controls_cache_reads(llm):
-    import easysteer.hidden_states as hs
+    import easysteer.capture as hs
     from vllm.steer_vectors import SelectSpec
 
     prompts = [LONG_PROMPT + suffix for suffix in ("First.", "Second.", "Third.")]
@@ -365,7 +365,7 @@ def test_helper_per_prompt_selection_controls_cache_reads(llm):
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_capture_dispatch_after_helper_stop_and_restart(llm, stream):
     """Changing row selection reuses buffers and ignores unselected requests."""
-    import easysteer.hidden_states as hs
+    import easysteer.capture as hs
     from vllm.steer_vectors import SelectSpec
 
     before = rpc(llm, "capture_status", stream)
@@ -413,7 +413,7 @@ def test_capture_dispatch_after_helper_stop_and_restart(llm, stream):
 
 def test_capture_graph_replaces_layers_and_streams(llm):
     """A new component signature cannot replay stale layer or stream buffers."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from vllm.capture import SelectSpec
 
     for stream, layer in (("hidden_states", 10), ("hidden_states", 11),

@@ -33,6 +33,15 @@ export STEER_TEST_MODEL=/path/to/Qwen2.5-1.5B-Instruct
 GPU_ID=0 ./tests/run_suites.sh baseline
 ```
 
+To check public Python callers, notebook code and Markdown examples without
+installing the engine, run `python -m pytest tests/cpu/test_example_api_fields.py`.
+This source-based check needs only pytest. It rejects deprecated package imports
+and unknown explicit capture, extraction and steering keywords; it cannot verify
+dynamically constructed arguments or model behavior. The API usage workflow runs
+it when callers or their definitions change. Numerical notebook workflow tests
+in `cpu/test_notebook_workflows.py` cover sample mapping and extraction semantics;
+frontend tests cover generated snippets and payload handoffs.
+
 | Group | Selection |
 | --- | --- |
 | `cpu` | All CPU suites; no model variables or GPU required. |

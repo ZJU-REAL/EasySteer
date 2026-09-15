@@ -33,6 +33,12 @@ export interface TrainingStatus {
   status_message: string;
   error_message: string;
   logs: string[];
+  result: {
+    output_dir: string;
+    model_path: string;
+    prompt_template: string;
+    steering: Record<string, unknown>;
+  } | null;
 }
 
 function base(): string {
@@ -137,6 +143,8 @@ export interface SaeExtractedVector {
   feature_index: number;
   file_path: string;
   scale: number;
+  layer: number;
+  data: Record<string, unknown>;
 }
 
 export function searchSaeFeatures(params: {
@@ -164,6 +172,7 @@ export function extractSaeVector(params: {
   feature_index: number;
   vector_name: string;
   scale: number;
+  layer: number;
 }): Promise<{ success: boolean; vector?: SaeExtractedVector; error?: string }> {
   return postJson("/api/sae/extract-vector", params);
 }

@@ -38,7 +38,11 @@ describe("toPython", () => {
     expect(code).toContain("enable_steer_vector=True");
     expect(code).toContain('steer_algorithms=["direct"]');
     expect(code).toContain("steering=spec");
-    expect(code).toContain("llm.get_tokenizer().apply_chat_template(");
+    expect(code).toContain("tokenizer = llm.get_tokenizer()");
+    expect(code).toContain("if tokenizer.chat_template:");
+    expect(code).toContain('prompt = {"prompt_token_ids": tokenizer.apply_chat_template(');
+    expect(code).toContain("tokenize=True, return_dict=False");
+    expect(code).toContain('else:\n    prompt = "Hi"');
     expect(code).toContain("llm.generate([prompt], sampling, steering=spec)");
     expect(code).not.toContain("llm.chat(");
     expect(code).not.toContain("normalize");
@@ -65,11 +69,34 @@ describe("toPython", () => {
 
   it("marks in-memory payloads as a placeholder", () => {
     const spec = defaultSteeringSpec();
-    spec.vectors[0].data = { __inline_payload__: "vec.from_pyreft('./weight/')" };
+    spec.vectors[0].data = { __inline_payload__: "vec.from_training('./adapter/')" };
     spec.vectors[0].algorithm = "loreft";
     const code = toPython(spec);
     expect(code).toContain("data=...");
+    expect(code).toContain("# Replace with vec.from_training('./adapter/')");
+    expect(code).toContain("import easysteer.vectors as vec");
     expect(code).toContain('algorithm="loreft"');
+  });
+
+  it("preserves a native checkpoint's JSON payload", () => {
+    const spec = defaultSteeringSpec();
+    spec.vectors[0].data = {
+      version: 1, kind: "direction", tensors: { "8": [1, -2] },
+      extra: {}, sha256: "checkpoint-digest",
+    };
+    const code = toPython(spec);
+    expect(code).toContain('data={"version": 1, "kind": "direction"');
+    expect(code).toContain('"8": [1, -2]');
+    expect(code).not.toContain("data=...");
+  });
+
+  it("uses the checkpoint prompt format for trained adapters", () => {
+    const code = toPython(sampleSpec(), {
+      model: "trained-model", prompt: "Hello", promptTemplate: "Training prompt: %s\nAnswer:",
+    });
+    expect(code).toContain('model="trained-model"');
+    expect(code).toContain('prompt = "Training prompt: %s\\nAnswer:" % "Hello"');
+    expect(code).not.toContain("apply_chat_template");
   });
 
   it("renders the new selectors and exclude twins", () => {
@@ -96,6 +123,15 @@ describe("toPython", () => {
 });
 
 describe("toCurl", () => {
+  it("preserves saved templates through the completions endpoint", () => {
+    const cmd = toCurl(sampleSpec(), {
+      baseUrl: "http://server/v1", model: "served-model", prompt: "Hello",
+      promptTemplate: "Training prompt: %s\nAnswer:",
+    });
+    expect(cmd).toContain("http://server/v1/completions");
+    expect(cmd).toContain('"prompt": "Training prompt: Hello\\nAnswer:"');
+    expect(cmd).not.toContain('"messages"');
+  });
   it("targets the configured base URL and inlines the steering field", () => {
     const cmd = toCurl(sampleSpec(), {
       baseUrl: "http://gpu-box:8000/v1/",

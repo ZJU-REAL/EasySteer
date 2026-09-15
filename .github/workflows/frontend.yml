@@ -5,7 +5,8 @@ on:
     paths:
       - "frontend/**"
       - "hf-space/**"
-      - "easysteer/vectors.py"
+      - "easysteer/**"
+      - "examples/training.py"
       - "tools/export_client_contracts.py"
       - "vllm-steer"
       - ".github/workflows/frontend.yml"
@@ -14,7 +15,8 @@ on:
     paths:
       - "frontend/**"
       - "hf-space/**"
-      - "easysteer/vectors.py"
+      - "easysteer/**"
+      - "examples/training.py"
       - "tools/export_client_contracts.py"
       - "vllm-steer"
       - ".github/workflows/frontend.yml"

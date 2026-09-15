@@ -14,6 +14,7 @@ export interface PlaygroundState {
   prompt: string;
   presetId: string | null;
   presetModel: string;
+  promptTemplate: string | null;
   /**
    * Bumped whenever `spec` is replaced wholesale (JSON edit, gallery
    * load); form editors key on it to re-seed their local text state.
@@ -26,6 +27,7 @@ export const playground = reactive<PlaygroundState>({
   prompt: "",
   presetId: null,
   presetModel: "",
+  promptTemplate: null,
   revision: 0,
 });
 
@@ -39,14 +41,19 @@ export function loadGalleryEntry(entry: GalleryEntry): void {
   playground.prompt = entry.prompt;
   playground.presetId = entry.id;
   playground.presetModel = entry.model;
+  playground.promptTemplate = entry.promptTemplate ?? null;
 }
 
 /** Replace the spec with one built elsewhere (workshop, SAE page),
     detaching whatever gallery preset was loaded before. */
-export function loadCustomSpec(spec: SteeringSpec): void {
+export function loadCustomSpec(
+  spec: SteeringSpec,
+  context: { model?: string; promptTemplate?: string } = {},
+): void {
   replaceSpec(spec);
   playground.presetId = null;
-  playground.presetModel = "";
+  playground.presetModel = context.model ?? "";
+  playground.promptTemplate = context.promptTemplate ?? null;
 }
 
 export function resetPlayground(): void {

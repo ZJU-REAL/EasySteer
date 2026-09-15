@@ -5,8 +5,9 @@
  */
 import { computed, ref } from "vue";
 import { useI18n } from "../i18n";
-import { streamChatCompletion, setServerSteering } from "../lib/openai";
+import { streamChatCompletion, streamTextCompletion, setServerSteering, type StreamOptions } from "../lib/openai";
 import { playground } from "../lib/playgroundStore";
+import { renderPrompt } from "../lib/prompts";
 import { settings } from "../lib/settings";
 import { validateSteeringSpec, type SteeringSpec } from "../lib/spec";
 
@@ -33,15 +34,21 @@ async function run(compare: boolean): Promise<void> {
 
   const common = {
     baseUrl: settings.openaiBaseUrl,
-    model: settings.model,
+    model: settings.model || playground.presetModel,
     messages: [{ role: "user" as const, content: playground.prompt }],
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
     signal: abort.signal,
   };
+  const complete = async (options: StreamOptions): Promise<void> => playground.promptTemplate !== null
+    ? streamTextCompletion({
+      ...options,
+      prompt: renderPrompt(playground.promptTemplate, playground.prompt),
+    })
+    : streamChatCompletion(options);
 
   const runs: Promise<void>[] = [
-    streamChatCompletion({
+    complete({
       ...common,
       steering: props.spec,
       onToken: (tok) => (outputB.value += tok),
@@ -50,7 +57,7 @@ async function run(compare: boolean): Promise<void> {
   if (compare) {
     // The baseline pane streams the same prompt with no steering.
     runs.push(
-      streamChatCompletion({
+      complete({
         ...common,
         steering: false,
         onToken: (tok) => (outputA.value += tok),
@@ -89,6 +96,9 @@ async function setAsServerDefault(): Promise<void> {
 <template>
   <div class="run-panel panel">
     <h2>{{ t("run_title") }}</h2>
+    <p v-if="playground.promptTemplate !== null" class="help-text">
+      {{ t("saved_prompt_template_notice") }}
+    </p>
 
     <div class="field">
       <label>{{ t("prompt_label") }}</label>

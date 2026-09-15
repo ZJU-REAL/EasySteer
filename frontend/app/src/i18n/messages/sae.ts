@@ -54,10 +54,10 @@ export const saeMessages = {
   sae_trigger_token_label: { en: "Trigger token", zh: "触发 token" },
   sae_extract_title: { en: "Extract as steering vector", zh: "提取为引导向量" },
   sae_extract_help: {
-    en: "Saves the feature's decoder row as a .pt file on the server (needs SAE_PARAMS_PATH set on the job backend).",
-    zh: "把该特征的解码器行保存为服务器端的 .pt 文件（任务后端需配置 SAE_PARAMS_PATH）。",
+    en: "Saves the decoder row as a .pt file and returns its steering payload for the selected layer (needs SAE_PARAMS_PATH on the job backend).",
+    zh: "保存解码器行为 .pt 文件，并返回所选层的引导负载（任务后端需配置 SAE_PARAMS_PATH）。",
   },
-  sae_vector_name_help: { en: "File name for the saved .pt vector.", zh: "保存的 .pt 向量文件名。" },
+  sae_vector_name_help: { en: "Display name for the extracted vector.", zh: "提取向量的显示名称。" },
   sae_scale_help: {
     en: "Decoder rows are unit-norm, so a scale around 500 is a typical strength.",
     zh: "解码器行是单位长度的，缩放系数取 500 左右是常见强度。",
@@ -65,9 +65,10 @@ export const saeMessages = {
   sae_vector_name_label: { en: "Vector name", zh: "向量名称" },
   sae_layer_input_label: { en: "Target layer", zh: "目标层" },
   sae_layer_input_help: {
-    en: "Layer the SAE reads from; it goes into the generated spec.",
-    zh: "该 SAE 所在的层，会写进生成的 Spec。",
+    en: "Layer the SAE reads from. Choose it before extracting; changing it requires extracting again.",
+    zh: "该 SAE 所在的层。请在提取前选择，修改后需要重新提取。",
   },
+  sae_layer_required: { en: "Choose a non-negative target layer before extracting.", zh: "请在提取前选择非负的目标层号。" },
   sae_extract_btn: { en: "Extract vector", zh: "提取向量" },
   sae_extracting: { en: "Extracting...", zh: "正在提取……" },
   sae_extract_done: { en: "Vector saved to {path}", zh: "向量已保存到 {path}" },

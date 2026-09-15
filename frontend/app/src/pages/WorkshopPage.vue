@@ -12,7 +12,7 @@ import { useI18n } from "../i18n";
 import * as flask from "../lib/flask";
 import { trainingApply } from "../lib/jobConfig";
 import { loadCustomSpec } from "../lib/playgroundStore";
-import { defaultSteeringSpec, type ApplySpec } from "../lib/spec";
+import { defaultSteeringSpec, specFromJson, type SteeringSpec } from "../lib/spec";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -24,9 +24,10 @@ const kind = ref<JobKind>("extraction");
 const extraction = ref({
   model_path: "",
   gpu_devices: "0",
-  method: "diffmean" as "diffmean" | "pca" | "lat",
+  method: "diffmean" as flask.ExtractionConfig["method"],
   token_pos: -1,
   normalize: true,
+  working_memory_mib: 256,
   positive_samples: [""] as string[],
   negative_samples: [""] as string[],
   output_path: "results/my_vector.gguf",
@@ -102,6 +103,7 @@ async function importPreset(): Promise<void> {
         method: cfg.method ?? "diffmean",
         token_pos: Number(cfg.token_pos ?? -1),
         normalize: cfg.normalize ?? true,
+        working_memory_mib: (cfg.max_working_bytes ?? 256 * 1024**2) / 1024**2,
         positive_samples: (cfg.positive_samples ?? []).length > 0 ? cfg.positive_samples : [""],
         negative_samples: (cfg.negative_samples ?? []).length > 0 ? cfg.negative_samples : [""],
         output_path: cfg.output_path ?? "results/my_vector.gguf",
@@ -136,12 +138,8 @@ async function importPreset(): Promise<void> {
 // ---- Job submission + polling ----
 const submitting = ref(false);
 const submitError = ref("");
-const submittedTraining = ref<{
-  output_dir: string;
-  algorithm: "direct" | "loreft";
-  layer: number;
-  apply: ApplySpec;
-} | null>(null);
+const trainedSpec = ref<SteeringSpec | null>(null);
+const trainedContext = ref<{ model: string; promptTemplate: string } | null>(null);
 const status = ref<{
   running: boolean;
   message: string;
@@ -177,14 +175,21 @@ async function pollOnce(jobKind: JobKind): Promise<void> {
       if (!s.is_extracting && (s.result || s.error_message)) stopPolling();
     } else {
       const s = await flask.getTrainingStatus();
-      const done = !s.is_training && (s.status_message.includes("complete") || s.error_message);
+      const done = !s.is_training && (s.result || s.error_message);
+      if (done && s.result) {
+        trainedSpec.value = specFromJson(s.result.steering);
+        trainedContext.value = {
+          model: s.result.model_path,
+          promptTemplate: s.result.prompt_template,
+        };
+      }
       status.value = {
         running: s.is_training,
         message: s.status_message,
         error: s.error_message || null,
         logs: s.logs ?? [],
         // The training pipeline saves native adapters into output_dir.
-        outputPath: done && !s.error_message ? submittedTraining.value?.output_dir ?? null : null,
+        outputPath: done && !s.error_message ? s.result?.output_dir ?? null : null,
         extra: s.is_training ? `epoch ${s.current_epoch ?? 0}, step ${s.current_step ?? 0}` : "",
       };
       if (done) stopPolling();
@@ -218,6 +223,7 @@ async function submitExtraction(): Promise<void> {
       method: extraction.value.method,
       token_pos: extraction.value.token_pos,
       normalize: extraction.value.normalize,
+      max_working_bytes: Math.floor(extraction.value.working_memory_mib * 1024**2),
       positive_samples: extraction.value.positive_samples.filter((sample) => sample.trim()),
       negative_samples: extraction.value.negative_samples.filter((sample) => sample.trim()),
       output_path: extraction.value.output_path,
@@ -233,6 +239,8 @@ async function submitExtraction(): Promise<void> {
 async function submitTraining(): Promise<void> {
   submitting.value = true;
   submitError.value = "";
+  trainedSpec.value = null;
+  trainedContext.value = null;
   try {
     const target = {
       output_dir: training.value.output_dir,
@@ -259,7 +267,6 @@ async function submitTraining(): Promise<void> {
         logging_steps: training.value.logging_steps,
       },
     });
-    submittedTraining.value = target;
     startPolling("training");
   } catch (e) {
     submitError.value = (e as Error).message;
@@ -298,13 +305,11 @@ function useInPlayground(): void {
     spec.vectors[0].source = status.value.outputPath;
     spec.vectors[0].algorithm = "direct";
   } else {
-    const target = submittedTraining.value;
-    if (!target) return;
-    // Export the native training payload with its training selection.
-    spec.vectors[0].data = { __inline_payload__: `vec.from_training(${JSON.stringify(status.value.outputPath)})` };
-    spec.vectors[0].algorithm = target.algorithm;
-    spec.vectors[0].layers = [target.layer];
-    spec.vectors[0].apply = trainingApply(target.apply);
+    if (!trainedSpec.value) return;
+    // Use the checkpoint's canonical payload and saved selection directly.
+    loadCustomSpec(trainedSpec.value, trainedContext.value ?? {});
+    router.push("/steer");
+    return;
   }
   loadCustomSpec(spec);
   router.push("/steer");
@@ -391,6 +396,7 @@ refreshPresets();
               <select v-model="extraction.method" class="full">
                 <option value="diffmean">{{ t("extract_method_diffmean") }}</option>
                 <option value="pca">{{ t("extract_method_pca") }}</option>
+                <option value="incremental_pca">{{ t("extract_method_incremental_pca") }}</option>
                 <option value="lat">{{ t("extract_method_lat") }}</option>
               </select>
               <div class="help-text">{{ t("extract_method_help") }}</div>
@@ -405,6 +411,12 @@ refreshPresets();
                 <input v-model="extraction.normalize" type="checkbox" />
                 {{ t("extract_normalize_label") }}
               </label>
+            </div>
+
+            <div class="field span-4">
+              <label>{{ t("extract_working_memory_label") }}</label>
+              <input v-model.number="extraction.working_memory_mib" type="number" min="1" class="mono full" />
+              <div class="help-text">{{ t("extract_working_memory_help") }}</div>
             </div>
 
             <div class="field span-2">

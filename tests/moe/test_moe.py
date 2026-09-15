@@ -30,7 +30,7 @@ import pytest
 import torch
 from vllm import SamplingParams
 
-from easysteer.hidden_states import capture
+from easysteer.capture import capture
 
 from helpers import MOE_MODEL, steering_spec
 

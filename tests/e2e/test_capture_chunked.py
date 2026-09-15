@@ -71,7 +71,7 @@ def test_capture_rows_under_chunked_prefill(llm, prompt_ids, reduce, expected):
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_public_capture_selects_chunk_boundaries_with_warm_prefix(llm, stream):
     """Warm cached blocks cannot omit selected rows across 64-token chunks."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from vllm.steer_vectors import SelectSpec
 
     prompt = TokensPrompt(prompt_token_ids=list(PROMPT_LONG))

@@ -145,7 +145,7 @@ def test_attention_head_delta_is_isolated(llm, num_prompts, max_tokens):
     from vllm.model_hooks.steering.payloads import DirectionVector
     from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     tp_size = llm.llm_engine.vllm_config.parallel_config.tensor_parallel_size
     layer = 10
@@ -281,7 +281,7 @@ def test_loreft_decode_effect_and_replay(llm):
     """The checkpoint changes fixed decode rows and runs in ordinary FULL graphs."""
     import torch
 
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from easysteer.vectors import from_pyreft
 
     prompt = "<|im_start|>user\nWho are you?<|im_end|>\n<|im_start|>assistant\n"

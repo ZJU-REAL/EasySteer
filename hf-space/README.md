@@ -92,14 +92,18 @@ Checkpoint-based algorithms (`linear`, `lm_steer`, `loreft`) need a local JSON
 payload in API mode. In an environment with EasySteer and vllm-steer installed:
 
 ```bash
-python hf-space/export_payload.py /path/to/checkpoint \
-  /path/to/payload.json --algorithm loreft
+python hf-space/export_payload.py /path/to/native-checkpoint \
+  /path/to/payload.json --algorithm loreft --format training
 ```
 
-For a native `easysteer.training` checkpoint, add `--format training` and
-select its recorded algorithm (`direct` or `loreft`). Keep the checkpoint's
-layer, prompt template and `prompt_positions: [-1]` in the demo configuration.
-The default `legacy` format reads the published third-party checkpoints.
+For a native `easysteer.training` checkpoint, select its recorded algorithm
+(`direct` or `loreft`). Copy the checkpoint's layer and `apply` selection into
+the demo configuration, and use its prompt format. The default training
+selection is `prompt_positions: [-1]`, but a checkpoint can contain any
+supported prompt/generation selection. `load_checkpoint(...).to_spec()` restores
+the payload, algorithm and selection together when using Python.
+The default `legacy` export format reads published third-party checkpoints;
+its PyReFT file adapter does not require or import the removed training framework.
 
 Set `payload_path` in the appropriate `steering.vectors` entry to the exported
 file, relative to `hf-space/`, and include it in the image. For example, the

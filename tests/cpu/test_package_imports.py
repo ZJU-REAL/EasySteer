@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Public steering imports work with NumPy alone; heavy dependencies stay local."""
+"""Public extraction imports work with NumPy alone; heavy dependencies stay local."""
 
 import os
 import subprocess
@@ -30,7 +30,7 @@ class TestPackageImports(unittest.TestCase):
             import sys
             import numpy as np
 
-            blocked = ("torch", "sklearn", "vllm", "gguf", "easysteer.steer.sae")
+            blocked = ("torch", "sklearn", "vllm", "gguf", "easysteer.extraction.sae")
             class BlockHeavy(importlib.abc.MetaPathFinder):
                 def find_spec(self, fullname, *args):
                     if any(fullname == name or fullname.startswith(name + ".")
@@ -38,16 +38,16 @@ class TestPackageImports(unittest.TestCase):
                         raise AssertionError("Unexpected dependency import: " + fullname)
             sys.meta_path.insert(0, BlockHeavy())
 
-            import easysteer.steer as steer
-            from easysteer.steer import (
+            import easysteer.extraction as extraction
+            from easysteer.extraction import (
                 DiffMeanAccumulator, MomentsAccumulator, TopKCountAccumulator,
                 StatisticalControlVector, extract_token_hiddens,
             )
             acc = MomentsAccumulator()
             acc.update(7, np.array([[1, 2], [3, 4]]))
             np.testing.assert_array_equal(acc.mean(7), [2, 3])
-            assert steer.MomentsAccumulator is MomentsAccumulator
-            assert "PCAExtractor" in dir(steer)
+            assert extraction.MomentsAccumulator is MomentsAccumulator
+            assert "PCAExtractor" in dir(extraction)
             assert not any(name == item or name.startswith(item + ".")
                            for name in sys.modules for item in blocked)
         """)
@@ -55,8 +55,8 @@ class TestPackageImports(unittest.TestCase):
     def test_tensor_like_rows_detach_and_convert_to_cpu_float(self):
         import numpy as np
 
-        from easysteer.steer import extract_token_hiddens
-        from easysteer.steer.utils import extract_token_from_sequence
+        from easysteer.extraction import extract_token_hiddens
+        from easysteer.extraction.selection import extract_token_from_sequence
         calls = []
         class TensorRow:
             def detach(self):
@@ -96,7 +96,7 @@ class TestPackageImports(unittest.TestCase):
             sys.meta_path.insert(0, NoTorch())
             # This test exercises local NPZ extraction and never uses the network.
             sys.modules["requests"] = types.ModuleType("requests")
-            from easysteer.steer import SAEFeatureExplorer
+            from easysteer.extraction import SAEFeatureExplorer
             assert "torch" not in sys.modules
             explorer = SAEFeatureExplorer(api_key="test")
             with tempfile.TemporaryDirectory() as folder:

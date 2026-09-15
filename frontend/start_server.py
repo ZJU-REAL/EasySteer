@@ -79,7 +79,7 @@ def display_startup_info():
     print("=" * 60)
     print()
     print("Features:")
-    print("   - Extract steering vectors (diffmean / pca / lat)")
+    print("   - Extract steering vectors (diffmean / pca / incremental_pca / lat)")
     print("   - Train native direct and LoReFT steering adapters")
     print("   - SAE feature search and decoder-vector extraction")
     print()

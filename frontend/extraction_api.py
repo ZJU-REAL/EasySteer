@@ -88,7 +88,7 @@ def run_extraction(config):
             )
         token_pos = int(token_pos)
         method = config["method"]
-        if method not in ("lat", "pca", "diffmean"):
+        if method not in ("lat", "pca", "diffmean", "incremental_pca"):
             raise ValueError(f"Unsupported extraction method: {method}")
 
         max_working_bytes = config.get("max_working_bytes", 256 * 1024**2)
@@ -136,7 +136,7 @@ def run_extraction(config):
             "budget_bytes": 256 * 1024 * 1024,
         }
         normalize = config.get("normalize", True)
-        if method == "diffmean":
+        if method in ("diffmean", "incremental_pca"):
 
             def checked_batches():
                 for batch in capture_batches(llm, all_samples, **capture_kwargs):

@@ -56,10 +56,19 @@ Set `EASYSTEER_DATA_DIR` when the JSON files are stored elsewhere. Set
 `EASYSTEER_LIMIT` to a positive integer for a smaller local check; the default
 runs the complete datasets.
 
+Set `CUDA_VISIBLE_DEVICES=0,1` and `EASYSTEER_TP=2` before starting the notebook
+kernel to use two GPUs for construction or evaluation. The default TP size is 1.
+
 ## Rebuilding vectors
 
 Place `math_train_1000.json`, a JSON list of the 1,000 MATH training problems,
 in the data directory. The construction notebook captures classified
-paragraph-break rows in small batches, accumulates category sums, and exports
-one vector for each category. Use the same model for construction and
+paragraph-break rows with `capture_batches`, bounded by both prompt count and
+the default 256 MiB raw-data budget. Global sample indices preserve the mapping
+from captured rows to their classified traces. It accumulates category sums
+and exports one vector for each category, recording the hidden-state component
+and model. Each paragraph break contributes equally; per-trace mean pooling
+would change the experiment. Evaluation converts the combined vector with
+`to_spec`, retaining the original paragraph-break selector and scale.
+Use the same model for construction and
 evaluation. The training subset and generated traces are not distributed here.

@@ -5,6 +5,7 @@
 
 import type { ApplySpec, SteeringSpec, VectorSpec } from "./spec";
 import { specToJson } from "./spec";
+import { renderPrompt } from "./prompts";
 
 function pyStr(s: string): string {
   return JSON.stringify(s);
@@ -79,9 +80,15 @@ function pyVector(v: VectorSpec, indent: string): string {
   const args: string[] = [];
   if (v.source) args.push(`source=${pyStr(v.source)}`);
   if (v.data !== null && v.data !== undefined) {
-    // Payload dicts are opaque to the UI; emit a placeholder the user
-    // replaces with an easysteer.vectors adapter call.
-    args.push("data=...,  # in-memory payload: see easysteer.vectors adapters");
+    if (typeof v.data === "object" && "__inline_payload__" in v.data) {
+      // Gallery references describe files that have not been loaded yet.
+      // Keep their adapter hint as a comment; never execute imported text.
+      const hint = String(v.data.__inline_payload__).replace(/[\r\n]/g, " ");
+      args.push(`# Replace with ${hint}\n${indent}    data=...`);
+    } else {
+      // Native checkpoints already contain the canonical JSON payload.
+      args.push(`data=${pyValue(v.data)}`);
+    }
   }
   if (v.algorithm !== "direct") args.push(`algorithm=${pyStr(v.algorithm)}`);
   if (v.scale !== 1.0) args.push(`scale=${v.scale}`);
@@ -100,6 +107,7 @@ export interface PythonExportOptions {
   prompt?: string;
   maxTokens?: number;
   temperature?: number;
+  promptTemplate?: string | null;
 }
 
 /** Full runnable offline-inference script using the vllm.steer_vectors API. */
@@ -110,6 +118,9 @@ export function toPython(spec: SteeringSpec, opts: PythonExportOptions = {}): st
   const temperature = opts.temperature ?? 0;
   const algorithms = [...new Set(spec.vectors.map((v) => v.algorithm))];
   const multiVector = spec.vectors.length > 1;
+  const payloadReferences = spec.vectors.some(
+    (v) => v.data !== null && typeof v.data === "object" && "__inline_payload__" in v.data,
+  );
 
   const vectorBlocks = spec.vectors.map((v) => "        " + pyVector(v, "        ").trimStart());
   const specArgs: string[] = [`vectors=[\n${vectorBlocks.join(",\n")},\n    ]`];
@@ -121,10 +132,20 @@ export function toPython(spec: SteeringSpec, opts: PythonExportOptions = {}): st
     `steer_algorithms=${pyValue(algorithms)}`,
   ];
   if (multiVector) llmArgs.push("steer_multi_vector=True");
+  const promptCode = opts.promptTemplate != null
+    ? `prompt = ${pyStr(opts.promptTemplate)} % ${pyStr(prompt)}`
+    : `messages = [{"role": "user", "content": ${pyStr(prompt)}}]
+tokenizer = llm.get_tokenizer()
+if tokenizer.chat_template:
+    prompt = {"prompt_token_ids": tokenizer.apply_chat_template(
+        messages, tokenize=True, return_dict=False, add_generation_prompt=True,
+    )}
+else:
+    prompt = ${pyStr(prompt)}`;
 
   return `from vllm import LLM, SamplingParams
 from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
-
+${payloadReferences ? "import easysteer.vectors as vec\n" : ""}
 spec = SteeringSpec(
     ${specArgs.join(",\n    ")},
 )
@@ -134,10 +155,7 @@ llm = LLM(
 )
 sampling = SamplingParams(temperature=${temperature}, max_tokens=${maxTokens})
 
-messages = [{"role": "user", "content": ${pyStr(prompt)}}]
-prompt = llm.get_tokenizer().apply_chat_template(
-    messages, tokenize=False, add_generation_prompt=True,
-)
+${promptCode}
 outputs = llm.generate([prompt], sampling, steering=spec)
 print(outputs[0].outputs[0].text)
 `;
@@ -155,15 +173,19 @@ export function toExtraBodyJson(spec: SteeringSpec): string {
 /** curl one-liner against the OpenAI-compatible server. */
 export function toCurl(
   spec: SteeringSpec,
-  opts: { baseUrl?: string; model?: string; prompt?: string } = {},
+  opts: { baseUrl?: string; model?: string; prompt?: string; promptTemplate?: string | null } = {},
 ): string {
   const baseUrl = (opts.baseUrl ?? "http://localhost:8000/v1").replace(/\/$/, "");
+  const prompt = opts.prompt ?? "Hello!";
+  const completion = opts.promptTemplate != null;
   const body = {
     model: opts.model ?? "your-model",
-    messages: [{ role: "user", content: opts.prompt ?? "Hello!" }],
+    ...(completion
+      ? { prompt: renderPrompt(opts.promptTemplate!, prompt) }
+      : { messages: [{ role: "user", content: prompt }] }),
     steering: specToJson(spec),
   };
-  return `curl ${baseUrl}/chat/completions \\
+  return `curl ${baseUrl}/${completion ? "completions" : "chat/completions"} \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(body, null, 2).replace(/'/g, "'\\''")}'`;
 }

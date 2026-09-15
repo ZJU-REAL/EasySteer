@@ -8,11 +8,12 @@ import { defaultApplySpec, type ApplySpec } from "./spec";
 export interface ExtractionConfig {
   model_path: string;
   gpu_devices?: string;
-  method: "diffmean" | "pca" | "lat";
+  method: "diffmean" | "pca" | "lat" | "incremental_pca";
   positive_samples: string[];
   negative_samples: string[];
   token_pos?: number | string;
   normalize?: boolean;
+  max_working_bytes?: number;
   output_path: string;
 }
 

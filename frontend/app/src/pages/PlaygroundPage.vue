@@ -34,6 +34,7 @@ function exportPython(): void {
     prompt: playground.prompt || undefined,
     maxTokens: settings.maxTokens,
     temperature: settings.temperature,
+    promptTemplate: playground.promptTemplate,
   });
 }
 
@@ -48,6 +49,7 @@ function exportCurl(): void {
     baseUrl: settings.openaiBaseUrl,
     model: settings.model || playground.presetModel || undefined,
     prompt: playground.prompt || undefined,
+    promptTemplate: playground.promptTemplate,
   });
 }
 
@@ -62,8 +64,8 @@ function onJsonReplace(spec: SteeringSpec): void {
       <h1>{{ t("playground_title") }}</h1>
       <template v-if="preset">
         <span class="badge accent">{{ preset.method }}</span>
-        <span class="badge mono">{{ preset.model }}</span>
       </template>
+      <span v-if="playground.presetModel" class="badge mono">{{ playground.presetModel }}</span>
       <span class="spacer"></span>
       <button class="small" @click="resetPlayground">{{ t("reset_btn") }}</button>
     </div>

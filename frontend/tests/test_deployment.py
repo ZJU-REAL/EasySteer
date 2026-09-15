@@ -8,7 +8,7 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
-from flask import Blueprint
+from flask import Blueprint, Flask
 
 FRONTEND = Path(__file__).resolve().parents[1]
 
@@ -70,7 +70,6 @@ def test_training_demo_uses_openai_payload(
                         {
                             "data": vectors.to_json_payload(payload),
                             "algorithm": algorithm,
-                            "component": "hidden_states",
                             "layers": [8],
                             "apply": {"prompt_positions": [-1]},
                         }
@@ -230,7 +229,7 @@ def extraction(monkeypatch, tmp_path):
     def extract(captures, labels, *, method, **kwargs):
         activity.append("extract")
         label_values = list(labels)
-        if method == "diffmean":
+        if method in ("diffmean", "incremental_pca"):
             for batch in captures:
                 consumed.append(len(batch))
                 del batch
@@ -278,6 +277,7 @@ def extraction(monkeypatch, tmp_path):
         ("lat", " -2 ", -2),
         ("pca", 0, 0),
         ("diffmean", "+2", 2),
+        ("incremental_pca", -1, -1),
     ],
 )
 def test_extraction_uses_labelled_capture_and_shared_dispatch(
@@ -292,7 +292,7 @@ def test_extraction_uses_labelled_capture_and_shared_dispatch(
         assert options["select"] == {"prompt_positions": [expected]}
         assert options["budget_bytes"] > 0
     (call,) = job.extracted
-    if method != "diffmean":
+    if method not in ("diffmean", "incremental_pca"):
         assert call["captures"] is job.captures[-1]()
     assert call["labels"] == [True, False]
     assert call["token_pos"] == 0
@@ -360,7 +360,9 @@ def test_extraction_passes_multiple_devices_to_the_engine(extraction, devices):
     assert extraction.output.exists()
 
 
-def test_diffmean_consumes_batches_without_retaining_the_whole_capture(extraction):
+@pytest.mark.parametrize("method", ["diffmean", "incremental_pca"])
+def test_streaming_extraction_does_not_retain_the_whole_capture(extraction, method):
+    extraction.config["method"] = method
     extraction.config["positive_samples"] = ["happy"] * 129
     extraction.module.run_extraction(extraction.config)
     batch_sizes = [32, 32, 32, 32, 2]
@@ -397,3 +399,56 @@ def test_extraction_forwards_explicit_working_memory_budget(extraction):
     extraction.config["max_working_bytes"] = 32 * 1024**2
     extraction.module.run_extraction(extraction.config)
     assert extraction.extracted[0]["max_working_bytes"] == 32 * 1024**2
+
+
+@pytest.fixture
+def sae(monkeypatch, payload_modules, tmp_path):
+    monkeypatch.syspath_prepend(str(FRONTEND))
+    payloads, vectors = payload_modules
+    steering = ModuleType("vllm.steer_vectors")
+    steering.DirectionVector = payloads.DirectionVector
+    monkeypatch.setitem(sys.modules, "vllm.steer_vectors", steering)
+    source = ModuleType("easysteer.extraction.sae")
+    calls = []
+
+    def extract_decoder(path, index, output):
+        calls.append((path, index, output))
+        return [1.0, -2.0]
+
+    source.extract_sae_decoder_vector = extract_decoder
+    source.get_sae_feature_explanation = lambda **kwargs: None
+    source.search_sae_features = lambda **kwargs: []
+    monkeypatch.setitem(sys.modules, "easysteer.extraction.sae", source)
+    module = load_module("sae_backend", FRONTEND / "sae_api.py")
+    monkeypatch.setattr(module, "SAE_PARAMS_PATH", "decoder.npz")
+    monkeypatch.setattr(module, "PROJECT_ROOT", str(tmp_path))
+    app = Flask(__name__)
+    app.register_blueprint(module.sae_bp)
+    return app.test_client(), calls, payloads, vectors
+
+
+def test_sae_result_contains_a_canonical_payload_for_its_selected_layer(sae):
+    client, calls, payloads, vectors = sae
+    response = client.post("/api/sae/extract-vector", json={
+        "feature_index": 7, "vector_name": "test", "scale": 2, "layer": 8,
+    })
+    assert response.status_code == 200
+    result = response.json["vector"]
+    assert result["layer"] == 8
+    assert result["scale"] == 2
+    assert result["data"] == vectors.to_json_payload(
+        payloads.DirectionVector({8: [1.0, -2.0]})
+    )
+    assert payloads.validate_wire(result["data"]) == "direction"
+    assert calls[0][:2] == ("decoder.npz", 7)
+
+
+@pytest.mark.parametrize("layer", [None, -1, True, 1.5, "8"])
+def test_sae_requires_a_valid_layer_before_extracting(sae, layer):
+    client, calls, _, _ = sae
+    response = client.post("/api/sae/extract-vector", json={
+        "feature_index": 7, "vector_name": "test", "layer": layer,
+    })
+    assert response.status_code == 400
+    assert "layer must be" in response.json["error"]
+    assert not calls

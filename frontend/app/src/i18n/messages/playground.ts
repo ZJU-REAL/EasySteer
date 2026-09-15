@@ -27,6 +27,10 @@ export const playgroundMessages = {
     en: "This vector carries an inline data payload; edit it in the SteeringSpec JSON panel.",
     zh: "该向量自带内联 data 负载，请在 SteeringSpec JSON 面板中编辑。",
   },
+  saved_prompt_template_notice: {
+    en: "Both runs use the saved prompt format through the completions API. Python and curl exports preserve this format too.",
+    zh: "两次生成均通过补全 API 使用保存的提示词格式，Python 和 curl 导出也会保留该格式。",
+  },
   algorithm_label: { en: "Algorithm", zh: "算法" },
   scale_label: { en: "Scale", zh: "缩放系数" },
   layers_label: { en: "Target layers", zh: "目标层" },

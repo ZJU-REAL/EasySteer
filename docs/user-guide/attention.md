@@ -94,9 +94,10 @@ other capture batches use eager execution. See
 
 The [ITI notebook](https://github.com/ZJU-REAL/EasySteer/blob/main/replications/iti/iti.ipynb)
 uses Llama-2-7B-Chat, the authors' QA prompt, 48 selected heads, and intervention
-strength 15. It loads a supplied direction, evaluates one fixed TruthfulQA set,
-and displays baseline/steered accuracy and generated examples as executed
-notebook outputs.
+strength 15. It loads a supplied direction and evaluates one fixed TruthfulQA
+set. Run the notebook to produce baseline/steered accuracy and generated
+examples for the current runtime; outputs from before the API migration have
+been cleared.
 
 To learn directions from your own data, use
 [`ITIExtractor`](extracting-vectors.md#iti-attention-head-directions). It fits

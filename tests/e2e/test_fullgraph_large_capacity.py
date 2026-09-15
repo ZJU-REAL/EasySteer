@@ -88,7 +88,7 @@ def test_loreft_decode_gather_path(llm):
     """LoReFT changes fixed decode rows and replays the ordinary gather graph."""
     import torch
 
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
     from easysteer.vectors import from_pyreft
 
     prompt = "<|im_start|>user\nWho are you?<|im_end|>\n<|im_start|>assistant\n"
@@ -125,7 +125,7 @@ def test_many_distinct_configs_isolated(llm):
     from vllm.inputs import TokensPrompt
     from vllm.model_hooks.steering.payloads import LowRankProjector
 
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     config = llm.llm_engine.vllm_config.steer_vector_config
     assert config.max_steer_vectors > 2 * config.graph_max_rank

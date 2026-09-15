@@ -70,8 +70,10 @@ with local `layout` and explicit `shard` metadata: `kind`, `tp_rank`, `tp_size`,
 
 Assembly validates shard coverage and matching request IDs, positions, and
 token IDs, then joins attention values in global query-head order. Worker reply
-order does not determine head order. The application helper uses this function
-and attaches the resulting global layouts to `CaptureResult.layouts`.
+order does not determine head order. This function assembles complete worker
+replies in memory. The application helper instead drains aligned pages directly
+into its final tensors or memory-mapped arrays, attaching the global layouts to
+`CaptureResult.layouts`.
 
 ::: model_hooks.capture.serialization.validate_capture_topology
     options:

@@ -365,7 +365,7 @@ class TestLabeledRows:
     def test_client_split_uses_labels(self, llm):
         """The easysteer client splits by labels, exactly, under
         concurrent generation."""
-        import easysteer.hidden_states as hs
+        import easysteer.capture as hs
 
         prompts = [
             "The capital of France is",
@@ -472,7 +472,7 @@ class TestPerRequestSelect:
     def test_client_capture_api(self, llm):
         from vllm.model_hooks.steering.api import SelectSpec
 
-        import easysteer.hidden_states as hs
+        import easysteer.capture as hs
 
         result = hs.capture(
             llm, self.PROMPTS, max_tokens=SP.max_tokens, layers=[5, 10],

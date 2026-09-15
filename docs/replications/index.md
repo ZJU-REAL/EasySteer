@@ -4,6 +4,11 @@ The [`replications/`](https://github.com/ZJU-REAL/EasySteer/tree/main/replicatio
 directory implements published steering methods with EasySteer notebooks. The folders
 contain paper notes, notebooks, and available vector or intervention artifacts.
 Consult each experiment for its required model, data and checkpoint files.
+The [replication usage guide](https://github.com/ZJU-REAL/EasySteer/blob/main/replications/README.md)
+describes the current capture/extraction APIs, dataset requirements, and
+`EASYSTEER_TP` inference setting. Notebooks retain their original extraction
+methods and position policies. Their old outputs have been cleared; rerun them
+to obtain results for the current runtime.
 
 | Folder | One-liner | Category | Component |
 |---|---|---|---|

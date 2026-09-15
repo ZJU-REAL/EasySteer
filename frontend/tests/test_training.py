@@ -37,6 +37,24 @@ def training(monkeypatch):
     train = ModuleType("easysteer.training")
     calls = []
     train.train = lambda **kwargs: calls.append(kwargs)
+
+    def load_checkpoint(path):
+        call = calls[-1]
+        assert path == call["save_dir"]
+        return SimpleNamespace(
+            config=SimpleNamespace(prompt_template="Training prompt: %s\nAnswer:"),
+            to_spec=lambda: SimpleNamespace(
+                model_dump=lambda **kwargs: {
+                    "vectors": [{
+                        "data": {"version": 1, "kind": "checkpoint-payload"},
+                        "algorithm": call["algorithm"],
+                        "apply": call["apply"],
+                    }],
+                }
+            )
+        )
+
+    train.load_checkpoint = load_checkpoint
     for name in ("easysteer",):
         monkeypatch.setitem(sys.modules, name, ModuleType(name))
     monkeypatch.setitem(sys.modules, "easysteer.training", train)
@@ -82,6 +100,13 @@ def test_preset_request_preserves_shared_training_arguments(training, preset):
     assert status["is_training"] is False
     assert status["error_message"] == ""
     assert status["status_message"].startswith("Training complete!")
+    assert status["result"]["output_dir"] == config["output_dir"]
+    assert status["result"]["model_path"] == config["model_path"]
+    assert status["result"]["prompt_template"] == "Training prompt: %s\nAnswer:"
+    (vector,) = status["result"]["steering"]["vectors"]
+    assert vector["algorithm"] == config["algorithm"]
+    assert vector["apply"] == call["apply"]
+    assert vector["data"] == {"version": 1, "kind": "checkpoint-payload"}
 
 
 def test_training_failure_and_log_retention(training, monkeypatch):

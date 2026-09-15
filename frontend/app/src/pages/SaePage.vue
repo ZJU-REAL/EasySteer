@@ -5,7 +5,7 @@
  * proxied by the backend), feature inspection, and extracting a feature's
  * decoder row as a steering vector that the playground can pick up.
  */
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import { useI18n } from "../i18n";
@@ -38,6 +38,11 @@ const targetLayerText = ref("");
 const extracting = ref(false);
 const extractError = ref("");
 const extracted = ref<flask.SaeExtractedVector | null>(null);
+let captureRevision = 0;
+watch([targetLayerText, saeId, modelId, details], () => {
+  captureRevision += 1;
+  extracted.value = null;
+}, { flush: "sync" });
 
 const apiKeyReady = computed(() => settings.neuronpediaApiKey.trim() !== "");
 
@@ -103,12 +108,21 @@ async function extractVector(): Promise<void> {
   if (selectedIndex.value === null) return;
   extracting.value = true;
   extractError.value = "";
+  const revision = captureRevision;
   try {
+    const layer = targetLayerText.value.trim() !== ""
+      ? Number(targetLayerText.value)
+      : guessLayer();
+    if (layer === null || !Number.isInteger(layer) || layer < 0) {
+      throw new Error(t("sae_layer_required"));
+    }
     const resp = await flask.extractSaeVector({
       feature_index: selectedIndex.value,
       vector_name: vectorName.value,
       scale: vectorScale.value,
+      layer,
     });
+    if (revision !== captureRevision) return;
     if (!resp.success || !resp.vector) {
       throw new Error(resp.error ?? "extraction failed");
     }
@@ -122,21 +136,14 @@ async function extractVector(): Promise<void> {
 
 /**
  * Seed the playground with a spec steering along the extracted decoder
- * row. The .pt file is loaded server-side via the payload adapter, so
- * the spec carries an inline-payload placeholder (same convention as
- * the gallery's SAE demo).
+ * row. The backend supplies canonical JSON data for the selected layer.
  */
 function useInPlayground(): void {
   if (!extracted.value) return;
-  const layer = targetLayerText.value.trim() !== ""
-    ? parseInt(targetLayerText.value, 10)
-    : guessLayer();
   const spec = defaultSteeringSpec();
-  spec.vectors[0].data = {
-    __inline_payload__: `vec.from_pt_direction(${JSON.stringify(extracted.value.file_path)}, layers=[${layer ?? 0}])`,
-  };
+  spec.vectors[0].data = extracted.value.data;
   spec.vectors[0].scale = vectorScale.value;
-  if (layer !== null && Number.isInteger(layer)) spec.vectors[0].layers = [layer];
+  spec.vectors[0].layers = [extracted.value.layer];
   spec.vectors[0].name = extracted.value.name;
   spec.vectors[0].apply = {
     ...defaultApplySpec(),

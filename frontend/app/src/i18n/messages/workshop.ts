@@ -26,12 +26,13 @@ export const workshopMessages = {
     zh: "设备号，用逗号分隔。",
   },
   extract_method_help: {
-    en: "How the direction is computed from the two sample sets.",
-    zh: "决定如何从正负两组样本中算出方向。",
+    en: "DiffMean and incremental PCA process capture batches as they arrive. Incremental PCA is approximate; exact PCA and LAT retain a bounded capture and fail if the budget is too small.",
+    zh: "DiffMean 和增量 PCA 边捕获边处理批次。增量 PCA 是近似算法；精确 PCA 和 LAT 保留有大小限制的捕获数据，预算不足时会报错。",
   },
   extract_method_label: { en: "Extraction method", zh: "提取方法" },
   extract_method_diffmean: { en: "DiffMean", zh: "DiffMean（均值差分）" },
   extract_method_pca: { en: "PCA", zh: "PCA（主成分分析）" },
+  extract_method_incremental_pca: { en: "Incremental PCA (approximate)", zh: "增量 PCA（近似）" },
   extract_method_lat: { en: "LAT", zh: "LAT（线性代数技术）" },
   extract_token_pos_label: { en: "Token position", zh: "Token 位置" },
   extract_token_pos_help: {
@@ -39,6 +40,11 @@ export const workshopMessages = {
     zh: "每条样本取哪个 token 的激活值（-1 表示最后一个 token）。",
   },
   extract_normalize_label: { en: "Normalize vector", zh: "归一化向量" },
+  extract_working_memory_label: { en: "Extraction working memory (MiB)", zh: "提取工作内存（MiB）" },
+  extract_working_memory_help: {
+    en: "Budget for estimated extraction allocations. Model weights, KV cache and runtime overhead are outside this limit. Capture uses separate finite budgets.",
+    zh: "提取算法预估分配量的预算，不含模型权重、KV 缓存及运行时开销。捕获使用独立的有限预算。",
+  },
   positive_samples_label: { en: "Positive samples", zh: "正样本" },
   sample_placeholder: { en: "one sample sentence", zh: "一条样本文本" },
   positive_samples_help: {

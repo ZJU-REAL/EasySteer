@@ -1,6 +1,6 @@
 """EasySteer job backend.
 
-Long-running jobs only: vector extraction, ReFT training, and SAE
+Long-running jobs only: vector extraction, native steering training, and SAE
 feature exploration. Text generation and steering go through the
 vllm-steer OpenAI-compatible server; the web UI lives in frontend/app
 (Vite + Vue).

@@ -45,6 +45,8 @@ export interface GalleryEntry {
   paper: { title: string; url: string };
   model: string;
   prompt: string;
+  /** A saved training template, or "%s" for raw completion models. */
+  promptTemplate?: string;
   description: LocalizedText;
   /** Caveats: inline payloads, dynamic token lists, multimodal, etc. */
   note?: LocalizedText;
@@ -312,6 +314,7 @@ export const galleryEntries: GalleryEntry[] = [
     },
     model: "openai-community/gpt2",
     prompt: "My life",
+    promptTemplate: "%s",
     description: {
       en: "LM-Steer learns low-rank projector pairs perturbing the final-layer hidden state feeding the LM head (h' = h + eps * v * (h P1) P2^T). The demo loads the official pretrained gpt2.pt checkpoint (steer dimension 2 = sentiment axis trained on SST-5) and continues 'My life' unsteered, positively (scale = 1e-3 * +2) and negatively (scale = 1e-3 * -2). Sampled with top_p=0.9 and a fixed seed, since greedy decoding degenerates on GPT-2.",
       zh: "LM-Steer 学习一对低秩投影矩阵，扰动送进 LM head 的末层隐藏状态（h' = h + eps * v * (h P1) P2^T）。演示加载官方预训练的 gpt2.pt 权重（第 2 个 steer 维度是在 SST-5 上训练的情感轴），对“My life”分别做不引导、正向（scale = 1e-3 * +2）和负向（scale = 1e-3 * -2）续写。GPT-2 贪心解码容易退化，所以采样用 top_p=0.9 并固定随机种子。",
@@ -347,18 +350,19 @@ export const galleryEntries: GalleryEntry[] = [
     },
     model: "Qwen/Qwen2.5-1.5B-Instruct",
     prompt: "Who are you?",
+    promptTemplate: "<|im_start|>user\n%s<|im_end|>\n<|im_start|>assistant\n",
     description: {
       en: "Replicates the official pyreft emoji-chat demo end to end: the published rank-4 LoReFT adapter targets layer 8 over ten instruction-to-emoji examples, applying at the last prompt token with response-token supervision. New training runs use native EasySteer adapters. At inference the trained intervention is applied exactly where it was trained — the last prompt token of layer 8 — and steered answers come back in emojis while the baseline answers normally.",
       zh: "端到端复现官方 pyreft 的 emoji 聊天演示：已发布的秩为 4 的 LoReFT 适配器使用 10 条“指令 → emoji”样例，在第 8 层 prompt 末尾 token 上施加变换，并以回答 token 计算训练损失。新的训练运行使用 EasySteer 原生适配器。推理时干预精确作用在训练它的位置（第 8 层 prompt 末尾 token），引导后的回答变成 emoji，基线回答则一切正常。",
     },
     note: {
-      en: "Vector is an in-memory payload: vec.from_pyreft('./weight/'). Train your own on the Extract & Train page (Training tab).",
-      zh: "向量为内联 data 负载：vec.from_pyreft('./weight/')。可以在“提取与训练”页的训练页签自己训一个。",
+      en: "Train with easysteer.training or the Extract & Train page, then load vec.from_training('./trained_adapter/'). The checkpoint's load_checkpoint(...).to_spec() also restores its token selection. Existing published PyReFT files use the separate from_pyreft adapter.",
+      zh: "通过 easysteer.training 或“提取与训练”页训练，再用 vec.from_training('./trained_adapter/') 加载。检查点的 load_checkpoint(...).to_spec() 还会恢复 token 选择。已有的 PyReFT 发布权重请使用单独的 from_pyreft 适配器。",
     },
     spec: {
       vectors: [
         {
-          data: inlinePayload("vec.from_pyreft('./weight/')"),
+          data: inlinePayload("vec.from_training('./trained_adapter/')"),
           algorithm: "loreft",
           layers: [8],
           apply: { prompt_positions: [-1] },

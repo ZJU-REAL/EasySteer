@@ -44,6 +44,20 @@ Extraction requires the V2 model runner, which vLLM 0.29.0 uses by default.
 V1 fallback paths and standalone multimodal encoder workers do not support
 capture. See the [capture guide](../docs/user-guide/hidden-state-capture.md).
 
+Workshop extraction calls `easysteer.capture` and the shared
+`easysteer.extraction.extract` API. DiffMean and approximate incremental PCA
+consume capture batches incrementally; exact PCA and LAT use one bounded
+capture. The token position selects a row in each input prompt before it is
+copied from the GPU. The extraction working-memory setting maps to
+`max_working_bytes` (256 MiB by default); capture has separate finite CPU,
+device-buffer, staging, and fetch budgets. These limits exclude model weights,
+KV cache, and runtime overhead. Multiple GPU IDs select tensor parallelism.
+
+SAE extraction requires an explicit target `layer` in `POST /api/sae/extract-vector`.
+The UI supplies the selected layer and receives a canonical direction payload,
+so **Use on Steer page** works without resolving a `.pt` path on the inference
+server. The job backend also retains the `.pt` file for reuse.
+
 ## Development
 
 Run these commands from the repository root in separate terminals:
@@ -108,6 +122,15 @@ can therefore be sent directly to the endpoint.
 vllm-steer. Omitting it selects the last prompt token. The Workshop selector
 editor preserves these rules through training and export to the Steer page,
 and the native checkpoint stores them for `load_checkpoint(...).to_spec()`.
+When training finishes, the backend returns that checkpoint's canonical
+steering spec. **Use on Steer page** loads its payload and saved selection
+directly, and Python/JSON exports preserve the payload. Gallery references to
+checkpoint files that have not been loaded remain placeholders; their Python
+exports include the adapter call to substitute.
+The trained model name and checkpoint prompt template travel with the result.
+Playground comparisons use `/v1/completions` with that exact template, and Python
+and curl exports preserve it. The inference server must serve the training
+model; its configured served-model alias can still be selected in Settings.
 Training uses reference response tokens when matching generation selectors;
 inference uses the generated tokens. `generation_positions: [0]` transforms
 the first response token's state while predicting the second token.

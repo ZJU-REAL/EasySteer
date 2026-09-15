@@ -6,11 +6,14 @@ from core import PROJECT_ROOT, lang, project_root_on_path, require_fields
 from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
+    from vllm.steer_vectors import DirectionVector
+
     from easysteer.extraction.sae import (
         extract_sae_decoder_vector,
         get_sae_feature_explanation,
         search_sae_features,
     )
+    from easysteer.vectors import to_json_payload
 
 sae_bp = Blueprint("sae", __name__)
 
@@ -76,6 +79,9 @@ def extract_sae_vector():
         feature_index = data["feature_index"]
         vector_name = data["vector_name"]
         scale = data.get("scale", 1.0)
+        layer = data.get("layer")
+        if type(layer) is not int or layer < 0:
+            return jsonify({"error": "layer must be a non-negative integer"}), 400
 
         # The SAE decoder weights file is configured via the environment
         if not SAE_PARAMS_PATH:
@@ -118,6 +124,8 @@ def extract_sae_vector():
                     "feature_index": feature_index,
                     "file_path": output_path,
                     "scale": scale,
+                    "layer": layer,
+                    "data": to_json_payload(DirectionVector({layer: vector})),
                 },
             }
         )

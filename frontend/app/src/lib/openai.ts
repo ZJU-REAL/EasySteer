@@ -32,9 +32,23 @@ function joinUrl(base: string, path: string): string {
 }
 
 export async function streamChatCompletion(opts: StreamOptions): Promise<void> {
+  return streamCompletion(opts, { messages: opts.messages }, "/chat/completions");
+}
+
+export async function streamTextCompletion(
+  opts: Omit<StreamOptions, "messages"> & { prompt: string },
+): Promise<void> {
+  return streamCompletion(opts, { prompt: opts.prompt }, "/completions");
+}
+
+async function streamCompletion(
+  opts: Omit<StreamOptions, "messages">,
+  input: Record<string, unknown>,
+  endpoint: string,
+): Promise<void> {
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: opts.messages,
+    ...input,
     stream: true,
   };
   if (opts.temperature !== undefined) body.temperature = opts.temperature;
@@ -42,7 +56,7 @@ export async function streamChatCompletion(opts: StreamOptions): Promise<void> {
   if (opts.steering === false) body.steering = false;
   else if (opts.steering !== null) body.steering = specToJson(opts.steering);
 
-  const resp = await fetch(joinUrl(opts.baseUrl, "/chat/completions"), {
+  const resp = await fetch(joinUrl(opts.baseUrl, endpoint), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -68,13 +82,13 @@ export async function streamChatCompletion(opts: StreamOptions): Promise<void> {
       if (!trimmed.startsWith("data:")) continue;
       const payload = trimmed.slice(5).trim();
       if (payload === "[DONE]") return;
-      let parsed: { choices?: { delta?: { content?: string } }[] };
+      let parsed: { choices?: { delta?: { content?: string }; text?: string }[] };
       try {
         parsed = JSON.parse(payload);
       } catch (e) {
         throw new Error(`malformed SSE chunk: ${payload.slice(0, 200)}`);
       }
-      const delta = parsed.choices?.[0]?.delta?.content;
+      const delta = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.text;
       if (delta) opts.onToken(delta);
     }
   }

@@ -25,6 +25,7 @@ training_status = {
     "status_message": "",
     "error_message": "",
     "logs": [],
+    "result": None,
 }
 
 # Config presets served by /api/train-configs and /api/train-config/<name>
@@ -185,10 +186,12 @@ def train():
                         "status_message": "Initializing training...",
                         "error_message": "",
                         "logs": [],
+                        "result": None,
                     }
                 )
 
                 with project_root_on_path():
+                    from easysteer.training import load_checkpoint
                     from easysteer.training import train as train_steering
 
                 logger.info(f"Starting to load model: {data['model_path']}")
@@ -217,11 +220,20 @@ def train():
                     learning_rate=training_args.get("learning_rate", 4e-3),
                     logging_steps=training_args.get("logging_steps", 40),
                 )
+                checkpoint = load_checkpoint(output_dir)
 
                 finish_job(
                     training_status,
                     "is_training",
                     f"Training complete! Model saved to: {output_dir}",
+                    result={
+                        "output_dir": output_dir,
+                        "model_path": data["model_path"],
+                        "prompt_template": checkpoint.config.prompt_template,
+                        "steering": checkpoint.to_spec().model_dump(
+                            mode="json", exclude_none=True
+                        ),
+                    },
                 )
 
                 logger.info(f"Training complete, model saved to: {output_dir}")

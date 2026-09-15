@@ -1,10 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { setServerSteering, streamChatCompletion } from "./openai";
+import { setServerSteering, streamChatCompletion, streamTextCompletion } from "./openai";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("streamed completion content", () => {
+  it("uses exact formatted prompts and text deltas for completion requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(
+      'data: {"choices":[{"text":"reply"}]}\n\ndata: [DONE]\n\n',
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const tokens: string[] = [];
+    await streamTextCompletion({
+      baseUrl: "http://server/v1", model: "trained-model",
+      prompt: "Training prompt: Hello\nAnswer:", steering: false,
+      onToken: (token) => tokens.push(token),
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe("http://server/v1/completions");
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({
+      model: "trained-model", prompt: "Training prompt: Hello\nAnswer:",
+      steering: false, stream: true,
+    });
+    expect(tokens).toEqual(["reply"]);
+  });
   it("delivers ordered deltas across split SSE lines and UTF-8 characters", async () => {
     const event = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\r\n\r\n`;
     const bytes = new TextEncoder().encode(
