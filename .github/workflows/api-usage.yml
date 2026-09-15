@@ -13,6 +13,8 @@ on:
       - "docker/**"
       - "tools/**"
       - "README*.md"
+      - "pyproject.toml"
+      - "setup.py"
       - "vllm-steer"
       - "tests/cpu/test_example_api_fields.py"
       - "tests/cpu/test_notebook_workflows.py"
@@ -27,13 +29,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       # Reads API definitions and exercises notebook estimators on small arrays.
       # No engine dependencies, model checkpoints or GPU are needed.
-      - run: python -m pip install pytest numpy scikit-learn
+      - run: python -m pip install pytest .
       - run: python -m pytest tests/cpu/test_example_api_fields.py tests/cpu/test_notebook_workflows.py -q
