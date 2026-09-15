@@ -65,3 +65,6 @@ DDP tests for update correctness.
 [`loreft.ipynb`](loreft.ipynb) provides an interactive single-GPU walkthrough.
 The bundled `weight/` files remain historical checkpoint data and are read by
 the standalone `easysteer.vectors.from_pyreft` adapter.
+The notebook also preserves its original PyReFT training and generation logs,
+with a link to their source snapshot. Those logs are historical records; the
+native single-GPU/DDP validation reported above was performed separately.

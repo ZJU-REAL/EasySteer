@@ -7,8 +7,10 @@ Consult each experiment for its required model, data and checkpoint files.
 The [replication usage guide](https://github.com/ZJU-REAL/EasySteer/blob/main/replications/README.md)
 describes the current capture/extraction APIs, dataset requirements, and
 `EASYSTEER_TP` inference setting. Notebooks retain their original extraction
-methods and position policies. Their old outputs have been cleared; rerun them
-to obtain results for the current runtime.
+methods and position policies. Saved outputs are preserved as historical
+experiment records, with the source snapshot identified in each notebook.
+Rerun the notebooks to obtain results for the current runtime; the retained
+outputs do not validate the migrated code.
 
 | Folder | One-liner | Category | Component |
 |---|---|---|---|

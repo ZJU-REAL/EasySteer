@@ -64,7 +64,14 @@ and SEAL evaluate from `math500.json`, a list of records with `problem` fields.
 These dataset files are not bundled; prepare them in the corresponding notebook
 directory before running construction or evaluation.
 
-Bundled vector/checkpoint files remain historical artifacts. Notebook outputs
-were cleared during the API migration; rerun all cells to obtain measurements
-for the current runtime. API checks alone do not establish that a rerun matches
-the published paper or the earlier saved outputs.
+Saved notebook outputs and bundled vector/checkpoint files are preserved as
+historical experiment records. Each notebook links the source snapshot of its
+restored outputs. Output-cell metadata also records the original execution
+count and source hash; current execution counters are empty because the updated
+code has not been rerun. LoReFT's restored training logs come from the former
+PyReFT implementation; its separate native-training validation is documented in
+[the LoReFT guide](loreft/README.md).
+
+API migrations should preserve these records and their provenance. Rerun all
+cells and update the provenance note to record measurements for a new runtime.
+API checks alone do not establish that a rerun matches the paper or saved results.
