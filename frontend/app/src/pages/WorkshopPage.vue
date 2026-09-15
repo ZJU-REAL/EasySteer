@@ -34,10 +34,10 @@ const extraction = ref({
 const training = ref({
   model_path: "",
   gpu_devices: "0",
-  intervention: "loreft",
+  algorithm: "loreft" as "direct" | "loreft",
   layer: 8,
-  component: "block_output",
-  low_rank_dimension: 4,
+  component: "hidden_states",
+  rank: 4,
   num_train_epochs: 100,
   per_device_train_batch_size: 10,
   learning_rate: 0.004,
@@ -112,10 +112,10 @@ async function importPreset(): Promise<void> {
       training.value = {
         model_path: cfg.model_path ?? "",
         gpu_devices: cfg.gpu_devices ?? "0",
-        intervention: cfg.intervention ?? "loreft",
-        layer: cfg.reft_config?.layer ?? 8,
-        component: cfg.reft_config?.component ?? "block_output",
-        low_rank_dimension: cfg.reft_config?.low_rank_dimension ?? 4,
+        algorithm: cfg.algorithm ?? "loreft",
+        layer: cfg.steering_config?.layer ?? 8,
+        component: cfg.steering_config?.component ?? "hidden_states",
+        rank: cfg.steering_config?.rank ?? 4,
         num_train_epochs: cfg.training_args?.num_train_epochs ?? 100,
         per_device_train_batch_size: cfg.training_args?.per_device_train_batch_size ?? 10,
         learning_rate: cfg.training_args?.learning_rate ?? 0.004,
@@ -173,8 +173,7 @@ async function pollOnce(jobKind: JobKind): Promise<void> {
         message: s.status_message,
         error: s.error_message || null,
         logs: s.logs ?? [],
-        // The training pipeline saves ReFT weights into output_dir; the
-        // playground consumes them via the pyreft payload adapter.
+        // The training pipeline saves native adapters into output_dir.
         outputPath: done && !s.error_message ? training.value.output_dir : null,
         extra: s.is_training ? `epoch ${s.current_epoch ?? 0}, step ${s.current_step ?? 0}` : "",
       };
@@ -228,13 +227,13 @@ async function submitTraining(): Promise<void> {
     await flask.startTraining({
       model_path: training.value.model_path,
       gpu_devices: training.value.gpu_devices,
-      intervention: training.value.intervention,
+      algorithm: training.value.algorithm,
       training_examples: training.value.examples.filter(([a, b]) => a.trim() || b.trim()),
       output_dir: training.value.output_dir,
-      reft_config: {
+      steering_config: {
         layer: training.value.layer,
         component: training.value.component,
-        low_rank_dimension: training.value.low_rank_dimension,
+        rank: training.value.rank,
       },
       training_args: {
         num_train_epochs: training.value.num_train_epochs,
@@ -281,11 +280,9 @@ function useInPlayground(): void {
     spec.vectors[0].source = status.value.outputPath;
     spec.vectors[0].algorithm = "direct";
   } else {
-    // Trained ReFT weights are an in-memory payload server-side; mark
-    // the spec so the Python export tells the user to load it via
-    // vec.from_pyreft(<output_dir>).
-    spec.vectors[0].data = { __inline_payload__: `vec.from_pyreft(${JSON.stringify(status.value.outputPath)})` };
-    spec.vectors[0].algorithm = "loreft";
+    // Export the native training payload with its training selection.
+    spec.vectors[0].data = { __inline_payload__: `vec.from_training(${JSON.stringify(status.value.outputPath)})` };
+    spec.vectors[0].algorithm = training.value.algorithm;
     spec.vectors[0].layers = [training.value.layer];
     spec.vectors[0].apply = {
       ...defaultApplySpec(),
@@ -452,10 +449,10 @@ refreshPresets();
             </div>
 
             <div class="field">
-              <label>{{ t("train_intervention_label") }}</label>
-              <select v-model="training.intervention" class="full">
+              <label>{{ t("train_algorithm_label") }}</label>
+              <select v-model="training.algorithm" class="full">
                 <option value="loreft">loreft</option>
-                <option value="bias">bias</option>
+                <option value="direct">direct</option>
               </select>
             </div>
             <div class="field">
@@ -465,14 +462,12 @@ refreshPresets();
             <div class="field">
               <label>{{ t("train_component_label") }}</label>
               <select v-model="training.component" class="full">
-                <option value="block_output">block_output</option>
-                <option value="attention_output">attention_output</option>
-                <option value="mlp_output">mlp_output</option>
+                <option value="hidden_states">hidden_states</option>
               </select>
             </div>
             <div class="field">
               <label>{{ t("train_low_rank_dim_label") }}</label>
-              <input v-model.number="training.low_rank_dimension" type="number" class="mono full" />
+              <input v-model.number="training.rank" :disabled="training.algorithm !== 'loreft'" type="number" class="mono full" />
             </div>
 
             <div class="field">

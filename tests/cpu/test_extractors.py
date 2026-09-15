@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""CPU units for the feature-extractor layer (easysteer.steer).
+"""CPU units for the feature-extractor layer (easysteer.extraction).
 
 Pins the explicit-failure conventions: one shared negative-derivation
 rule (negatives are every sample not in positive_indices, ascending;
@@ -11,7 +11,7 @@ ids flowing through utils and the extractors.
 import numpy as np
 import pytest
 
-from easysteer.steer import (
+from easysteer.extraction import (
     DiffMeanExtractor,
     ITIExtractor,
     LATExtractor,
@@ -23,11 +23,10 @@ from easysteer.steer import (
     extract_statistical_control_vector,
     extract_token_hiddens,
 )
-from easysteer.steer.utils import (
+from easysteer.extraction._utils import correct_sign, l2_normalize
+from easysteer.extraction.selection import (
     _TOKEN_REDUCERS,
-    correct_sign,
     extract_token_from_sequence,
-    l2_normalize,
 )
 
 RNG = np.random.default_rng(11)
@@ -341,7 +340,7 @@ class TestUnifiedMetadata:
 class TestLATSingleExtraction:
     def test_capture_rows_are_visited_once(self, monkeypatch):
         """LAT reuses selected rows for direction correction within each layer."""
-        from easysteer.steer import base_extractor
+        from easysteer.extraction import base as base_extractor
 
         calls = {"n": 0}
         real = base_extractor.iter_token_hiddens

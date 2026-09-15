@@ -10,8 +10,8 @@ from core.validation import normalize_gpu_devices
 from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
-    from easysteer.hidden_states import capture, capture_batches
-    from easysteer.steer import (
+    from easysteer.capture import capture, capture_batches
+    from easysteer.extraction import (
         DiffMeanAccumulator,
         DiffMeanExtractor,
         extract_statistical_control_vector,

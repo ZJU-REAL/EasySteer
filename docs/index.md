@@ -19,7 +19,7 @@ prefix caching, and CUDA graph support.
 | Control layers, tokens, and multiple interventions | [Steering requests](user-guide/steering.md) |
 | Capture model activations and learn a direction | [Capture](user-guide/hidden-state-capture.md) → [Extracting vectors](user-guide/extracting-vectors.md) |
 | Intervene on attention heads | [Attention and ITI](user-guide/attention.md) |
-| Train a ReFT intervention | [ReFT training](user-guide/reft-training.md) |
+| Train a steering adapter | [Steering training](user-guide/reft-training.md) |
 | Deploy an API or demo | [OpenAI server](user-guide/openai-server.md) → [Web demos](user-guide/web-demo.md) |
 | Choose graph, caching, and capacity settings | [Performance](user-guide/performance.md) · [Engine arguments](api-reference/engine-configuration.md) |
 | Reproduce a paper | [Replications](replications/index.md) |
@@ -29,10 +29,10 @@ prefix caching, and CUDA graph support.
 | Component | What it is |
 |---|---|
 | `vllm-steer/` | vLLM fork exposing `vllm.steer_vectors` and `vllm.capture` |
-| `easysteer.hidden_states` | Capture labelled hidden states, attention head outputs, and MoE router logits |
-| `easysteer.steer` | Extract steering vectors from captured hidden states (analysis-based) |
+| `easysteer.capture` | Capture labelled hidden states, attention head outputs, and MoE router logits |
+| `easysteer.extraction` | Extract steering vectors from captured hidden states (analysis-based) |
 | `easysteer.vectors` | Convert files or extraction results into common inference payloads |
-| `easysteer.reft` | Train parameterized interventions on frozen models (learning-based) |
+| `easysteer.training` | Train native steering adapters on frozen models (learning-based) |
 | `frontend/`, `hf-space/` | Full research frontend and lightweight hosted demo |
 | `replications/` | Notebook reproductions of published steering papers |
 

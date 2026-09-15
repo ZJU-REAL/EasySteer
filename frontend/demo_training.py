@@ -6,6 +6,7 @@ This script demonstrates how to use the training functionality of EasySteer via 
 """
 
 import argparse
+import json
 import os
 import time
 from pathlib import Path
@@ -75,12 +76,12 @@ def start_training_demo(model_path, gpu_devices="0", preset="emoji"):
     config = {
         "model_path": model_path,
         "gpu_devices": gpu_devices,
-        "reft_config": {
+        "steering_config": {
             "layer": 8,
-            "component": "block_output",
-            "low_rank_dimension": 4,
+            "component": "hidden_states",
+            "rank": 4,
         },
-        "intervention": "loreft",
+        "algorithm": "loreft",
         "output_dir": f"./results/demo_{preset}_training",
         "training_examples": presets[preset],
         "training_args": {
@@ -166,31 +167,19 @@ def monitor_training():
 
 
 def test_inference(model_name, steer_vector_path, test_inputs, api_url, api_key):
-    """Send a trained LoReFT payload to a running vllm-steer server."""
-    from easysteer.vectors import from_pyreft, to_json_payload
+    """Send a native training checkpoint to a running vllm-steer server."""
+    from easysteer.training import load_checkpoint
 
-    payload = from_pyreft(str(steer_vector_path))
-    wire = to_json_payload(payload)
-    # The adapter also accepts BiasIntervention checkpoints.
-    algorithm = {"reft": "loreft", "direction": "direct"}[wire["kind"]]
-    spec = {
-        "vectors": [
-            {
-                "data": wire,
-                "algorithm": algorithm,
-                "scale": 1.0,
-                "apply": {"prompt_positions": [-1]},
-            }
-        ]
-    }
+    checkpoint = load_checkpoint(str(steer_vector_path))
+    spec = json.loads(checkpoint.to_spec().model_dump_json())
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     for instruction in test_inputs:
         response = requests.post(
-            f"{api_url.rstrip('/')}/chat/completions",
+            f"{api_url.rstrip('/')}/completions",
             headers=headers,
             json={
                 "model": model_name,
-                "messages": [{"role": "user", "content": instruction}],
+                "prompt": checkpoint.config.prompt_template % instruction,
                 "temperature": 0.0,
                 "max_tokens": 128,
                 "repetition_penalty": 1.1,
@@ -199,7 +188,7 @@ def test_inference(model_name, steer_vector_path, test_inputs, api_url, api_key)
             timeout=180,
         )
         response.raise_for_status()
-        generated = response.json()["choices"][0]["message"]["content"]
+        generated = response.json()["choices"][0]["text"]
         print(f"Input: {instruction}\nOutput: {generated}\n")
 
 

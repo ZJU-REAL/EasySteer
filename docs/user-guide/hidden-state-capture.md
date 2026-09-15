@@ -1,6 +1,6 @@
 # Hidden-state capture
 
-`easysteer.hidden_states` extracts intermediate activations from a running vLLM
+`easysteer.capture` extracts intermediate activations from a running vLLM
 engine for analysis, training data and steering-vector extraction. Capture works
 without enabling steering.
 
@@ -13,7 +13,7 @@ prompts; prompt embeddings are not supported.
 
 ```python
 from vllm import LLM
-import easysteer.hidden_states as hs
+import easysteer.capture as hs
 
 llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct", tensor_parallel_size=1)
 # Capture chooses its execution path automatically. Admission skips
@@ -124,7 +124,7 @@ remain cached for the next batch.
 For diffmean, keep running statistics rather than all captured samples:
 
 ```python
-from easysteer.steer import DiffMeanAccumulator, DiffMeanExtractor
+from easysteer.extraction import DiffMeanAccumulator, DiffMeanExtractor
 
 accumulator = DiffMeanAccumulator()
 for positive, group in [(True, positive_prompts), (False, negative_prompts)]:

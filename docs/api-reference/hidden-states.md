@@ -1,4 +1,4 @@
-# `easysteer.hidden_states`
+# `easysteer.capture`
 
 Hidden-state, attention-head, and MoE router-logit capture from a running vLLM
 engine. The [capture guide](../user-guide/hidden-state-capture.md) explains
@@ -6,11 +6,11 @@ selection, graph execution, and prefix-cache behavior.
 
 ## Capture
 
-::: easysteer.hidden_states.capture
+::: easysteer.capture.capture
 
-::: easysteer.hidden_states.capture_batches
+::: easysteer.capture.capture_batches
 
-::: easysteer.hidden_states.CaptureResult
+::: easysteer.capture.CaptureResult
     options:
       merge_init_into_class: true
       members: [layers, outputs, layouts, layer_ids, labelled, rows, meta, sample, sample_rows, token, sample_positions, sample_token_ids, to_nested, __len__]

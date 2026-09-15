@@ -51,9 +51,9 @@ Built on vLLM, EasySteer is a unified framework for high-performance LLM steerin
 | Component | What it is | Docs |
 |---|---|---|
 | `vllm-steer/` | vLLM fork with the steering engine (`vllm.steer_vectors`) | [Steering guide](https://zju-real.github.io/EasySteer/latest/user-guide/steering/) |
-| `easysteer.hidden_states` | Capture hidden states / MoE router logits from a running engine | [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/) |
-| `easysteer.steer` | Extract steering vectors from hidden states (analysis-based) | [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/) |
-| `easysteer.reft` | Train parameterized interventions on frozen models (learning-based) | [ReFT training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/) |
+| `easysteer.capture` | Capture hidden states, attention outputs and MoE router logits | [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/) |
+| `easysteer.extraction` | Extract steering vectors from hidden states (analysis-based) | [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/) |
+| `easysteer.training` | Train native steering adapters on frozen models (learning-based) | [Steering training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/) |
 | `frontend/` | Web UI for interactive steering experiments | [Web demo](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) |
 | `replications/` | Reproductions of published steering papers | [Replications](https://zju-real.github.io/EasySteer/latest/replications/) |
 
@@ -158,7 +158,7 @@ Full walkthrough (including where the vector comes from): [Quickstart](https://z
 - **Capturing hidden states, attention heads, and MoE router logits**, including ordinary tensor parallelism: [Capture guide](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
 - **Attention-head steering** with global head directions and TP support: [Attention guide](https://zju-real.github.io/EasySteer/latest/user-guide/attention/)
 - **Extracting vectors** (DiffMean, PCA, LAT, linear probe, SAE): [Extraction guide](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/)
-- **Training interventions** (ReFT / LoReFT / LM-Steer): [ReFT training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
+- **Training steering adapters** (direct / LoReFT): [Steering training](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
 - **API reference**: [zju-real.github.io/EasySteer/latest/api-reference/](https://zju-real.github.io/EasySteer/latest/api-reference/)
 
 ## Contributing

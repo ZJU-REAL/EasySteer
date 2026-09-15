@@ -50,7 +50,7 @@ nav:
       - Extraction and Training:
           - Hidden-state capture: user-guide/hidden-state-capture.md
           - Extracting vectors: user-guide/extracting-vectors.md
-          - ReFT training: user-guide/reft-training.md
+          - Training steering adapters: user-guide/reft-training.md
       - Serving:
           - OpenAI-compatible server: user-guide/openai-server.md
           - Web demos: user-guide/web-demo.md
@@ -72,6 +72,7 @@ nav:
           - vllm.capture: api-reference/capture.md
       - Extraction and Extension:
           - Vector extraction and adapters: api-reference/steer.md
+          - Training: api-reference/training.md
           - Algorithm extension API: api-reference/algorithm-extension.md
 
 plugins:

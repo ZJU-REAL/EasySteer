@@ -19,12 +19,12 @@ export interface TrainingConfig {
   gpu_devices?: string;
   /** [input, output] pairs. */
   training_examples: [string, string][];
-  intervention?: string;
+  algorithm?: "direct" | "loreft";
   output_dir: string;
-  reft_config?: {
+  steering_config?: {
     layer?: number;
     component?: string;
-    low_rank_dimension?: number;
+    rank?: number;
   };
   training_args?: {
     num_train_epochs?: number;

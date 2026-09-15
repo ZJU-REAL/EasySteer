@@ -2,7 +2,7 @@
 
 The Vue UI sends generation requests to a separate vllm-steer
 OpenAI-compatible server. The Flask job backend handles vector extraction,
-ReFT training, and SAE exploration. A built UI and `/api` are served from
+native steering training, and SAE exploration. A built UI and `/api` are served from
 one origin so Workshop and SAE requests reach the job backend.
 
 ![EasySteer Frontend](../figures/demosys.png)
@@ -14,7 +14,7 @@ First install EasySteer and vllm-steer using the
 Python environment for the job backend. From the repository root:
 
 ```bash
-python -m pip install -r frontend/requirements.txt
+python -m pip install -e '.[training]' -r frontend/requirements.txt
 cd frontend/app
 npm ci
 npm run build
@@ -85,7 +85,7 @@ python -m pytest frontend/tests -q
 
 `demo_training.py` trains through the Flask API. Its optional inference
 step calls a separately running vllm-steer server with the saved checkpoint
-converted by `easysteer.vectors.from_pyreft`:
+converted by `easysteer.training.load_checkpoint(path).to_spec()`:
 
 ```bash
 python frontend/demo_training.py --model Qwen/Qwen2.5-1.5B-Instruct \
@@ -100,6 +100,6 @@ same model and declare `loreft` (or `direct` for a bias checkpoint).
 and generates responses through the inference server.
 
 Training presets use the same fields as `POST /api/train`: `model_path`,
-`intervention`, `output_dir`, an array of `[input, output]` pairs in
-`training_examples`, and the `reft_config` / `training_args` objects. Presets
+`algorithm`, `output_dir`, an array of `[input, output]` pairs in
+`training_examples`, and the `steering_config` / `training_args` objects. Presets
 can therefore be sent directly to the endpoint.

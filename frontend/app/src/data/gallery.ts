@@ -348,8 +348,8 @@ export const galleryEntries: GalleryEntry[] = [
     model: "Qwen/Qwen2.5-1.5B-Instruct",
     prompt: "Who are you?",
     description: {
-      en: "Replicates the official pyreft emoji-chat demo end to end: a rank-4 LoReFT intervention is trained on the block output of layer 8 over ten instruction-to-emoji examples, supervised at the last prompt position only. At inference the trained intervention is applied exactly where it was trained — the last prompt token of layer 8 — and steered answers come back in emojis while the baseline answers normally.",
-      zh: "端到端复现官方 pyreft 的 emoji 聊天演示：在第 8 层 block 输出上，用 10 条“指令 → emoji”样例训练一个秩为 4 的 LoReFT 干预，只在 prompt 最后一个位置上做监督。推理时干预精确作用在训练它的位置（第 8 层 prompt 末尾 token），引导后的回答变成 emoji，基线回答则一切正常。",
+      en: "Replicates the official pyreft emoji-chat demo end to end: the published rank-4 LoReFT adapter targets layer 8 over ten instruction-to-emoji examples, applying at the last prompt token with response-token supervision. New training runs use native EasySteer adapters. At inference the trained intervention is applied exactly where it was trained — the last prompt token of layer 8 — and steered answers come back in emojis while the baseline answers normally.",
+      zh: "端到端复现官方 pyreft 的 emoji 聊天演示：已发布的秩为 4 的 LoReFT 适配器使用 10 条“指令 → emoji”样例，在第 8 层 prompt 末尾 token 上施加变换，并以回答 token 计算训练损失。新的训练运行使用 EasySteer 原生适配器。推理时干预精确作用在训练它的位置（第 8 层 prompt 末尾 token），引导后的回答变成 emoji，基线回答则一切正常。",
     },
     note: {
       en: "Vector is an in-memory payload: vec.from_pyreft('./weight/'). Train your own on the Extract & Train page (Training tab).",

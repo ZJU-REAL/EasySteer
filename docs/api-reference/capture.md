@@ -1,7 +1,7 @@
 # Capture API (`vllm.capture`)
 
 Applications normally call
-[`easysteer.hidden_states.capture()`](hidden-states.md#easysteer.hidden_states.capture),
+[`easysteer.capture.capture()`](hidden-states.md#easysteer.capture.capture),
 which starts capture, generates requests, fetches labelled tensors, and stops the
 stream. The fork exports the selection, serialization, and worker-session types
 documented below for integrations.

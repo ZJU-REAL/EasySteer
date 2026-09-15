@@ -145,7 +145,7 @@ snapshot rather than reopen the source.
 
 `easysteer.vectors.load(path, format=...)` selects an explicit format adapter.
 Supported formats are `gguf`, `concept_pair`, `moe_router`, `pt_direction`,
-`pyreft`, `lm_steer`, and `linear_transport`. The existing convenience adapters
+`training`, `pyreft`, `lm_steer`, and `linear_transport`. The existing convenience adapters
 remain available (`from_pyreft`,
 `from_lm_steer`, `from_linear_transport`, `from_pt_direction`, `from_gguf`),
 and `easysteer.vectors.from_control_vector(cv)` steers an extraction result

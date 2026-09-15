@@ -16,6 +16,7 @@ def check_dependencies():
         "flask",
         "flask_cors",
         "transformers",
+        "accelerate",
         "torch",
         "vllm",
     ]
@@ -35,7 +36,7 @@ def check_dependencies():
         for package in missing_packages:
             print(f"   - {package}")
         print("\n💡 Install missing packages with:")
-        print("   python -m pip install -r frontend/requirements.txt")
+        print("   python -m pip install -e '.[training]' -r frontend/requirements.txt")
         print(
             "Then follow docs/getting-started/installation.md for EasySteer and vllm-steer."
         )
@@ -59,7 +60,7 @@ def check_environment():
                 gpu_name = torch.cuda.get_device_name(i)
                 print(f"   GPU {i}: {gpu_name}")
         else:
-            print("⚠️  CUDA not available - training will use CPU (slower)")
+            print("⚠️  CUDA not available - GPU jobs require a CUDA environment")
     except ImportError:
         print("⚠️  PyTorch not installed - cannot check CUDA")
 
@@ -79,7 +80,7 @@ def display_startup_info():
     print()
     print("Features:")
     print("   - Extract steering vectors (diffmean / pca / lat)")
-    print("   - Train custom steer vectors with ReFT")
+    print("   - Train native direct and LoReFT steering adapters")
     print("   - SAE feature search and decoder-vector extraction")
     print()
     print("Access URLs:")

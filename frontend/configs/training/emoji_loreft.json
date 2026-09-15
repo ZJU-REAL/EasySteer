@@ -1,12 +1,12 @@
 {
   "model_path": "Qwen/Qwen2.5-1.5B-Instruct",
   "gpu_devices": "0",
-  "intervention": "loreft",
+  "algorithm": "loreft",
   "output_dir": "./results/emoji_loreft",
-  "reft_config": {
+  "steering_config": {
     "layer": 8,
-    "component": "block_output",
-    "low_rank_dimension": 4
+    "component": "hidden_states",
+    "rank": 4
   },
   "training_args": {
     "num_train_epochs": 100.0,

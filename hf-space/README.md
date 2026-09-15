@@ -96,6 +96,11 @@ python hf-space/export_payload.py /path/to/checkpoint \
   /path/to/payload.json --algorithm loreft
 ```
 
+For a native `easysteer.training` checkpoint, add `--format training` and
+select its recorded algorithm (`direct` or `loreft`). Keep the checkpoint's
+layer, prompt template and `prompt_positions: [-1]` in the demo configuration.
+The default `legacy` format reads the published third-party checkpoints.
+
 Set `payload_path` in the appropriate `steering.vectors` entry to the exported
 file, relative to `hf-space/`, and include it in the image. For example, the
 bundled LoReFT vector uses:

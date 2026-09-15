@@ -64,6 +64,7 @@ schemas are loaded explicitly in the client and passed as `data`:
 | `concept_pair` | Directory with `h1.gguf` and `h2.gguf` | `ConceptPair` | `source="concepts/"` with `algorithm="concept_replace"` |
 | `moe_router` | JSON with per-layer `layer_configs` | `RouterConfig` | `source="router.json"` with `algorithm="moe_router"` |
 | `pt_direction` | One tensor or NumPy array saved with `torch.save` | `DirectionVector` | `load(path, format="pt_direction", layers=[10])` |
+| `training` | Native `steering_adapter.json` | `DirectionVector` or `ReftIntervention` | `load(path, format="training")` |
 | `pyreft` | One intervention `.bin` and its config in a directory | `DirectionVector` for bias, `ReftIntervention` for LoReFT | `load(path, format="pyreft")` |
 | `lm_steer` | Published projector checkpoint layout | `LowRankProjector` | `load(path, format="lm_steer", vector_index=0)` |
 | `linear_transport` | Pickled transport with `A_` and optional `B_` | `LinearMap` | `load(path, format="linear_transport")` |

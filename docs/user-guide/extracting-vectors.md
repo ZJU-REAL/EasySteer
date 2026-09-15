@@ -2,14 +2,14 @@
 
 Two complementary routes turn captured hidden states into interventions.
 
-## Analysis-based: `easysteer.steer`
+## Analysis-based: `easysteer.extraction`
 
 Derives directions from captured activations while keeping model weights fixed.
 Available extractors: DiffMean, PCA, LAT, linear probe, ITI attention head
 directions, and SAE feature vectors.
 
 ```python
-from easysteer.steer import extract_diffmean_control_vector, StatisticalControlVector
+from easysteer.extraction import extract_diffmean_control_vector, StatisticalControlVector
 
 control_vector = extract_diffmean_control_vector(
     all_hidden_states=capture_result,  # CaptureResult from hs.capture(...)
@@ -51,7 +51,7 @@ cannot cross the training, validation, and test boundaries.
 ```python
 from pathlib import Path
 
-from easysteer.steer import ITIExtractor
+from easysteer.extraction import ITIExtractor
 from easysteer.vectors import from_control_vector
 
 iti = ITIExtractor.extract(
@@ -87,19 +87,13 @@ examples. It uses the authors' QA prompt and loads the model once. The supplied
 direction uses the official code's separate, unlabeled GEN calibration bank;
 the extractor above uses its training and validation captures for that scale.
 
-## Learning-based: `easysteer.reft`
+## Learning-based: `easysteer.training`
 
-Reimplements pyreft: trains a parameterized intervention (e.g. `BiasIntervention`,
-LoReFT) on a frozen HuggingFace model with a standard `transformers` trainer, then saves
-the learned representation for inference.
+Train a native `direct` or `loreft` adapter on a frozen Hugging Face model with
+`easysteer.training.train`. The checkpoint exports the payload and its target
+through `load_checkpoint(path).to_spec()`. Training and inference use the same
+algorithm and component names.
 
-Use `easysteer.reft.train.train_reft` for the shared training pipeline. Bias
-checkpoints are loaded through `easysteer.vectors.from_pyreft` and applied with
-`algorithm="direct"`; LoReFT checkpoints use the same adapter with
-`algorithm="loreft"`. These checkpoints are passed through `VectorSpec(data=...)`,
-rather than as a third-party checkpoint path in `source`.
-
-The complete training walkthrough (data module, trainer, saving) is in
-[ReFT training](reft-training.md); see the
-[LoReFT replication](../replications/index.md) for a complete train-then-steer
-notebook.
+See [Training steering adapters](reft-training.md) for training, export and
+migration from the removed ReFT API, or the [LoReFT replication](../replications/index.md)
+for a complete notebook.

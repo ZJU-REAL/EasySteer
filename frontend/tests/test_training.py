@@ -19,12 +19,12 @@ def training(monkeypatch):
     monkeypatch.setitem(sys.modules, "core.runtime", runtime)
     monkeypatch.setitem(sys.modules, "transformers", ModuleType("transformers"))
     monkeypatch.setitem(sys.modules, "transformers.trainer_callback", SimpleNamespace(TrainerCallback=object))
-    train = ModuleType("easysteer.reft.train")
+    train = ModuleType("easysteer.training")
     calls = []
-    train.train_reft = lambda **kwargs: calls.append(kwargs)
-    for name in ("easysteer", "easysteer.reft"):
+    train.train = lambda **kwargs: calls.append(kwargs)
+    for name in ("easysteer",):
         monkeypatch.setitem(sys.modules, name, ModuleType(name))
-    monkeypatch.setitem(sys.modules, "easysteer.reft.train", train)
+    monkeypatch.setitem(sys.modules, "easysteer.training", train)
     spec = importlib.util.spec_from_file_location("training_backend", FRONTEND / "training_api.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -52,9 +52,9 @@ def test_preset_request_preserves_shared_training_arguments(training, preset):
     call, = calls
     assert call["model_path"] == config["model_path"]
     assert call["examples"] == config["training_examples"]
-    assert call["intervention"] == config["intervention"]
+    assert call["algorithm"] == config["algorithm"]
     assert call["save_dir"] == call["output_dir"] == config["output_dir"]
-    assert {key: call[key] for key in config["reft_config"]} == config["reft_config"]
+    assert {key: call[key] for key in config["steering_config"]} == config["steering_config"]
     assert {key: call[key] for key in config["training_args"]} == config["training_args"]
     status = client.get("/api/train-status").json
     assert status["is_training"] is False
@@ -71,7 +71,7 @@ def test_training_failure_and_log_retention(training, monkeypatch):
             callback.on_log(None, SimpleNamespace(global_step=step, epoch=1), None, {"loss": step})
         raise RuntimeError("checkpoint write failed")
 
-    monkeypatch.setattr(trainer, "train_reft", fail)
+    monkeypatch.setattr(trainer, "train", fail)
     config = client.get("/api/train-config/emoji_loreft").json
     assert client.post("/api/train", json=config).status_code == 200
     status = client.get("/api/train-status").json
@@ -97,4 +97,26 @@ def test_nested_output_dir_is_not_an_implicit_request_format(training):
     config = client.get("/api/train-config/emoji_loreft").json
     config["training_args"]["output_dir"] = config.pop("output_dir")
     assert client.post("/api/train", json=config).status_code == 400
+    assert not calls
+
+
+@pytest.mark.parametrize("legacy_field", ["intervention", "reft_config"])
+def test_removed_training_fields_fail_before_dispatch(training, legacy_field):
+    _, client, _, calls = training
+    config = client.get("/api/train-config/emoji_loreft").json
+    config[legacy_field] = "bias" if legacy_field == "intervention" else {}
+    response = client.post("/api/train", json=config)
+    assert response.status_code == 400
+    assert "API was removed" in response.json["error"]
+    assert not calls
+
+
+@pytest.mark.parametrize("component", ["block_output", "attention_heads", "router_logits"])
+def test_unsupported_training_component_fails_before_dispatch(training, component):
+    _, client, _, calls = training
+    config = client.get("/api/train-config/emoji_loreft").json
+    config["steering_config"]["component"] = component
+    response = client.post("/api/train", json=config)
+    assert response.status_code == 400
+    assert "hidden_states" in response.json["error"]
     assert not calls

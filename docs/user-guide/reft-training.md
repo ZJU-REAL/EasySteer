@@ -1,74 +1,72 @@
-# ReFT training (learning-based steering)
+# Training steering adapters
 
-`easysteer.reft` includes a local implementation of
-[pyreft](https://github.com/stanfordnlp/pyreft). It trains an intervention on a frozen
-Hugging Face model, then exports a checkpoint that can be used by the inference
-engine through a [steering payload](steering.md#steering-with-your-own-tensors).
+`easysteer.training` trains a small transformation on a frozen Hugging Face causal
+language model and exports a native vLLM steering payload. It uses PyTorch and the
+Transformers Trainer directly; PyReFT and PyVene are no longer bundled or required.
 
-For the analysis-based route without training, see
-[Extracting steering vectors](extracting-vectors.md).
+Install the training dependencies in your EasySteer environment:
 
-## Train a bias intervention
+```bash
+pip install -e '.[training]'
+```
 
-The shared `train_reft` helper handles model loading, the training data module,
-trainer construction, and checkpoint saving. Run this script from the repository
-root in the installed EasySteer environment with a GPU:
+## Train
 
 ```python
-from easysteer.reft.train import train_reft
-from examples.reft import EMOJI_EXAMPLES
+from easysteer.training import train
+from examples.training import EMOJI_EXAMPLES
 
-train_reft(
+model, tokenizer = train(
     model_path="Qwen/Qwen2.5-1.5B-Instruct",
     examples=EMOJI_EXAMPLES,
-    intervention="bias",
+    algorithm="direct",
+    component="hidden_states",
     layer=8,
-    save_dir="results/emoji_bias",
-    output_dir="results/emoji_bias_training",
+    save_dir="results/emoji_direct",
+    output_dir="results/emoji_direct_training",
     num_train_epochs=100,
     per_device_train_batch_size=8,
     learning_rate=3e-3,
 )
 ```
 
-The examples are instruction/response pairs. This helper supervises the last prompt
-position and uses Qwen's chat format by default; pass `prompt_template` when using
-a different model. Training arguments such as the learning rate are illustrative,
-so evaluate the trained intervention on held-out prompts.
+`direct` learns an additive direction. `loreft` learns the standard linear LoReFT
+transformation; select it with `algorithm="loreft", rank=4`. These names match
+vLLM's inference algorithms. Both currently support `component="hidden_states"`,
+at the output of a supported decoder layer. Attention and router-logit training
+are not implemented. Unsupported components fail before the model is loaded.
 
-The helper saves its prompt template, position selection, and standard linear
-activation setting in `config.json` under `easysteer_training`. A command-line
-version is available in `examples/reft.py`.
+Each example is an instruction/response pair. The transformation applies at the
+last prompt token; the response tokens supply the causal language-model loss.
+Prompt tokens are excluded from the loss. The base model stays frozen and in
+evaluation mode, while the small steering transformation receives gradients.
+Gradient checkpointing is not supported by this training wrapper.
+
+The default prompt template is Qwen's chat format. Pass `prompt_template` for
+other formats, or set `EASYSTEER_MODEL_PATH` and pass `model_path=None`.
+Evaluate learned adapters on held-out prompts; these example hyperparameters
+are illustrative. A command-line example is available in `examples/training.py`.
 
 ## Apply the checkpoint
 
-Run inference in a separate process after training exits, so the training model no
-longer occupies GPU memory. `from_pyreft` preserves the checkpoint's layer index.
-A bias checkpoint becomes a `DirectionVector`, so its inference algorithm is
-`direct`:
+A training run saves `steering_adapter.json`: a versioned configuration and native
+payload, including its algorithm, component, layer, prompt template and token
+selection. It contains no Python class paths or frozen base-model weights.
+
+Run inference after the training process exits to release its GPU memory:
 
 ```python
-import json
-from pathlib import Path
-
-from easysteer.vectors import from_pyreft
+from easysteer.training import load_checkpoint
 from vllm import LLM, SamplingParams
-from vllm.steer_vectors import ApplySpec, SteeringSpec, VectorSpec
 
+checkpoint = load_checkpoint("results/emoji_direct")
+spec = checkpoint.to_spec()
 llm = LLM(
     model="Qwen/Qwen2.5-1.5B-Instruct",
     enable_steer_vector=True,
-    steer_algorithms=["direct"],
+    steer_algorithms=[checkpoint.config.algorithm],
 )
-config = json.loads(Path("results/emoji_bias/config.json").read_text())
-training = config["easysteer_training"]
-spec = SteeringSpec(vectors=[VectorSpec(
-    data=from_pyreft("results/emoji_bias"),
-    algorithm="direct",
-    scale=1.0,
-    apply=ApplySpec(**training["apply"]),
-)])
-prompt = training["prompt_template"] % "Who are you?"
+prompt = checkpoint.config.prompt_template % "Who are you?"
 outputs = llm.generate(
     prompt,
     SamplingParams(temperature=0.0, max_tokens=128),
@@ -77,39 +75,42 @@ outputs = llm.generate(
 print(outputs[0].outputs[0].text)
 ```
 
-The prompt preserves the training helper's exact `prompt_template`, and the
-selection matches the last prompt position used in training. Applying the
-intervention to every generated token is a different experiment; choose that
-explicitly with `generation="all"` if needed.
+`to_spec()` preserves the training selection (`prompt_positions=[-1]`). Applying
+an adapter to generated tokens or every prompt token changes the experiment.
+For payload-only integrations, `easysteer.vectors.from_training(path)` and
+`vectors.load(path, format="training")` return the native payload; the caller
+then supplies the remaining spec fields.
 
-Older checkpoints may not contain `easysteer_training`. Supply their original
-prompt format and `ApplySpec` explicitly; the bundled emoji checkpoints use
-`ApplySpec(prompt_positions=[-1])`.
+`load(model_path, save_dir)` reloads the adapter on a Hugging Face model, and
+`generate(model, tokenizer, instruction)` uses its stored prompt template and
+last-prompt-token selection. It does not steer subsequent cached decode steps.
 
-## LoReFT and lower-level APIs
+## Migration from the removed ReFT API
 
-For LoReFT, train with `intervention="loreft"` and `low_rank_dimension=4`, save to
-a separate checkpoint directory, and change both `steer_algorithms` and the
-`VectorSpec.algorithm` to `"loreft"`. The same `from_pyreft` adapter then produces
-a `ReftIntervention` payload. The adapter accepts one explicitly identified
-LoReFT or bias intervention on `block_output`, with `unit="pos"` and one unit.
-Other component targets, intervention types, and multi-intervention checkpoints
-raise an error before weights are loaded. An attention-output checkpoint cannot
-be loaded as hidden-state LoReFT merely because its tensor width matches.
+The `easysteer.reft` package and its lower-level PyReFT/PyVene APIs have been
+removed. Update training calls as follows:
 
-LoReFT conversion implements the standard linear activation used by the training
-helper. Explicit nonlinear `act_fn` metadata is rejected. Older checkpoints
-without activation metadata are interpreted as standard linear LoReFT; the
-activation cannot be recovered from the saved weight tensors alone.
+| Former API | Native API |
+|---|---|
+| `from easysteer.reft.train import train_reft` | `from easysteer.training import train` |
+| `intervention="bias"` | `algorithm="direct"` |
+| `intervention="loreft"` | `algorithm="loreft"` |
+| `component="block_output"` | `component="hidden_states"` |
+| `low_rank_dimension=4` | `rank=4` |
+| `REFT_MODEL_PATH` | `EASYSTEER_MODEL_PATH` |
 
-The lower-level exports are under `easysteer.reft.pyreft`, including `ReftConfig`,
-`get_reft_model`, `LoreftIntervention`, and `ReftTrainerForCausalLM`.
-`BiasIntervention` lives in `easysteer.reft.pyreft.reft.algorithms`. For a complete
-LoReFT experiment, see the [replication gallery](../replications/index.md).
+The native wrapper does not implement PyVene's source/base interventions,
+model profiles, arbitrary component paths, classification trainers, or multiple
+representations. Its supported targets and exported payloads match the inference
+contract.
 
-The training helper resolves the width of registered sequence components from the
-model profile. Head selection and custom module paths require the lower-level
-PyReFT API, which also provides multiple representations, per-example positions,
-and `h.pos` units. Those training capabilities are broader than the checkpoint
-adapter's supported inference targets; exporting a payload does not translate an
-arbitrary PyReFT configuration into a vLLM intervention.
+Existing published checkpoints remain usable through
+`easysteer.vectors.from_pyreft`. This file adapter does not import PyReFT: it
+validates known metadata and reads tensor weights. It accepts one bias or linear
+LoReFT checkpoint on `block_output` with `unit="pos"` and one unit. Unsupported
+targets, nonlinear activations and multi-intervention checkpoints are rejected.
+For historical files, supply their original prompt format and `ApplySpec`
+explicitly; the bundled emoji checkpoint uses `prompt_positions=[-1]`.
+
+The mathematical LoReFT algorithm and native `ReftIntervention` payload name
+remain compatible. They do not imply a dependency on the former framework.

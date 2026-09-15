@@ -40,6 +40,7 @@ __all__ = [
     "from_lm_steer",
     "from_pt_direction",
     "from_pyreft",
+    "from_training",
     "load",
     "to_json_payload",
 ]
@@ -102,7 +103,7 @@ def load(path: str, *, format: str, **options) -> Payload:
     """Load an explicitly identified checkpoint schema into a canonical payload.
 
     Formats: ``gguf``, ``concept_pair`` (named h1/h2 GGUF directory),
-    ``moe_router`` (JSON), ``pt_direction``, ``pyreft``, ``lm_steer`` and
+    ``moe_router`` (JSON), ``training``, ``pt_direction``, ``pyreft``, ``lm_steer`` and
     ``linear_transport``. Options go to the chosen adapter; for example
     ``layers=[10]`` for pt_direction or ``vector_index=1`` for lm_steer.
     A suffix such as .pt never selects or guesses a checkpoint schema.
@@ -112,6 +113,7 @@ def load(path: str, *, format: str, **options) -> Payload:
 
         return load_file_payload(path, format=format, **options)
     adapters = {
+        "training": from_training,
         "pt_direction": from_pt_direction,
         "pyreft": from_pyreft,
         "lm_steer": from_lm_steer,
@@ -120,6 +122,17 @@ def load(path: str, *, format: str, **options) -> Payload:
     if format not in adapters:
         raise ValueError(f"Unknown checkpoint format: {format!r}")
     return adapters[format](path, **options)
+
+
+def from_training(path: str) -> DirectionVector | ReftIntervention:
+    """Read the payload from a native EasySteer training checkpoint.
+
+    For a complete spec including algorithm, component and token selection,
+    use ``easysteer.training.load_checkpoint(path).to_spec()`` instead.
+    """
+    from easysteer.training import load_checkpoint
+
+    return load_checkpoint(path).payload
 
 
 def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
@@ -132,6 +145,9 @@ def from_pyreft(path: str) -> DirectionVector | ReftIntervention:
     other components and intervention types raise ValueError, even when their
     tensors happen to have the same width as hidden states. Older checkpoints
     without activation metadata are interpreted as standard linear LoReFT.
+
+    This legacy file adapter does not import or require PyReFT. New training
+    runs use ``easysteer.training`` and its native checkpoint format.
 
     The payload preserves the layer and weights. Token selection belongs to
     ``VectorSpec.apply``: use the checkpoint config's ``easysteer_training.apply``

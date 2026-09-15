@@ -81,8 +81,18 @@ class TestGgufReaders:
         assert resolve_vector_payload(gguf_path, None, "direct") == same
 
         before = os.stat(gguf_path)
-        write_gguf(gguf_path, {0: np.zeros(8), 5: np.ones(8)})
-        os.utime(gguf_path, ns=(before.st_atime_ns, before.st_mtime_ns))
+        replacement = gguf_path + ".replacement.gguf"
+        write_gguf(replacement, {0: np.zeros(8), 5: np.ones(8)})
+        os.utime(replacement, ns=(before.st_atime_ns, before.st_mtime_ns))
+        # A new inode distinguishes same-size, same-mtime versions even on
+        # filesystems whose ctime clock cannot separate consecutive writes.
+        os.replace(replacement, gguf_path)
+        after = os.stat(gguf_path)
+        assert after.st_ino != before.st_ino
+        assert (after.st_size, after.st_mtime_ns) == (
+            before.st_size,
+            before.st_mtime_ns,
+        )
         changed = resolve_vector_payload(gguf_path, None, "direct")
         assert changed["sha256"] != same["sha256"] and len(reads) == 2
         assert materialize(same, "cpu", torch.float32, None)[5][0] == 2
@@ -93,8 +103,17 @@ class TestGgufReaders:
         write_gguf(h2, {3: np.zeros(8)})
         first = resolve_vector_payload(str(tmp_path), None, "concept_replace")
         before = os.stat(tmp_path)
+        child_before = os.stat(h2)
         write_gguf(h2, {3: np.full(8, 2.0)})
-        os.utime(tmp_path, ns=(before.st_atime_ns, before.st_mtime_ns))
+        # Advance the child version explicitly; immediate writes can share
+        # timestamps. Updating file contents leaves the directory unchanged.
+        os.utime(h2, ns=(child_before.st_atime_ns, child_before.st_mtime_ns + 10**9))
+        assert os.stat(h2).st_mtime_ns > child_before.st_mtime_ns
+        after = os.stat(tmp_path)
+        assert (after.st_mtime_ns, after.st_ctime_ns) == (
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        )
         changed = resolve_vector_payload(str(tmp_path), None, "concept_replace")
         assert changed["sha256"] != first["sha256"]
         assert materialize(first, "cpu", torch.float32, None)[3]["h2"].sum() == 0

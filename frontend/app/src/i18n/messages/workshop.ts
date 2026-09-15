@@ -9,7 +9,7 @@ export const workshopMessages = {
     zh: "做一个引导向量：选择方法、填写配置、把任务提交给 Flask 后端，跑完就能在“引导”页里用。",
   },
   workshop_kind_extraction: { en: "Extraction (activation-based)", zh: "提取（基于激活值）" },
-  workshop_kind_training: { en: "Training (ReFT)", zh: "训练（ReFT）" },
+  workshop_kind_training: { en: "Training", zh: "训练" },
   model_path_label: { en: "Model path", zh: "模型路径" },
   model_path_placeholder: {
     en: "e.g. /path/to/Qwen2.5-1.5B-Instruct/",
@@ -68,7 +68,7 @@ export const workshopMessages = {
   train_layer_label: { en: "Target layer", zh: "目标层" },
   train_component_label: { en: "Component", zh: "作用组件" },
   train_low_rank_dim_label: { en: "Low-rank dimension", zh: "低秩维度" },
-  train_intervention_label: { en: "Intervention", zh: "干预类型" },
+  train_algorithm_label: { en: "Algorithm", zh: "算法" },
   train_epochs_label: { en: "Epochs", zh: "训练轮数" },
   train_batch_size_label: { en: "Batch size", zh: "批大小" },
   train_learning_rate_label: { en: "Learning rate", zh: "学习率" },

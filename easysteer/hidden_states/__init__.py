@@ -1,23 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Labelled activation capture for vllm-steer components.
+"""Compatibility imports for :mod:`easysteer.capture`."""
 
-The primary entry point is ``capture``, which returns a
-``CaptureResult`` with labelled per-sample views.
-``capture_batches`` yields batches for bounded processing or storage.
+import warnings
 
-Example:
-    >>> import easysteer.hidden_states as hs
-    >>> from vllm import LLM
-    >>>
-    >>> llm = LLM(model="Qwen/Qwen2.5-1.5B-Instruct")
-    >>> result = hs.capture(llm, ["Hello world"])
-    >>> result.sample(0)[10].shape  # sample 0, layer 10
-"""
+from easysteer.capture import CaptureResult, capture, capture_batches
 
-from .capture_result import CaptureResult, capture, capture_batches
+warnings.warn(
+    "easysteer.hidden_states is deprecated; use easysteer.capture instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-__all__ = [
-    "CaptureResult",
-    "capture",
-    "capture_batches",
-]
+__all__ = ["CaptureResult", "capture", "capture_batches"]

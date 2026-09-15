@@ -7,7 +7,7 @@ import pytest
 import torch
 from vllm.model_hooks.capture.serialization import CaptureMeta
 
-from easysteer.hidden_states import CaptureResult
+from easysteer.capture import CaptureResult
 
 
 def test_nested_conversion_slices_each_sample_once():
@@ -73,7 +73,7 @@ def test_result_rejects_reversed_sample_order_in_another_layer():
 @pytest.mark.parametrize("stream", ["hidden_states", "attention_heads"])
 def test_capture_helper_preserves_prompts_and_forwards_steering(stream):
     """The engine plans cache reads; the helper must not re-key prompts."""
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     prompts = [{"prompt_token_ids": [10, 11], "cache_salt": "caller-salt"}]
     seen = {}
@@ -227,7 +227,7 @@ def test_failed_capture_rpc_does_not_change_admission_policy(async_engine):
 
 
 def test_selected_token_reads_preserve_sample_order_without_copying_all_rows():
-    from easysteer.steer import extract_token_hiddens
+    from easysteer.extraction import extract_token_hiddens
 
     labels = CaptureMeta(
         ["b", "a", "a"], torch.tensor([8, 9, 2]), torch.tensor([18, 19, 12])
@@ -248,7 +248,7 @@ def test_selected_token_reads_preserve_sample_order_without_copying_all_rows():
 
 
 def test_capture_batches_slices_prompt_configuration_together_and_yields_lazily():
-    import easysteer.hidden_states.capture_result as module
+    import easysteer.capture.api as module
 
     prompts = [f"prompt-{i}" for i in range(5)]
     selections = [{"prompt_positions": [i]} for i in range(5)]
@@ -279,7 +279,7 @@ def test_capture_batches_slices_prompt_configuration_together_and_yields_lazily(
     "failure", ["start_capture", "generate", "dropped", "fetch_captured"]
 )
 def test_capture_failures_stop_the_stream_without_returning_partial_rows(failure):
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     calls = []
 
@@ -439,7 +439,7 @@ def test_capture_assembly_rejects_duplicate_replicas_or_missing_owner(owner_rank
     ],
 )
 def test_capture_rejects_unsupported_topology_before_starting_workers(field, value):
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     calls = []
 
@@ -458,7 +458,7 @@ def test_capture_rejects_unsupported_topology_before_starting_workers(field, val
 
 @pytest.mark.parametrize("per_prompt", [False, True])
 def test_capture_validates_selectors_before_contacting_workers(per_prompt):
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     def rpc(*args, **kwargs):
         pytest.fail("Invalid selectors must not reach workers")
@@ -474,7 +474,7 @@ def test_capture_validates_selectors_before_contacting_workers(per_prompt):
 
 @pytest.mark.parametrize("failure", [None, "dropped", "fetch", "generate"])
 def test_capture_helper_assembles_workers_and_observes_nonzero_rank_failures(failure):
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     calls = []
 
@@ -516,7 +516,7 @@ def test_capture_helper_assembles_workers_and_observes_nonzero_rank_failures(fai
 
 
 def test_capture_preserves_original_error_if_cleanup_also_fails():
-    from easysteer.hidden_states import capture
+    from easysteer.capture import capture
 
     def rpc(method, **kwargs):
         if method == "capture_status":

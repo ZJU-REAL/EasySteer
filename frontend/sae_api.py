@@ -6,7 +6,7 @@ from core import PROJECT_ROOT, lang, project_root_on_path, require_fields
 from flask import Blueprint, jsonify, request
 
 with project_root_on_path():
-    from easysteer.steer.sae import (
+    from easysteer.extraction.sae import (
         extract_sae_decoder_vector,
         get_sae_feature_explanation,
         search_sae_features,

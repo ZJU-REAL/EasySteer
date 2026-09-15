@@ -116,9 +116,10 @@ accessible MoE gates;
 consume the same discovered component targets. Standard decoder
 stacks use their global stack indices; pipeline-parallel placeholders retain
 those indices. Architecture exceptions belong in discovery and output-layout
-rules, rather than separate name parsing in each consumer. ReFT uses its own
-Transformers model profiles; repeated decoder layouts share an implementation,
-while component dimensions and special layouts remain explicit.
+rules, rather than separate name parsing in each consumer. Native training uses
+an explicit Hugging Face decoder-layer binding for the supported hidden-state
+target. Its checkpoint converts directly to the inference payload and selection
+contract; it does not inherit PyVene's representation or source/base abstractions.
 
 Controllers declare their graph mask names and allocate their own component
 tables. Shared graph state calls that interface without branching on concrete
@@ -142,3 +143,19 @@ capture row labels and reduction plans to the shared token-selection result.
 For the current public contracts, read the [steering guide](../user-guide/steering.md),
 [capture guide](../user-guide/hidden-state-capture.md), and the engine architecture
 linked above. The `vllm-steer` fork follows upstream vLLM's pre-commit configuration.
+
+## EasySteer Python package
+
+The client package separates four responsibilities:
+
+- `capture/`: labelled activation results and engine capture orchestration.
+- `extraction/`: statistical methods, token selection, and vector serialization.
+- `training/`: frozen-model training, small trainable transformations, and native checkpoints.
+- `vectors.py`: native and third-party file adapters into vLLM payloads.
+
+Algorithm names and component names follow vLLM's existing capability contract.
+Keep engine runtime imports out of client package initialization. Training dependencies
+are an optional extra; extraction dispatch imports only the selected estimator.
+`hidden_states` and `steer` remain deprecated import aliases for existing capture
+and extraction users. New code uses `capture` and `extraction`. The old `reft`
+framework API is removed; only its file-format adapter remains.

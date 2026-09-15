@@ -47,7 +47,7 @@ LABEL description="EasySteer - High-Performance LLM Steering Framework"
 WORKDIR /app/easysteer
 # Do not overwrite Python interfaces that setup extracted into vllm-steer.
 COPY --exclude=vllm-steer . ./
-RUN python3 -m pip install --no-cache-dir -c /opt/vllm-constraints.txt -e .
+RUN python3 -m pip install --no-cache-dir -c /opt/vllm-constraints.txt -e '.[training]'
 
 ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/workspace

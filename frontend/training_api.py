@@ -103,6 +103,25 @@ def train():
         if error:
             return jsonify({"error": error}), 400
 
+        if "intervention" in data or "reft_config" in data:
+            return jsonify(
+                {
+                    "error": "Use algorithm and steering_config; the ReFT training API was removed"
+                }
+            ), 400
+        if data.get("algorithm", "loreft") not in ("direct", "loreft"):
+            return jsonify(
+                {"error": "Training algorithm must be direct or loreft"}
+            ), 400
+        config = data.get("steering_config", {})
+        if (
+            not isinstance(config, dict)
+            or config.get("component", "hidden_states") != "hidden_states"
+        ):
+            return jsonify(
+                {"error": "Training requires the hidden_states component"}
+            ), 400
+
         output_dir = data.get("output_dir")
         if not output_dir:
             return jsonify(
@@ -143,23 +162,23 @@ def train():
                 )
 
                 with project_root_on_path():
-                    from easysteer.reft.train import train_reft
+                    from easysteer.training import train as train_steering
 
                 logger.info(f"Starting to load model: {data['model_path']}")
                 training_status["status_message"] = (
                     f"Loading model: {data['model_path']}"
                 )
 
-                reft_config = data.get("reft_config", {})
+                steering_config = data.get("steering_config", {})
                 training_args = data.get("training_args", {})
 
-                train_reft(
+                train_steering(
                     model_path=data["model_path"],
                     examples=training_examples,
-                    intervention=data.get("intervention", "loreft"),
-                    layer=reft_config.get("layer", 8),
-                    component=reft_config.get("component", "block_output"),
-                    low_rank_dimension=reft_config.get("low_rank_dimension", 4),
+                    algorithm=data.get("algorithm", "loreft"),
+                    layer=steering_config.get("layer", 8),
+                    component=steering_config.get("component", "hidden_states"),
+                    rank=steering_config.get("rank", 4),
                     callbacks=[TrainingProgressCallback()],
                     save_dir=output_dir,
                     output_dir=output_dir,
@@ -198,7 +217,7 @@ def train():
                 "message": "Training has started",
                 "output_dir": output_dir,
                 "training_examples_count": len(training_examples),
-                "reft_config": data.get("reft_config", {}),
+                "steering_config": data.get("steering_config", {}),
                 "training_args": data.get("training_args", {}),
                 "note": "Training is running in the background. Check server logs for progress.",
             }

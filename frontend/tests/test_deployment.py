@@ -1,6 +1,7 @@
 """CPU checks for UI routing and the training demo's HTTP boundary."""
 
 import importlib.util
+import json
 import sys
 import weakref
 from pathlib import Path
@@ -52,22 +53,36 @@ def test_training_demo_uses_openai_payload(monkeypatch, payload_modules, kind, a
     payloads, vectors = payload_modules
     payload = (payloads.ReftIntervention([[1]], [[1]], layer=8) if kind == "reft"
                else payloads.DirectionVector({8: [1]}))
-    monkeypatch.setattr(vectors, "from_pyreft", lambda path: payload)
+    training = ModuleType("easysteer.training")
+    training.load_checkpoint = lambda path: SimpleNamespace(
+        config=SimpleNamespace(prompt_template="Custom prompt: %s\nAnswer:"),
+        to_spec=lambda: SimpleNamespace(model_dump_json=lambda: json.dumps({
+            "vectors": [{
+                "data": vectors.to_json_payload(payload),
+                "algorithm": algorithm,
+                "component": "hidden_states",
+                "layers": [8],
+                "apply": {"prompt_positions": [-1]},
+            }]
+        })),
+    )
+    monkeypatch.setitem(sys.modules, "easysteer.training", training)
     calls = []
 
     def post(url, **kwargs):
         calls.append((url, kwargs))
         return SimpleNamespace(
             raise_for_status=lambda: None,
-            json=lambda: {"choices": [{"message": {"content": "test reply"}}]},
+            json=lambda: {"choices": [{"text": "test reply"}]},
         )
 
     monkeypatch.setattr(module.requests, "post", post)
     module.test_inference("served-model", "/checkpoint", ["Hello"], "http://example/v1/", "key")
     url, kwargs = calls[0]
-    assert url == "http://example/v1/chat/completions"
+    assert url == "http://example/v1/completions"
     assert kwargs["headers"] == {"Authorization": "Bearer key"}
     assert kwargs["json"]["model"] == "served-model"
+    assert kwargs["json"]["prompt"] == "Custom prompt: Hello\nAnswer:"
     vector = kwargs["json"]["steering"]["vectors"][0]
     assert vector["algorithm"] == algorithm
     assert next(iter(vector["data"]["tensors"].values()))["data"] == "AACAPw=="
@@ -87,7 +102,7 @@ def test_training_demo_sends_the_current_job_request(monkeypatch):
     assert module.start_training_demo("model") is True
     request, = calls
     assert request["output_dir"] == "./results/demo_emoji_training"
-    assert request["intervention"] == "loreft"
+    assert request["algorithm"] == "loreft"
     assert isinstance(request["training_examples"], list)
     assert "output_dir" not in request["training_args"]
 
@@ -169,7 +184,7 @@ def extraction(monkeypatch, tmp_path):
 
     captures = []
     live_batches = []
-    hidden_states = ModuleType("easysteer.hidden_states")
+    hidden_states = ModuleType("easysteer.capture")
 
     def capture(llm, prompts, **kwargs):
         assert llm is engine
@@ -188,7 +203,7 @@ def extraction(monkeypatch, tmp_path):
 
     hidden_states.capture_batches = capture_batches
     monkeypatch.setitem(sys.modules, "easysteer", ModuleType("easysteer"))
-    monkeypatch.setitem(sys.modules, "easysteer.hidden_states", hidden_states)
+    monkeypatch.setitem(sys.modules, "easysteer.capture", hidden_states)
     extracted = []
 
     def extract_statistical_control_vector(
@@ -210,7 +225,7 @@ def extraction(monkeypatch, tmp_path):
             export_gguf=lambda output: Path(output).write_bytes(b"mock vector"),
         )
 
-    steer = ModuleType("easysteer.steer")
+    steer = ModuleType("easysteer.extraction")
     steer.extract_statistical_control_vector = extract_statistical_control_vector
     updates = []
 
@@ -231,7 +246,7 @@ def extraction(monkeypatch, tmp_path):
 
     steer.DiffMeanAccumulator = Accumulator
     steer.DiffMeanExtractor = SimpleNamespace(from_moments=from_moments)
-    monkeypatch.setitem(sys.modules, "easysteer.steer", steer)
+    monkeypatch.setitem(sys.modules, "easysteer.extraction", steer)
     module = load_module("extraction_backend", FRONTEND / "extraction_api.py")
     monkeypatch.chdir(tmp_path)
     config = {

@@ -13,11 +13,11 @@ authors = [
 license = {text = "Apache License 2.0"}
 requires-python = ">=3.10"
 dependencies = [
+    "numpy",
     "gguf",
     "scikit-learn",
-    "datasets",
-    "matplotlib",
-    "accelerate",
+    "tqdm",
+    "requests",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -31,6 +31,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 keywords = ["llm", "steering", "nlp", "machine learning", "deep learning"]
+
+[project.optional-dependencies]
+training = ["torch", "transformers>=5.10.4", "accelerate"]
 
 [project.urls]
 Homepage = "https://github.com/ZJU-REAL/EasySteer"

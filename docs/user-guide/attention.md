@@ -28,7 +28,7 @@ The same capture API and selectors work for attention heads:
 ```python
 from vllm import LLM
 from vllm.capture import SelectSpec
-import easysteer.hidden_states as hs
+import easysteer.capture as hs
 
 llm = LLM(
     model="Qwen/Qwen2.5-1.5B-Instruct",

@@ -51,9 +51,9 @@ EasySteer 是一个基于 vLLM 构建的高性能 LLM 干预（steering）统一
 | 组件 | 说明 | 文档 |
 |---|---|---|
 | `vllm-steer/` | 内置干预引擎（`vllm.steer_vectors`）的 vLLM 分支 | [干预指南](https://zju-real.github.io/EasySteer/latest/user-guide/steering/) |
-| `easysteer.hidden_states` | 从运行中的引擎捕获隐状态 / MoE 路由 logits | [捕获指南](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/) |
-| `easysteer.steer` | 从隐状态中提取干预向量（分析式） | [向量提取指南](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/) |
-| `easysteer.reft` | 在冻结模型上训练参数化干预（学习式） | [ReFT 训练](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/) |
+| `easysteer.capture` | 从运行中的引擎捕获隐状态 / MoE 路由 logits | [捕获指南](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/) |
+| `easysteer.extraction` | 从隐状态中提取干预向量（分析式） | [向量提取指南](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/) |
+| `easysteer.training` | 在冻结模型上训练原生引导适配器（学习式） | [引导训练](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/) |
 | `frontend/` | 交互式干预实验的 Web 界面 | [Web 演示](https://zju-real.github.io/EasySteer/latest/user-guide/web-demo/) |
 | `replications/` | 已发表干预论文的复现 | [复现集](https://zju-real.github.io/EasySteer/latest/replications/) |
 
@@ -157,7 +157,7 @@ print(happy[0].outputs[0].text)     # 明显偏"快乐"的输出
 - **捕获隐状态、注意力头输出与 MoE 路由 logits**，支持常规张量并行: [捕获指南](https://zju-real.github.io/EasySteer/latest/user-guide/hidden-state-capture/)
 - **注意力头干预**（全局头方向向量，支持 TP）: [注意力指南](https://zju-real.github.io/EasySteer/latest/user-guide/attention/)
 - **提取向量**（DiffMean、PCA、LAT、线性探针、SAE）: [向量提取指南](https://zju-real.github.io/EasySteer/latest/user-guide/extracting-vectors/)
-- **训练干预**（ReFT / LoReFT / LM-Steer）: [ReFT 训练](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
+- **训练引导适配器**（direct / LoReFT）: [引导训练](https://zju-real.github.io/EasySteer/latest/user-guide/reft-training/)
 - **API 参考**: [zju-real.github.io/EasySteer/latest/api-reference/](https://zju-real.github.io/EasySteer/latest/api-reference/)
 
 ## 如何贡献

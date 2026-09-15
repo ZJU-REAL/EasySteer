@@ -14,13 +14,13 @@ describe("built-in job presets", () => {
     }
   });
 
-  it("ships ReFT presets in the request shape the form reads", () => {
+  it("ships native training presets in the request shape the form reads", () => {
     const loreft = builtinTrainingPresets.find((p) => p.name === "emoji_loreft");
     expect(loreft).toBeDefined();
     expect(loreft!.config).toMatchObject({
-      intervention: "loreft",
+      algorithm: "loreft",
       output_dir: "./results/emoji_loreft",
-      reft_config: { layer: 8, component: "block_output", low_rank_dimension: 4 },
+      steering_config: { layer: 8, component: "hidden_states", rank: 4 },
       training_args: {
         num_train_epochs: 100,
         per_device_train_batch_size: 10,
@@ -33,7 +33,7 @@ describe("built-in job presets", () => {
     expect(loreft!.config.training_examples[0]).toHaveLength(2);
 
     const bias = builtinTrainingPresets.find((p) => p.name === "emoji_bias");
-    expect(bias?.config.intervention).toBe("bias");
-    expect(bias?.config.reft_config?.low_rank_dimension).toBe(2);
+    expect(bias?.config.algorithm).toBe("direct");
+    expect(bias?.config.steering_config?.rank).toBe(2);
   });
 });

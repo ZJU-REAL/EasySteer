@@ -86,9 +86,9 @@ training text retain the formats required by those workflows.
 taking the difference of means — the full pipeline is:
 
 1. [Capture hidden states](../user-guide/hidden-state-capture.md) with
-   `easysteer.hidden_states.capture()`.
+   `easysteer.capture.capture()`.
 2. [Extract a vector](../user-guide/extracting-vectors.md) with
-   `easysteer.steer.extract_diffmean_control_vector()` and export it as GGUF.
+   `easysteer.extraction.extract_diffmean_control_vector()` and export it as GGUF.
 3. Apply it at inference with a `SteeringSpec` (this page).
 
 ## Next steps

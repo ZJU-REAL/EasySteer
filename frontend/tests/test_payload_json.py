@@ -44,14 +44,17 @@ def test_space_light_runtime_accepts_router_metadata(payload_modules, tmp_path):
     assert loaded == wire
 
 
-@pytest.mark.parametrize("algorithm,adapter", [
-    ("linear", "from_linear_transport"),
-    ("lm_steer", "from_lm_steer"),
-    ("loreft", "from_pyreft"),
+@pytest.mark.parametrize("algorithm,adapter,format", [
+    ("linear", "from_linear_transport", "legacy"),
+    ("lm_steer", "from_lm_steer", "legacy"),
+    ("loreft", "from_pyreft", "legacy"),
+    ("loreft", "from_training", "training"),
+    ("direct", "from_training", "training"),
 ])
-def test_space_export_is_readable_by_light_runtime(payload_modules, monkeypatch, tmp_path, algorithm, adapter):
+def test_space_export_is_readable_by_light_runtime(payload_modules, monkeypatch, tmp_path, algorithm, adapter, format):
     payloads, vectors = payload_modules
     payload = {
+        "direct": lambda: payloads.DirectionVector({22: [1.0]}),
         "linear": lambda: payloads.LinearMap([[1]]),
         "lm_steer": lambda: payloads.LowRankProjector([[1]], [[1]]),
         "loreft": lambda: payloads.ReftIntervention([[1]], [[1]], layer=22),
@@ -68,7 +71,7 @@ def test_space_export_is_readable_by_light_runtime(payload_modules, monkeypatch,
     checkpoint = tmp_path / "checkpoint.bin"
     checkpoint.write_bytes(b"mock checkpoint")
     output = tmp_path / "payload.json"
-    load("export_payload").export_payload(checkpoint, algorithm, output)
+    load("export_payload").export_payload(checkpoint, algorithm, output, format=format)
     wire = load("runtime").load_payload(output, algorithm)
     assert payloads.validate_wire(wire) == payload.kind
     assert wire == vectors.to_json_payload(payload)

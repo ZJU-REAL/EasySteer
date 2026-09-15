@@ -1,0 +1,249 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Dispatch control-vector extraction by method name."""
+
+import inspect
+from importlib import import_module
+
+from .result import StatisticalControlVector
+
+_EXTRACTORS = {
+    "diffmean": ("diffmean", "DiffMeanExtractor"),
+    "pca": ("pca", "PCAExtractor"),
+    "lat": ("lat", "LATExtractor"),
+    "linear_probe": ("linear_probe", "LinearProbeExtractor"),
+    "iti": ("iti", "ITIExtractor"),
+}
+
+_COMMON_PARAMS = ("all_hidden_states", "positive_indices", "negative_indices")
+
+
+def _accepted_options(extract_fn):
+    """List named extractor options, excluding the shared data arguments."""
+    signature = inspect.signature(extract_fn)
+    return [
+        name
+        for name, param in signature.parameters.items()
+        if param.kind
+        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        and name not in _COMMON_PARAMS
+    ]
+
+
+def _dispatch(method, all_hidden_states, positive_indices, negative_indices, kwargs):
+    """Validate the method and options, then call the selected extractor."""
+    if method not in _EXTRACTORS:
+        raise ValueError(
+            f"Unsupported method: {method!r}. Supported methods: {list(_EXTRACTORS)}"
+        )
+    module, name = _EXTRACTORS[method]
+    extract_fn = getattr(import_module(f"{__package__}.{module}"), name).extract
+    accepted = _accepted_options(extract_fn)
+    unknown = sorted(set(kwargs) - set(accepted))
+    if unknown:
+        raise ValueError(
+            f"Unknown option(s) {unknown} for method {method!r}. "
+            f"Accepted options: {accepted}"
+        )
+    return extract_fn(
+        all_hidden_states=all_hidden_states,
+        positive_indices=positive_indices,
+        negative_indices=negative_indices,
+        **kwargs,
+    )
+
+
+def extract_statistical_control_vector(
+    method: str, all_hidden_states, positive_indices, negative_indices=None, **kwargs
+) -> StatisticalControlVector:
+    """Unified control vector extraction interface.
+
+    Args:
+        method (str): Method name; one of "diffmean", "pca", "lat",
+            "linear_probe", "iti". ITI also requires validation captures,
+            validation labels and query head counts.
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, or a CaptureResult
+            from easysteer.capture.
+        positive_indices (list[int]): Indices of positive samples.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None, every sample index not in
+            ``positive_indices`` becomes a negative, in ascending
+            sample order.
+        **kwargs (Any): Method-specific options. Unknown options raise
+            ValueError naming the accepted ones for ``method``.
+
+    Returns:
+        StatisticalControlVector: The extracted control vector.
+    """
+    return _dispatch(
+        method, all_hidden_states, positive_indices, negative_indices, kwargs
+    )
+
+
+def extract_diffmean_control_vector(
+    all_hidden_states, positive_indices, negative_indices=None, **kwargs
+) -> StatisticalControlVector:
+    """Extract a DiffMean control vector.
+
+    Args:
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, or a CaptureResult
+            from easysteer.capture.
+        positive_indices (list[int]): Indices of positive samples.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None, every sample index not in
+            ``positive_indices`` becomes a negative, in ascending
+            sample order.
+        **kwargs (Any): Options accepted by DiffMeanExtractor:
+            `normalize` (bool, default True),
+            `token_pos` (int | str, default -1). Unknown options raise
+            ValueError.
+
+    Returns:
+        StatisticalControlVector: The DiffMean control vector.
+    """
+    return _dispatch(
+        "diffmean", all_hidden_states, positive_indices, negative_indices, kwargs
+    )
+
+
+def extract_pca_control_vector(
+    all_hidden_states, positive_indices, negative_indices=None, **kwargs
+) -> StatisticalControlVector:
+    """Extract a PCA control vector.
+
+    Args:
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, or a CaptureResult
+            from easysteer.capture.
+        positive_indices (list[int]): Indices of positive samples.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None, every sample index not in
+            ``positive_indices`` becomes a negative, in ascending
+            sample order.
+        **kwargs (Any): Options accepted by PCAExtractor:
+            `method` (str, default "standard") selects the PCA variant
+            ("standard" uses only positive samples, "diff" runs PCA
+            over positive/negative differences, "center" over
+            pair-centered samples); `correct_direction` (bool, default
+            True) flips the vector if needed so it points from negative
+            toward positive samples; `n_components` (int, must be 1);
+            `normalize` (bool, default True); `token_pos` (int | str,
+            default -1, the last token). Unknown
+            options raise ValueError.
+
+    Returns:
+        StatisticalControlVector: The PCA control vector.
+
+    Examples:
+        >>> # Plain PCA over positive samples only
+        >>> pca_vector = extract_pca_control_vector(
+        ...     all_hidden_states, positive_indices,
+        ...     method="standard"
+        ... )
+        >>>
+        >>> # PCA over pair differences with direction correction
+        >>> pca_diff_vector = extract_pca_control_vector(
+        ...     all_hidden_states, positive_indices, negative_indices,
+        ...     method="diff", correct_direction=True
+        ... )
+        >>>
+        >>> # PCA over pair differences without direction correction
+        >>> pca_diff_no_correct = extract_pca_control_vector(
+        ...     all_hidden_states, positive_indices, negative_indices,
+        ...     method="diff", correct_direction=False
+        ... )
+    """
+    return _dispatch(
+        "pca", all_hidden_states, positive_indices, negative_indices, kwargs
+    )
+
+
+def extract_lat_control_vector(
+    all_hidden_states, positive_indices, negative_indices=None, **kwargs
+) -> StatisticalControlVector:
+    """Extract a LAT control vector.
+
+    Args:
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, or a CaptureResult
+            from easysteer.capture.
+        positive_indices (list[int]): Indices of positive samples.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None and `use_positive_only` is False, every
+            sample index not in ``positive_indices`` becomes a
+            negative, in ascending sample order.
+        **kwargs (Any): Options accepted by LATExtractor:
+            `use_positive_only` (bool, default True) uses only the
+            positive samples; `correct_direction` (bool, default True)
+            flips the vector if needed so it points from negative
+            toward positive samples; `n_components` (int, default 1);
+            `normalize` (bool, default True); `token_pos` (int | str,
+            default -1, the last token). Unknown
+            options raise ValueError.
+
+    Returns:
+        StatisticalControlVector: The LAT control vector.
+
+    Examples:
+        >>> # Positive samples only (traditional LAT)
+        >>> lat_vector = extract_lat_control_vector(
+        ...     all_hidden_states, positive_indices,
+        ...     use_positive_only=True
+        ... )
+        >>>
+        >>> # Positive and negative samples with direction correction
+        >>> lat_mixed_vector = extract_lat_control_vector(
+        ...     all_hidden_states, positive_indices, negative_indices,
+        ...     use_positive_only=False, correct_direction=True
+        ... )
+    """
+    return _dispatch(
+        "lat", all_hidden_states, positive_indices, negative_indices, kwargs
+    )
+
+
+def extract_linear_probe_control_vector(
+    all_hidden_states, positive_indices, negative_indices=None, **kwargs
+) -> StatisticalControlVector:
+    """Extract a Linear Probe control vector.
+
+    Args:
+        all_hidden_states (list | CaptureResult): Nested
+            `[sample][layer][token]` hidden states, or a CaptureResult
+            from easysteer.capture.
+        positive_indices (list[int]): Indices of positive samples.
+        negative_indices (list[int] | None): Indices of negative
+            samples. If None, every sample index not in
+            ``positive_indices`` becomes a negative, in ascending
+            sample order.
+        **kwargs (Any): Options accepted by LinearProbeExtractor:
+            `regularization` (str, default "l2") is one of "l1", "l2",
+            "elasticnet", "none" — unknown values raise ValueError;
+            `C` (float, default 1.0) is the inverse regularization
+            strength (for L2, C=1.0 is usually fine; for L1, prefer
+            C=10.0 or larger to avoid excessive sparsification; with
+            "none" C is ignored); `standardize` (bool, default True);
+            `normalize` (bool, default True); `token_pos` (int | str,
+            default -1, the last token). Unknown
+            options raise ValueError.
+
+    Returns:
+        StatisticalControlVector: The Linear Probe control vector.
+
+    Examples:
+        >>> # L2 regularization (recommended)
+        >>> linear_probe_vector = extract_linear_probe_control_vector(
+        ...     all_hidden_states, positive_indices, negative_indices,
+        ...     regularization="l2", C=1.0
+        ... )
+        >>>
+        >>> # L1 regularization (feature selection)
+        >>> linear_probe_l1 = extract_linear_probe_control_vector(
+        ...     all_hidden_states, positive_indices, negative_indices,
+        ...     regularization="l1", C=10.0
+        ... )
+    """
+    return _dispatch(
+        "linear_probe", all_hidden_states, positive_indices, negative_indices, kwargs
+    )

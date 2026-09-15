@@ -2,7 +2,7 @@
 
 The [`frontend/`](https://github.com/ZJU-REAL/EasySteer/tree/main/frontend) module
 provides a Vue interface for comparing baseline and steered outputs, chatting with
-an intervention, and submitting vector extraction and ReFT training jobs.
+an intervention, and submitting vector extraction and steering training jobs.
 
 The Flask backend runs extraction and training jobs. Generation uses a separate
 [OpenAI-compatible vLLM server](openai-server.md), configured in the UI.

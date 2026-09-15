@@ -1,36 +1,36 @@
-# `easysteer.steer`
+# `easysteer.extraction`
 
 Analysis-based extraction of steering vectors from captured hidden states.
 
 ## Unified extraction interface
 
-::: easysteer.steer.extract_statistical_control_vector
+::: easysteer.extraction.extract_statistical_control_vector
 
-::: easysteer.steer.extract_diffmean_control_vector
+::: easysteer.extraction.extract_diffmean_control_vector
 
-::: easysteer.steer.extract_pca_control_vector
+::: easysteer.extraction.extract_pca_control_vector
 
-::: easysteer.steer.extract_lat_control_vector
+::: easysteer.extraction.extract_lat_control_vector
 
-::: easysteer.steer.extract_linear_probe_control_vector
+::: easysteer.extraction.extract_linear_probe_control_vector
 
 ## ITI attention extraction
 
-::: easysteer.steer.ITIExtractor
+::: easysteer.extraction.ITIExtractor
 
 ## Containers and utilities
 
-::: easysteer.steer.StatisticalControlVector
+::: easysteer.extraction.StatisticalControlVector
 
-::: easysteer.steer.extract_token_hiddens
+::: easysteer.extraction.extract_token_hiddens
 
 ## SAE helpers
 
-::: easysteer.steer.search_sae_features
+::: easysteer.extraction.search_sae_features
 
-::: easysteer.steer.get_sae_feature_explanation
+::: easysteer.extraction.get_sae_feature_explanation
 
-::: easysteer.steer.extract_sae_decoder_vector
+::: easysteer.extraction.extract_sae_decoder_vector
 
 ## Payload adapters (`easysteer.vectors`)
 
@@ -46,6 +46,8 @@ steering payloads passed via `VectorSpec(data=...)`.
 ::: easysteer.vectors.from_gguf
 
 ::: easysteer.vectors.from_pt_direction
+
+::: easysteer.vectors.from_training
 
 ::: easysteer.vectors.from_pyreft
 

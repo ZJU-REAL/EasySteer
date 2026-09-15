@@ -50,6 +50,10 @@ in-graph execution.
 The PyReFT-compatible batch-256 run at 2048 tokens ended with OOM. The
 batch-128 result completed all 512 requests.
 
+These PyReFT measurements used the former bundled framework. Its benchmark
+and implementation are preserved at commit `baab511`; they were retired when
+EasySteer moved to native training. They do not measure the new training API.
+
 ## Distinct configurations per batch
 
 This in-graph run uses 512 requests and 28 layers. vLLM resolves

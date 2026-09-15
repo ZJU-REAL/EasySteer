@@ -16,7 +16,7 @@ def test_light_utilities_do_not_initialize_runtime():
     code = """
 import sys
 from core import ConfigStore, get_message, require_fields
-assert ConfigStore('training').get('emoji_bias')['intervention'] == 'bias'
+assert ConfigStore('training').get('emoji_bias')['algorithm'] == 'direct'
 assert not {'core.runtime', 'core.llm_manager', 'vllm', 'torch', 'transformers'} & sys.modules.keys()
 """
     subprocess.run(
