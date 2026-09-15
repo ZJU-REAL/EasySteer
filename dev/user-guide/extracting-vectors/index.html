@@ -971,16 +971,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#analysis-based-easysteersteer" class="md-nav__link">
+  <a href="#analysis-based-easysteerextraction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Analysis-based: easysteer.steer
+        Analysis-based: easysteer.extraction
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Analysis-based: easysteer.steer">
+    <nav class="md-nav" aria-label="Analysis-based: easysteer.extraction">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#working-memory-and-pca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working memory and PCA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-and-existing-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export and existing interfaces
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#iti-attention-head-directions" class="md-nav__link">
@@ -999,10 +1021,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#learning-based-easysteerreft" class="md-nav__link">
+  <a href="#learning-based-easysteertraining" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Learning-based: easysteer.reft
+        Learning-based: easysteer.training
       
     </span>
   </a>
@@ -1032,7 +1054,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1830,6 +1852,8 @@
       
         
       
+        
+      
     
     
     
@@ -1890,6 +1914,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -1973,16 +2025,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#analysis-based-easysteersteer" class="md-nav__link">
+  <a href="#analysis-based-easysteerextraction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Analysis-based: easysteer.steer
+        Analysis-based: easysteer.extraction
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Analysis-based: easysteer.steer">
+    <nav class="md-nav" aria-label="Analysis-based: easysteer.extraction">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#working-memory-and-pca" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working memory and PCA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-and-existing-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export and existing interfaces
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#iti-attention-head-directions" class="md-nav__link">
@@ -2001,10 +2075,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#learning-based-easysteerreft" class="md-nav__link">
+  <a href="#learning-based-easysteertraining" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Learning-based: easysteer.reft
+        Learning-based: easysteer.training
       
     </span>
   </a>
@@ -2112,91 +2186,178 @@
 
 <h1 id="extracting-steering-vectors">Extracting steering vectors<a class="headerlink" href="#extracting-steering-vectors" title="Permanent link">&para;</a></h1>
 <p>Two complementary routes turn captured hidden states into interventions.</p>
-<h2 id="analysis-based-easysteersteer">Analysis-based: <code>easysteer.steer</code><a class="headerlink" href="#analysis-based-easysteersteer" title="Permanent link">&para;</a></h2>
-<p>Derives directions from captured activations while keeping model weights fixed.
-Available extractors: DiffMean, PCA, LAT, linear probe, ITI attention head
-directions, and SAE feature vectors.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.steer</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_diffmean_control_vector</span><span class="p">,</span> <span class="n">StatisticalControlVector</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">control_vector</span> <span class="o">=</span> <span class="n">extract_diffmean_control_vector</span><span class="p">(</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">all_hidden_states</span><span class="o">=</span><span class="n">capture_result</span><span class="p">,</span>  <span class="c1"># CaptureResult from hs.capture(...)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">positive_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">negative_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">],</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">token_pos</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>       <span class="c1"># which token's activation to use</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">control_vector</span><span class="o">.</span><span class="n">export_gguf</span><span class="p">(</span><span class="s2">"vectors/diffmean.gguf"</span><span class="p">)</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># ... later</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">control_vector</span> <span class="o">=</span> <span class="n">StatisticalControlVector</span><span class="o">.</span><span class="n">import_gguf</span><span class="p">(</span><span class="s2">"vectors/diffmean.gguf"</span><span class="p">)</span>
+<h2 id="analysis-based-easysteerextraction">Analysis-based: <code>easysteer.extraction</code><a class="headerlink" href="#analysis-based-easysteerextraction" title="Permanent link">&para;</a></h2>
+<p>Derive directions from captured activations while keeping model weights fixed.
+<code>extract</code> accepts a <code>CaptureResult</code> or a one-pass iterator of capture batches,
+with one Boolean or integer 0/1 label per sample. Layer IDs and component names
+come from the capture, so attention outputs remain attention directions.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">capture_batches</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.extraction</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># prompts and labels have the same order; labels can also be an iterator.</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">batches</span> <span class="o">=</span> <span class="n">capture_batches</span><span class="p">(</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">llm</span><span class="p">,</span> <span class="n">prompts</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="mi">12</span><span class="p">],</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">select</span><span class="o">=</span><span class="n">SelectSpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">budget_bytes</span><span class="o">=</span><span class="mi">256</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">vector</span> <span class="o">=</span> <span class="n">extract</span><span class="p">(</span><span class="n">batches</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"diffmean"</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">vector</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span> <span class="n">scale</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">new_prompts</span><span class="p">,</span> <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">)</span>
 </code></pre></div>
-<p>The exported GGUF file is what <code>VectorSpec(source=...)</code> consumes at inference time.
-Pass <code>CaptureResult</code> directly to preserve true layer IDs. Legacy nested
-<code>[sample][layer][token]</code> inputs are also accepted, but their layer keys are inferred
-from list positions starting at zero. The selected rows must include every sample
-needed by <code>positive_indices</code> and <code>negative_indices</code>.</p>
-<p>Extractor <code>normalize=True</code> normalizes the extracted direction. This differs from
-inference-time <code>VectorSpec.normalize=True</code>, which rescales the transformed hidden
-state to its original norm.</p>
-<p>Sibling functions follow the same shape: <code>extract_pca_control_vector</code>,
-<code>extract_lat_control_vector</code>, <code>extract_linear_probe_control_vector</code>, and the generic
-<code>extract_statistical_control_vector</code>. SAE helpers (<code>search_sae_features</code>,
-<code>get_sae_feature_explanation</code>, <code>extract_sae_decoder_vector</code>) locate and export
-interpretable SAE decoder directions. See the
+<p>DiffMean releases each consumed batch and retains two running class sums per
+layer. No accumulator loop or conversion to nested lists is needed. Label
+counts, missing rows, changed layers and inconsistent capture provenance produce
+explicit errors. Labels follow batch/sample order; <code>sample_indices</code> remains
+available on each capture for tracking the original dataset. It is not used
+to index or reorder the label iterable.</p>
+<p><code>token_pos=-1</code> selects the last <strong>captured</strong> row of each sample. Other choices
+are an integer row index, <code>"first"</code>, <code>"last"</code>, <code>"mean"</code>, <code>"max"</code> or <code>"min"</code>.
+The last two select the row with the largest or smallest L2 norm. Mean pooling
+uses bounded token chunks, including when continuous batching interleaves one
+sample's rows. Each sample contributes one pooled row, so long responses do not
+receive extra weight.</p>
+<h3 id="working-memory-and-pca">Working memory and PCA<a class="headerlink" href="#working-memory-and-pca" title="Permanent link">&para;</a></h3>
+<p>The default <code>max_working_bytes=256 * 1024**2</code> preflights extraction's estimated
+numerical allocations. It excludes input captures, Python objects and numerical
+library/runtime overhead; it is not an operating-system RSS limit. Capture has
+its own host/device budgets. To process a large dataset, consume
+<code>capture_batches(...)</code> directly or iterate over saved captures; turning the
+iterator into a list retains all input activations.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Accepted input</th>
+<th>Numerical storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diffmean</code></td>
+<td>Single capture or batch iterator</td>
+<td>Class sums proportional to total captured layer width</td>
+</tr>
+<tr>
+<td><code>incremental_pca</code></td>
+<td>Single capture or batch iterator</td>
+<td>Bounded per-layer row buffers plus one SVD's scratch space</td>
+</tr>
+<tr>
+<td><code>pca</code>, <code>lat</code>, <code>linear_probe</code>, <code>iti</code></td>
+<td>Single materialized or memory-mapped capture</td>
+<td>One layer's reduced dataset and estimator scratch, checked before extraction</td>
+</tr>
+</tbody>
+</table>
+<p>Incremental PCA is an explicit approximation, fit on positive examples. Negative
+examples orient its sign when present. Its result can depend on sample order and
+<code>pca_batch_size</code>; ordinary <code>method="pca"</code> never switches to it automatically.
+For a single finite capture, the allocated PCA buffer is capped by its sample
+count. Requested batch size remains recorded in the metadata.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">vector</span> <span class="o">=</span> <span class="n">extract</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">batches</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"incremental_pca"</span><span class="p">,</span> <span class="n">pca_batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">max_working_bytes</span><span class="o">=</span><span class="mi">128</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># For a dataset that fits the materialized-method working budget:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">vector</span> <span class="o">=</span> <span class="n">extract</span><span class="p">(</span><span class="n">capture_result</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"pca"</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"center"</span><span class="p">)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">probe</span> <span class="o">=</span> <span class="n">extract</span><span class="p">(</span><span class="n">capture_result</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"linear_probe"</span><span class="p">,</span> <span class="n">C</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</code></pre></div>
+<p>An iterator is consumed by one extraction call. To compare algorithms, create a
+fresh iterator over saved batches instead of rerunning model capture.
+See the <a href="../hidden-state-capture/#process-a-dataset-in-batches">saved-dataset example</a>
+for reopening batches in order. Exact
+covariance remains available through
+<code>MomentsAccumulator(track_second_moment=True, max_working_bytes=...)</code>, but it
+requires quadratic float64 storage in layer width. Its budget check happens
+before statistics change and also reserves covariance/eigendecomposition scratch.
+Use incremental PCA when those matrices do not fit.</p>
+<h3 id="export-and-existing-interfaces">Export and existing interfaces<a class="headerlink" href="#export-and-existing-interfaces" title="Permanent link">&para;</a></h3>
+<p><code>to_spec</code> requires an explicit inference <code>ApplySpec</code>; capture positions are
+analysis provenance and are never reused as an implicit steering policy. It
+selects <code>direct</code> for hidden states and <code>attention_add</code> for attention heads.
+Statistical router-logit directions can be analyzed or exported, but cannot be
+converted to a <code>moe_router</code> intervention: that algorithm requires explicit
+expert selections and modes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.extraction</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatisticalControlVector</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">vector</span><span class="o">.</span><span class="n">export_gguf</span><span class="p">(</span><span class="s2">"vectors/diffmean.gguf"</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">restored</span> <span class="o">=</span> <span class="n">StatisticalControlVector</span><span class="o">.</span><span class="n">import_gguf</span><span class="p">(</span><span class="s2">"vectors/diffmean.gguf"</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">restored</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">))</span>
+</code></pre></div>
+<p>GGUF preserves directions, component, model hint and nested extraction metadata,
+including integer layer keys, strings, Booleans and token pooling settings.
+Vector metadata records the global capture selection and whether any per-prompt
+overrides were used. The saved capture retains each override and the exact row
+positions; vectors do not retain a corpus-sized list of sample selections.
+Older GGUF files remain readable. When their component is unknown, supply
+<code>component="hidden_states"</code> or <code>component="attention_heads"</code> explicitly to
+<code>to_spec</code>. A conflicting known component is rejected.</p>
+<p>The existing functions (<code>extract_diffmean_control_vector</code>,
+<code>extract_pca_control_vector</code>, <code>extract_lat_control_vector</code>,
+<code>extract_linear_probe_control_vector</code>, <code>extract_statistical_control_vector</code>) and
+extractor classes remain available for index-based analysis. They accept
+<code>positive_indices</code> and optional <code>negative_indices</code>; omitted negatives are the
+complement. These lower-level interfaces require the caller to size the input
+and working storage. The generic index-based selector is <code>algorithm="pca"</code>,
+with <code>variant="standard"</code>, <code>"diff"</code> or <code>"center"</code>; historical <code>method</code> aliases
+remain supported. Use <code>CaptureResult</code> to preserve true layer IDs. Legacy nested
+<code>[sample][layer][token]</code> inputs infer layer IDs from positions and have no target
+provenance.</p>
+<p>Extraction normalizes directions by default, except ITI, which preserves its
+projection scale. This differs from inference-time <code>VectorSpec.normalize=True</code>,
+which rescales the transformed hidden state to its original norm. Standardized
+linear probes export coefficients converted back to raw activation coordinates.
+SAE helpers locate and export interpretable decoder directions; see the
 <a href="../../api-reference/steer/">API reference</a>.</p>
 <h3 id="iti-attention-head-directions">ITI attention head directions<a class="headerlink" href="#iti-attention-head-directions" title="Permanent link">&para;</a></h3>
-<p><code>ITIExtractor</code> takes training and validation captures from
+<p>ITI takes training and validation captures from
 <a href="../hidden-state-capture/#attention-head-outputs"><code>stream="attention_heads"</code></a>.
 Split data by question before capture so different answers to one question
 cannot cross the training, validation, and test boundaries.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.steer</span><span class="w"> </span><span class="kn">import</span> <span class="n">ITIExtractor</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_control_vector</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">iti</span> <span class="o">=</span> <span class="n">ITIExtractor</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">train_capture</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">positive_indices</span><span class="o">=</span><span class="n">train_true_answer_indices</span><span class="p">,</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">validation_hidden_states</span><span class="o">=</span><span class="n">validation_capture</span><span class="p">,</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">validation_positive_indices</span><span class="o">=</span><span class="n">validation_true_answer_indices</span><span class="p">,</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">num_heads</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="n">layer</span><span class="p">:</span> <span class="n">layout</span><span class="p">[</span><span class="s2">"num_heads"</span><span class="p">]</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="k">for</span> <span class="n">layer</span><span class="p">,</span> <span class="n">layout</span> <span class="ow">in</span> <span class="n">train_capture</span><span class="o">.</span><span class="n">layouts</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="p">},</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">top_k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="p">)</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">payload</span> <span class="o">=</span> <span class="n">from_control_vector</span><span class="p">(</span><span class="n">iti</span><span class="p">)</span>  <span class="c1"># VectorSpec(data=payload, algorithm="attention_add", ...)</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="n">Path</span><span class="p">(</span><span class="s2">".runtime/iti"</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="n">iti</span><span class="o">.</span><span class="n">export_gguf</span><span class="p">(</span><span class="s2">".runtime/iti/iti.gguf"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.extraction</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">iti</span> <span class="o">=</span> <span class="n">extract</span><span class="p">(</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">train_capture</span><span class="p">,</span> <span class="n">train_labels</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"iti"</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">validation_hidden_states</span><span class="o">=</span><span class="n">validation_capture</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">validation_labels</span><span class="o">=</span><span class="n">validation_labels</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="c1"># Query head counts come from the capture layouts.</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">top_k</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">iti</span><span class="o">.</span><span class="n">to_spec</span><span class="p">(</span><span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span> <span class="n">scale</span><span class="o">=</span><span class="mf">15.0</span><span class="p">)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">Path</span><span class="p">(</span><span class="s2">".runtime/iti"</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="n">iti</span><span class="o">.</span><span class="n">export_gguf</span><span class="p">(</span><span class="s2">".runtime/iti/iti.gguf"</span><span class="p">)</span>
 </code></pre></div>
-<p>Unlisted answer indices are negatives unless explicit negative indices are
-provided. Probes fit the training set and rank heads by validation accuracy.
+<p>Both label iterables contain one Boolean or integer 0/1 per sample. The
+index-based <code>ITIExtractor.extract</code> also remains available: unlisted answer
+indices are negatives unless explicit negative indices are provided. Probes fit
+the training set and rank heads by validation accuracy.
 Following <a href="https://proceedings.neurips.cc/paper_files/paper/2023/hash/81b8390039b7302c909cb769f8b6cd93-Abstract-Conference.html">ITI</a>,
 the selected head directions use the truthful-minus-false means from both
 development splits, normalized and multiplied by their projection standard
 deviation. Unselected head slices remain zero. The returned vector preserves
 this scale; apply it with <code>algorithm="attention_add"</code>, <code>normalize=False</code>, and
-<code>scale</code> set to the desired intervention strength. The generic extraction
-interface also accepts <code>method="iti"</code> with the same keyword arguments.</p>
+<code>scale</code> set to the desired intervention strength. The bounded interface checks
+training and validation layer widths before reading feature rows.</p>
 <p>The <a href="https://github.com/ZJU-REAL/EasySteer/blob/main/replications/iti/iti.ipynb">ITI notebook</a>
 demonstrates Llama-2-7B-Chat with a supplied direction: 48 heads, strength 15,
 one fixed TruthfulQA evaluation set, an accuracy comparison, and generated
 examples. It uses the authors' QA prompt and loads the model once. The supplied
 direction uses the official code's separate, unlabeled GEN calibration bank;
 the extractor above uses its training and validation captures for that scale.</p>
-<h2 id="learning-based-easysteerreft">Learning-based: <code>easysteer.reft</code><a class="headerlink" href="#learning-based-easysteerreft" title="Permanent link">&para;</a></h2>
-<p>Reimplements pyreft: trains a parameterized intervention (e.g. <code>BiasIntervention</code>,
-LoReFT) on a frozen HuggingFace model with a standard <code>transformers</code> trainer, then saves
-the learned representation for inference.</p>
-<p>Use <code>easysteer.reft.train.train_reft</code> for the shared training pipeline. Bias
-checkpoints are loaded through <code>easysteer.vectors.from_pyreft</code> and applied with
-<code>algorithm="direct"</code>; LoReFT checkpoints use the same adapter with
-<code>algorithm="loreft"</code>. These checkpoints are passed through <code>VectorSpec(data=...)</code>,
-rather than as a third-party checkpoint path in <code>source</code>.</p>
-<p>The complete training walkthrough (data module, trainer, saving) is in
-<a href="../reft-training/">ReFT training</a>; see the
-<a href="../../replications/">LoReFT replication</a> for a complete train-then-steer
-notebook.</p>
+<h2 id="learning-based-easysteertraining">Learning-based: <code>easysteer.training</code><a class="headerlink" href="#learning-based-easysteertraining" title="Permanent link">&para;</a></h2>
+<p>Train a native <code>direct</code> or <code>loreft</code> adapter on a frozen Hugging Face model with
+<code>easysteer.training.train</code>. The checkpoint exports the payload and its target
+through <code>load_checkpoint(path).to_spec()</code>. Training and inference use the same
+algorithm and component names.</p>
+<p>See <a href="../reft-training/">Training steering adapters</a> for training, export and
+migration from the removed ReFT API, or the <a href="../../replications/">LoReFT replication</a>
+for a complete notebook.</p>
 
 
 
@@ -2251,13 +2412,13 @@ notebook.</p>
         
         
           
-          <a href="../reft-training/" class="md-footer__link md-footer__link--next" aria-label="Next: ReFT training">
+          <a href="../reft-training/" class="md-footer__link md-footer__link--next" aria-label="Next: Training steering adapters">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                ReFT training
+                Training steering adapters
               </div>
             </div>
             <div class="md-footer__button md-icon">

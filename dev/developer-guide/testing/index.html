@@ -931,7 +931,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1822,6 +1822,8 @@
       
         
       
+        
+      
     
     
     
@@ -1882,6 +1884,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2165,9 +2195,13 @@ reconstruction path may omit steering state; speculative decode-step indexing
 and resumed-prefill prompt/generation boundaries need dedicated validation.
 A baseline pass also does not certify every MoE model, parallelism setting,
 conditional graph payload or a performance improvement.</p>
-<p>Capture uses <code>vllm.capture</code>. Eligible single-worker FULL batches use a separate
-capture graph; other steps needing rows dispatch eagerly, while empty selections
-keep normal execution. <code>capture_status</code> exposes actual graph replay and eager
+<p>Capture uses <code>vllm.capture</code> and supports ordinary TP with <code>PP=DP=1</code>, without
+context, sequence, or expert parallelism. The capture suites accept
+<code>STEER_TEST_TP=2</code> with two GPUs; see the
+<a href="https://github.com/ZJU-REAL/EasySteer/blob/main/tests/README.md#tensor-parallel-capture-and-steering">test guide</a>.
+Eligible FULL batches use a separate capture graph, including at <code>TP&gt;1</code>.
+Other steps needing rows dispatch eagerly, while empty selections keep normal
+execution. <code>capture_status</code> exposes actual graph replay and eager
 forward counters. Admission skips prefix-cache reads only when a hit could omit
 selected prompt rows, preserving normal cache writes. Requests already admitted
 before capture starts fail at fetch if selected rows were skipped.</p>

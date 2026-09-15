@@ -1037,7 +1037,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1835,6 +1835,8 @@
       
         
       
+        
+      
     
     
     
@@ -1895,6 +1897,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2127,19 +2157,22 @@ used by <a href="https://proceedings.neurips.cc/paper_files/paper/2023/hash/81b8
 It changes the representation passed to the output projection; it does not edit
 attention scores, attention probabilities, or stored keys and values directly.</p>
 <h2 id="supported-component">Supported component<a class="headerlink" href="#supported-component" title="Permanent link">&para;</a></h2>
-<p>Use standard decoder MHA or GQA with <code>tensor_parallel_size=1</code>. MLA, encoder
-attention, and cross-attention are outside this component's current scope.
+<p>Standard decoder MHA and GQA support ordinary tensor parallelism, including
+<code>tensor_parallel_size=2</code> on two GPUs. Use <code>PP=DP=1</code> with context, sequence, and
+expert parallelism disabled. MLA, encoder attention, and cross-attention are
+outside this component's current scope.
 The engine discovers attention modules from the model itself and checks that
 the hook target is available.</p>
 <p>For a layer with <code>H</code> query heads and value-output dimension <code>D</code>, the captured
 and steered tensor has shape <code>(rows, H * D)</code>. This width need not equal the
 residual hidden size. GQA still uses the <strong>query</strong> head count at this point,
-not the number of KV heads.</p>
+not the number of KV heads. Public capture results and steering vectors use
+all query heads in the model's global head order, independent of TP size.</p>
 <h2 id="capture-the-representation">Capture the representation<a class="headerlink" href="#capture-the-representation" title="Permanent link">&para;</a></h2>
 <p>The same capture API and selectors work for attention heads:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.capture</span><span class="w"> </span><span class="kn">import</span> <span class="n">SelectSpec</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">easysteer.hidden_states</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">hs</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">easysteer.capture</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">hs</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
@@ -2167,9 +2200,10 @@ applications, render the model's chat template as in the
 <a href="../../getting-started/quickstart/">quickstart</a>. For a paper replication, keep
 the paper's prompt format.</p>
 <h2 id="apply-selected-head-directions">Apply selected head directions<a class="headerlink" href="#apply-selected-head-directions" title="Permanent link">&para;</a></h2>
-<p>Use a concatenated <code>DirectionVector</code> or an EasySteer direction GGUF. Leave
-unselected head slices zero. The same per-request <code>ApplySpec</code>, prefix caching,
-and graph rules apply:</p>
+<p>Use a concatenated <code>DirectionVector</code> or an EasySteer direction GGUF with the
+full global width <code>H * D</code>, including with TP. Leave unselected head slices zero;
+the engine handles distribution across workers. The same per-request
+<code>ApplySpec</code>, prefix caching, and graph rules apply:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># This file must contain attention directions for the model loaded above.</span>
@@ -2188,13 +2222,17 @@ decode forward passes. To steer all prompt processing as well, use
 <code>ApplySpec(prompt="all", generation="all")</code>.</p>
 <p><code>attention_add</code> supports eager, <code>split</code>, and <code>in_graph</code>; a single-vector
 declaration selects <code>in_graph</code> under the default <code>auto</code> mode. Normalization is
-not supported, so keep <code>normalize=False</code>.</p>
+not supported, so keep <code>normalize=False</code>. These steering modes also support TP.
+Capture on <code>TP&gt;1</code> can replay a separate FULL CUDA graph with <code>in_graph</code> steering;
+other capture batches use eager execution. See
+<a href="../hidden-state-capture/#graph-execution">capture execution</a>.</p>
 <h2 id="iti-example">ITI example<a class="headerlink" href="#iti-example" title="Permanent link">&para;</a></h2>
 <p>The <a href="https://github.com/ZJU-REAL/EasySteer/blob/main/replications/iti/iti.ipynb">ITI notebook</a>
 uses Llama-2-7B-Chat, the authors' QA prompt, 48 selected heads, and intervention
-strength 15. It loads a supplied direction, evaluates one fixed TruthfulQA set,
-and displays baseline/steered accuracy and generated examples as executed
-notebook outputs.</p>
+strength 15. It loads a supplied direction and evaluates one fixed TruthfulQA
+set. Run the notebook to produce baseline/steered accuracy and generated
+examples for the current runtime; outputs from before the API migration have
+been cleared.</p>
 <p>To learn directions from your own data, use
 <a href="../extracting-vectors/#iti-attention-head-directions"><code>ITIExtractor</code></a>. It fits
 per-head probes on training captures, selects heads by validation accuracy, and

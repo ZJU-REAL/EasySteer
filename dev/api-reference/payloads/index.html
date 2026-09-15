@@ -931,7 +931,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -2194,6 +2194,8 @@
       
         
       
+        
+      
     
     
     
@@ -2257,6 +2259,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -3045,9 +3075,10 @@ encoding of those bytes.</p>
 </div><h2 id="direction-weights">Direction weights<a class="headerlink" href="#direction-weights" title="Permanent link">&para;</a></h2>
 <p><code>layers</code> maps true decoder-layer IDs to one-dimensional vectors. Widths may
 differ across layers when the model component does. For <code>attention_add</code>, each
-vector contains concatenated head outputs; obtain their dimensions from capture
-layouts. The constructor returns a <code>DirectionVector</code>; algorithms determine how
-its directions are applied.</p>
+vector contains all query-head outputs in global head order; obtain their
+dimensions from capture layouts. Supply this same full-width vector with TP;
+the engine handles its distribution. The constructor returns a
+<code>DirectionVector</code>; algorithms determine how its directions are applied.</p>
 
 
 <div class="doc doc-object doc-class">

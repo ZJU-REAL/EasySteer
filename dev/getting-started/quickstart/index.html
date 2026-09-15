@@ -1055,7 +1055,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1850,6 +1850,8 @@
       
         
       
+        
+      
     
     
     
@@ -1910,6 +1912,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2207,9 +2237,9 @@ training text retain the formats required by those workflows.</p>
 taking the difference of means — the full pipeline is:</p>
 <ol>
 <li><a href="../../user-guide/hidden-state-capture/">Capture hidden states</a> with
-   <code>easysteer.hidden_states.capture()</code>.</li>
+   <code>easysteer.capture.capture()</code>.</li>
 <li><a href="../../user-guide/extracting-vectors/">Extract a vector</a> with
-   <code>easysteer.steer.extract_diffmean_control_vector()</code> and export it as GGUF.</li>
+   <code>easysteer.extraction.extract_diffmean_control_vector()</code> and export it as GGUF.</li>
 <li>Apply it at inference with a <code>SteeringSpec</code> (this page).</li>
 </ol>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>

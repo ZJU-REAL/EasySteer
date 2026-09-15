@@ -27,7 +27,7 @@
     
     
       
-        <title>ReFT training - EasySteer</title>
+        <title>Training steering adapters - EasySteer</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#reft-training-learning-based-steering" class="md-skip">
+        <a href="#training-steering-adapters" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ReFT training
+              Training steering adapters
             
           </span>
         </div>
@@ -955,7 +955,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -973,7 +973,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -999,10 +999,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#train-a-bias-intervention" class="md-nav__link">
+  <a href="#train" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Train a bias intervention
+        Train
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#select-training-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select training positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#train-on-multiple-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train on multiple GPUs
       
     </span>
   </a>
@@ -1021,10 +1043,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#loreft-and-lower-level-apis" class="md-nav__link">
+  <a href="#migration-from-the-removed-reft-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LoReFT and lower-level APIs
+        Migration from the removed ReFT API
       
     </span>
   </a>
@@ -1824,6 +1846,8 @@
       
         
       
+        
+      
     
     
     
@@ -1884,6 +1908,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -1967,10 +2019,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#train-a-bias-intervention" class="md-nav__link">
+  <a href="#train" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Train a bias intervention
+        Train
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#select-training-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select training positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#train-on-multiple-gpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train on multiple GPUs
       
     </span>
   </a>
@@ -1989,10 +2063,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#loreft-and-lower-level-apis" class="md-nav__link">
+  <a href="#migration-from-the-removed-reft-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LoReFT and lower-level APIs
+        Migration from the removed ReFT API
       
     </span>
   </a>
@@ -2098,102 +2172,193 @@
   
 
 
-<h1 id="reft-training-learning-based-steering">ReFT training (learning-based steering)<a class="headerlink" href="#reft-training-learning-based-steering" title="Permanent link">&para;</a></h1>
-<p><code>easysteer.reft</code> includes a local implementation of
-<a href="https://github.com/stanfordnlp/pyreft">pyreft</a>. It trains an intervention on a frozen
-Hugging Face model, then exports a checkpoint that can be used by the inference
-engine through a <a href="../steering/#steering-with-your-own-tensors">steering payload</a>.</p>
-<p>For the analysis-based route without training, see
-<a href="../extracting-vectors/">Extracting steering vectors</a>.</p>
-<h2 id="train-a-bias-intervention">Train a bias intervention<a class="headerlink" href="#train-a-bias-intervention" title="Permanent link">&para;</a></h2>
-<p>The shared <code>train_reft</code> helper handles model loading, the training data module,
-trainer construction, and checkpoint saving. Run this script from the repository
-root in the installed EasySteer environment with a GPU:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.reft.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_reft</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">examples.reft</span><span class="w"> </span><span class="kn">import</span> <span class="n">EMOJI_EXAMPLES</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">train_reft</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">model_path</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">examples</span><span class="o">=</span><span class="n">EMOJI_EXAMPLES</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">intervention</span><span class="o">=</span><span class="s2">"bias"</span><span class="p">,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">layer</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">save_dir</span><span class="o">=</span><span class="s2">"results/emoji_bias"</span><span class="p">,</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="s2">"results/emoji_bias_training"</span><span class="p">,</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">num_train_epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">per_device_train_batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">3e-3</span><span class="p">,</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
+<h1 id="training-steering-adapters">Training steering adapters<a class="headerlink" href="#training-steering-adapters" title="Permanent link">&para;</a></h1>
+<p><code>easysteer.training</code> trains a small transformation on a frozen Hugging Face causal
+language model and exports a native vLLM steering payload. It uses PyTorch and the
+Transformers Trainer directly; PyReFT and PyVene are no longer bundled or required.</p>
+<p>Install the training dependencies in your EasySteer environment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[training]'</span>
 </code></pre></div>
-<p>The examples are instruction/response pairs. This helper supervises the last prompt
-position and uses Qwen's chat format by default; pass <code>prompt_template</code> when using
-a different model. Training arguments such as the learning rate are illustrative,
-so evaluate the trained intervention on held-out prompts.</p>
-<p>The helper saves its prompt template, position selection, and standard linear
-activation setting in <code>config.json</code> under <code>easysteer_training</code>. A command-line
-version is available in <code>examples/reft.py</code>.</p>
-<h2 id="apply-the-checkpoint">Apply the checkpoint<a class="headerlink" href="#apply-the-checkpoint" title="Permanent link">&para;</a></h2>
-<p>Run inference in a separate process after training exits, so the training model no
-longer occupies GPU memory. <code>from_pyreft</code> preserves the checkpoint's layer index.
-A bias checkpoint becomes a <code>DirectionVector</code>, so its inference algorithm is
-<code>direct</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<h2 id="train">Train<a class="headerlink" href="#train" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.training</span><span class="w"> </span><span class="kn">import</span> <span class="n">train</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">examples.training</span><span class="w"> </span><span class="kn">import</span> <span class="n">EMOJI_EXAMPLES</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">from_pyreft</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">SamplingParams</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">enable_steer_vector</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">steer_algorithms</span><span class="o">=</span><span class="p">[</span><span class="s2">"direct"</span><span class="p">],</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">)</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"results/emoji_bias/config.json"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">training</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">"easysteer_training"</span><span class="p">]</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">data</span><span class="o">=</span><span class="n">from_pyreft</span><span class="p">(</span><span class="s2">"results/emoji_bias"</span><span class="p">),</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"direct"</span><span class="p">,</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="o">**</span><span class="n">training</span><span class="p">[</span><span class="s2">"apply"</span><span class="p">]),</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="p">)])</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="n">prompt</span> <span class="o">=</span> <span class="n">training</span><span class="p">[</span><span class="s2">"prompt_template"</span><span class="p">]</span> <span class="o">%</span> <span class="s2">"Who are you?"</span>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">prompt</span><span class="p">,</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">SamplingParams</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">),</span>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="p">)</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="nb">print</span><span class="p">(</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">model</span><span class="p">,</span> <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">model_path</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">examples</span><span class="o">=</span><span class="n">EMOJI_EXAMPLES</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"direct"</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">component</span><span class="o">=</span><span class="s2">"hidden_states"</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">layer</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">save_dir</span><span class="o">=</span><span class="s2">"results/emoji_direct"</span><span class="p">,</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="s2">"results/emoji_direct_training"</span><span class="p">,</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">num_train_epochs</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">per_device_train_batch_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">3e-3</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="p">)</span>
 </code></pre></div>
-<p>The prompt preserves the training helper's exact <code>prompt_template</code>, and the
-selection matches the last prompt position used in training. Applying the
-intervention to every generated token is a different experiment; choose that
-explicitly with <code>generation="all"</code> if needed.</p>
-<p>Older checkpoints may not contain <code>easysteer_training</code>. Supply their original
-prompt format and <code>ApplySpec</code> explicitly; the bundled emoji checkpoints use
-<code>ApplySpec(prompt_positions=[-1])</code>.</p>
-<h2 id="loreft-and-lower-level-apis">LoReFT and lower-level APIs<a class="headerlink" href="#loreft-and-lower-level-apis" title="Permanent link">&para;</a></h2>
-<p>For LoReFT, train with <code>intervention="loreft"</code> and <code>low_rank_dimension=4</code>, save to
-a separate checkpoint directory, and change both <code>steer_algorithms</code> and the
-<code>VectorSpec.algorithm</code> to <code>"loreft"</code>. The same <code>from_pyreft</code> adapter then produces
-a <code>ReftIntervention</code> payload. The adapter accepts one explicitly identified
-LoReFT or bias intervention on <code>block_output</code>, with <code>unit="pos"</code> and one unit.
-Other component targets, intervention types, and multi-intervention checkpoints
-raise an error before weights are loaded. An attention-output checkpoint cannot
-be loaded as hidden-state LoReFT merely because its tensor width matches.</p>
-<p>LoReFT conversion implements the standard linear activation used by the training
-helper. Explicit nonlinear <code>act_fn</code> metadata is rejected. Older checkpoints
-without activation metadata are interpreted as standard linear LoReFT; the
-activation cannot be recovered from the saved weight tensors alone.</p>
-<p>The lower-level exports are under <code>easysteer.reft.pyreft</code>, including <code>ReftConfig</code>,
-<code>get_reft_model</code>, <code>LoreftIntervention</code>, and <code>ReftTrainerForCausalLM</code>.
-<code>BiasIntervention</code> lives in <code>easysteer.reft.pyreft.reft.algorithms</code>. For a complete
-LoReFT experiment, see the <a href="../../replications/">replication gallery</a>.</p>
-<p>The training helper resolves the width of registered sequence components from the
-model profile. Head selection and custom module paths require the lower-level
-PyReFT API, which also provides multiple representations, per-example positions,
-and <code>h.pos</code> units. Those training capabilities are broader than the checkpoint
-adapter's supported inference targets; exporting a payload does not translate an
-arbitrary PyReFT configuration into a vLLM intervention.</p>
+<p><code>direct</code> learns an additive direction. <code>loreft</code> learns the standard linear LoReFT
+transformation; select it with <code>algorithm="loreft", rank=4</code>. These names match
+vLLM's inference algorithms. Both currently support <code>component="hidden_states"</code>,
+at the output of a supported decoder layer. Attention and router-logit training
+are not implemented. Unsupported components fail before the model is loaded.</p>
+<p>Each example is an instruction/response pair. By default, the transformation
+applies at the last prompt token. Response tokens supply the causal
+language-model loss, and prompt tokens are excluded from the loss. The loss is
+averaged over response tokens across the whole effective batch, including all
+distributed ranks and accumulated microbatches. Longer responses therefore
+contribute more tokens. The base model stays frozen and in evaluation mode,
+while the small steering transformation receives gradients.</p>
+<p>The default prompt template is Qwen's chat format. Pass <code>prompt_template</code> for
+other formats, or set <code>EASYSTEER_MODEL_PATH</code> and pass <code>model_path=None</code>.
+Evaluate learned adapters on held-out prompts; these example hyperparameters
+are illustrative. A command-line example is available in <code>examples/training.py</code>.</p>
+<h2 id="select-training-positions">Select training positions<a class="headerlink" href="#select-training-positions" title="Permanent link">&para;</a></h2>
+<p>Pass <code>apply</code> as vLLM's <code>ApplySpec</code>, <code>SelectSpec</code>, or the equivalent JSON-compatible
+dictionary. Training calls the same token-selection resolver as <code>vllm-steer</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">model</span><span class="p">,</span> <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">model_path</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">examples</span><span class="o">=</span><span class="n">EMOJI_EXAMPLES</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"loreft"</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">layer</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">rank</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">prompt_window</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">exclude_prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">generation_window</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="p">),</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">save_dir</span><span class="o">=</span><span class="s2">"results/emoji_selected"</span><span class="p">,</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p">)</span>
+</code></pre></div>
+<p>This selects the last three prompt tokens except the second-to-last token, plus
+the first four response tokens. Prompt and generation phases are independent;
+include selectors form a union, and exclusions subtract from that union.
+Token IDs, positions, half-open windows, and <code>prompt="all"</code> /
+<code>generation="all"</code> have the same meaning in training and inference. Prompt
+positions count from each unpadded prompt: <code>-1</code> selects its last token, and a
+positive index past the end clamps to that token. Generation positions start at
+zero and cannot be negative.</p>
+<p>Selection identifies the hidden state being transformed, not the token being
+predicted. The last prompt state predicts the first response token.
+<code>generation_positions=[0]</code> transforms the first response token's state when
+predicting the second response token. During training, response token IDs come
+from the reference answer; during generation, they come from the model's output.
+The same selection rule applies in both cases, including with the KV cache.
+Padding is never selected.</p>
+<h2 id="train-on-multiple-gpus">Train on multiple GPUs<a class="headerlink" href="#train-on-multiple-gpus" title="Permanent link">&para;</a></h2>
+<p>Use PyTorch DDP through <code>torchrun</code>, with one process per GPU. Device selection
+and adapter seeding happen before model construction; each rank receives its
+own complete frozen model and a synchronized adapter. For the example script:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="m">0</span>,1<span class="w"> </span>torchrun<span class="w"> </span>--standalone<span class="w"> </span>--nproc-per-node<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>examples/training.py<span class="w"> </span>--model<span class="w"> </span>Qwen/Qwen2.5-1.5B-Instruct<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--algorithm<span class="w"> </span>loreft<span class="w"> </span>--epochs<span class="w"> </span><span class="m">200</span><span class="w"> </span>--batch-size<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--save-dir<span class="w"> </span>results/emoji_loreft
+</code></pre></div>
+<p>Here the effective batch has 10 examples: 5 per GPU × 2 GPUs. With gradient
+accumulation, multiply again by <code>gradient_accumulation_steps</code>. Keep this global
+batch size and the training seed fixed when comparing runs. DDP synchronizes
+adapter gradients and only rank zero writes adapter checkpoints. Distributed
+floating-point reduction can introduce small numerical differences.</p>
+<p>Compare the interval <code>loss</code> values from <code>logging_steps</code>: Trainer gathers these
+across ranks. Its final <code>train_loss</code> summary can include a rank-local remainder
+when the last step is not logged, including with <code>logging_strategy="no"</code>. That
+summary does not affect the globally normalized gradients or parameter updates.</p>
+<p>DDP improves throughput; each GPU must still fit the full base model and its
+activations. Training does not support model sharding, tensor parallelism,
+FSDP, DeepSpeed, or <code>DataParallel</code>. Multiple visible GPUs without <code>torchrun</code> are
+rejected. For one GPU, set <code>CUDA_VISIBLE_DEVICES=0</code> and launch with <code>python</code>.
+Keep <code>device="cuda"</code> under <code>torchrun</code> so the launcher assigns each rank's device.
+CPU DDP is available with <code>device="cpu"</code>.</p>
+<p>Gradient checkpointing is unsupported because it replays the temporary steering
+hooks during backward. Native checkpoints store the materialized adapter, so
+exact optimizer-state resume through the Trainer is also unsupported. Load a
+checkpoint for inference with the APIs below.</p>
+<h2 id="apply-the-checkpoint">Apply the checkpoint<a class="headerlink" href="#apply-the-checkpoint" title="Permanent link">&para;</a></h2>
+<p>A training run saves <code>steering_adapter.json</code>: a versioned configuration and native
+payload, including its algorithm, component, layer, prompt template and token
+selection. It contains no Python class paths or frozen base-model weights.
+New checkpoints use format version 2. The loader also accepts version 1
+checkpoints with their original last-prompt-token selection.</p>
+<p>Run inference after the training process exits to release its GPU memory:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.training</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_checkpoint</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">SamplingParams</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">checkpoint</span> <span class="o">=</span> <span class="n">load_checkpoint</span><span class="p">(</span><span class="s2">"results/emoji_direct"</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="o">.</span><span class="n">to_spec</span><span class="p">()</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">llm</span> <span class="o">=</span> <span class="n">LLM</span><span class="p">(</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">"Qwen/Qwen2.5-1.5B-Instruct"</span><span class="p">,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">enable_steer_vector</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">steer_algorithms</span><span class="o">=</span><span class="p">[</span><span class="n">checkpoint</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">algorithm</span><span class="p">],</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">prompt</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">prompt_template</span> <span class="o">%</span> <span class="s2">"Who are you?"</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">prompt</span><span class="p">,</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">SamplingParams</span><span class="p">(</span><span class="n">temperature</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="mi">128</span><span class="p">),</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="p">)</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="nb">print</span><span class="p">(</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+<p><code>to_spec()</code> preserves the complete training selection. Its default remains
+<code>prompt_positions=[-1]</code>; explicitly changing that selection changes the experiment.
+For payload-only integrations, <code>easysteer.vectors.from_training(path)</code> and
+<code>vectors.load(path, format="training")</code> return the native payload; the caller
+then supplies the remaining spec fields.</p>
+<p><code>load(model_path, save_dir)</code> reloads the adapter on a Hugging Face model, and
+<code>generate(model, tokenizer, instruction)</code> uses its stored prompt template and
+selection for both prompt processing and subsequent generation. It supports
+the default dynamic KV cache and full-sequence recomputation with
+<code>use_cache=False</code>. Hugging Face static caches are explicitly unsupported.</p>
+<h2 id="migration-from-the-removed-reft-api">Migration from the removed ReFT API<a class="headerlink" href="#migration-from-the-removed-reft-api" title="Permanent link">&para;</a></h2>
+<p>The <code>easysteer.reft</code> package and its lower-level PyReFT/PyVene APIs have been
+removed. Update training calls as follows:</p>
+<table>
+<thead>
+<tr>
+<th>Former API</th>
+<th>Native API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>from easysteer.reft.train import train_reft</code></td>
+<td><code>from easysteer.training import train</code></td>
+</tr>
+<tr>
+<td><code>intervention="bias"</code></td>
+<td><code>algorithm="direct"</code></td>
+</tr>
+<tr>
+<td><code>intervention="loreft"</code></td>
+<td><code>algorithm="loreft"</code></td>
+</tr>
+<tr>
+<td><code>component="block_output"</code></td>
+<td><code>component="hidden_states"</code></td>
+</tr>
+<tr>
+<td><code>low_rank_dimension=4</code></td>
+<td><code>rank=4</code></td>
+</tr>
+<tr>
+<td><code>REFT_MODEL_PATH</code></td>
+<td><code>EASYSTEER_MODEL_PATH</code></td>
+</tr>
+</tbody>
+</table>
+<p>The native wrapper does not implement PyVene's source/base interventions,
+model profiles, arbitrary component paths, classification trainers, or multiple
+representations. Its supported targets and exported payloads match the inference
+contract.</p>
+<p>Existing published checkpoints remain usable through
+<code>easysteer.vectors.from_pyreft</code>. This file adapter does not import PyReFT: it
+validates known metadata and reads tensor weights. It accepts one bias or linear
+LoReFT checkpoint on <code>block_output</code> with <code>unit="pos"</code> and one unit. Unsupported
+targets, nonlinear activations and multi-intervention checkpoints are rejected.
+For historical files, supply their original prompt format and <code>ApplySpec</code>
+explicitly; the bundled emoji checkpoint uses <code>prompt_positions=[-1]</code>.</p>
+<p>The mathematical LoReFT algorithm and native <code>ReftIntervention</code> payload name
+remain compatible. They do not imply a dependency on the former framework.</p>
 
 
 

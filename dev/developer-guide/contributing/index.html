@@ -931,7 +931,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1346,6 +1346,17 @@
     <span class="md-ellipsis">
       
         Ground rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#easysteer-python-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EasySteer Python package
       
     </span>
   </a>
@@ -1822,6 +1833,8 @@
       
         
       
+        
+      
     
     
     
@@ -1882,6 +1895,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2002,6 +2043,17 @@
     <span class="md-ellipsis">
       
         Ground rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#easysteer-python-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EasySteer Python package
       
     </span>
   </a>
@@ -2243,9 +2295,10 @@ accessible MoE gates;
 consume the same discovered component targets. Standard decoder
 stacks use their global stack indices; pipeline-parallel placeholders retain
 those indices. Architecture exceptions belong in discovery and output-layout
-rules, rather than separate name parsing in each consumer. ReFT uses its own
-Transformers model profiles; repeated decoder layouts share an implementation,
-while component dimensions and special layouts remain explicit.</p>
+rules, rather than separate name parsing in each consumer. Native training uses
+an explicit Hugging Face decoder-layer binding for the supported hidden-state
+target. Its checkpoint converts directly to the inference payload and selection
+contract; it does not inherit PyVene's representation or source/base abstractions.</p>
 <p>Controllers declare their graph mask names and allocate their own component
 tables. Shared graph state calls that interface without branching on concrete
 controller classes. A new component supplies its discovery, output adapter,
@@ -2266,6 +2319,20 @@ capture row labels and reduction plans to the shared token-selection result.
 <p>For the current public contracts, read the <a href="../../user-guide/steering/">steering guide</a>,
 <a href="../../user-guide/hidden-state-capture/">capture guide</a>, and the engine architecture
 linked above. The <code>vllm-steer</code> fork follows upstream vLLM's pre-commit configuration.</p>
+<h2 id="easysteer-python-package">EasySteer Python package<a class="headerlink" href="#easysteer-python-package" title="Permanent link">&para;</a></h2>
+<p>The client package separates four responsibilities:</p>
+<ul>
+<li><code>capture/</code>: labelled activation results and engine capture orchestration.</li>
+<li><code>extraction/</code>: statistical methods, token selection, and vector serialization.</li>
+<li><code>training/</code>: frozen-model training, small trainable transformations, and native checkpoints.</li>
+<li><code>vectors.py</code>: native and third-party file adapters into vLLM payloads.</li>
+</ul>
+<p>Algorithm names and component names follow vLLM's existing capability contract.
+Keep engine runtime imports out of client package initialization. Training dependencies
+are an optional extra; extraction dispatch imports only the selected estimator.
+<code>hidden_states</code> and <code>steer</code> remain deprecated import aliases for existing capture
+and extraction users. New code uses <code>capture</code> and <code>extraction</code>. The old <code>reft</code>
+framework API is removed; only its file-format adapter remains.</p>
 
 
 

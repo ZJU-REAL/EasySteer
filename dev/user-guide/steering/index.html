@@ -1120,7 +1120,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1918,6 +1918,8 @@
       
         
       
+        
+      
     
     
     
@@ -1978,6 +1980,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2473,7 +2503,7 @@ materialization path. The file is read before execution; workers consume that
 snapshot rather than reopen the source.</p>
 <p><code>easysteer.vectors.load(path, format=...)</code> selects an explicit format adapter.
 Supported formats are <code>gguf</code>, <code>concept_pair</code>, <code>moe_router</code>, <code>pt_direction</code>,
-<code>pyreft</code>, <code>lm_steer</code>, and <code>linear_transport</code>. The existing convenience adapters
+<code>training</code>, <code>pyreft</code>, <code>lm_steer</code>, and <code>linear_transport</code>. The existing convenience adapters
 remain available (<code>from_pyreft</code>,
 <code>from_lm_steer</code>, <code>from_linear_transport</code>, <code>from_pt_direction</code>, <code>from_gguf</code>),
 and <code>easysteer.vectors.from_control_vector(cv)</code> steers an extraction result

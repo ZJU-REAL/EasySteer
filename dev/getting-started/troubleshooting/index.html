@@ -1094,7 +1094,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1889,6 +1889,8 @@
       
         
       
+        
+      
     
     
     
@@ -1949,6 +1951,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2309,8 +2339,9 @@ predicts the first answer token. Add <code>prompt_positions=[-1]</code> when tha
 should be steered.</p>
 <h2 id="capture">Capture<a class="headerlink" href="#capture" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Unsupported runner or worker count:</strong> capture uses the V2 GPU runner and the
-  public client helper requires one worker. Keep <code>tensor_parallel_size=1</code>.</li>
+<li><strong>Unsupported runner or parallelism:</strong> capture uses the V2 GPU runner and
+  supports ordinary TP with <code>PP=DP=1</code>. Disable context, sequence, and expert
+  parallelism. A multiworker fetch must contain one complete TP group.</li>
 <li><strong>Empty rows:</strong> confirm the token selection matches a forward pass. With
   <code>max_tokens=1</code>, there are prompt rows but no decode-forward rows for a
   generation-only selector.</li>

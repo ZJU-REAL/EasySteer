@@ -931,7 +931,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1844,6 +1844,8 @@
       
         
       
+        
+      
     
     
     
@@ -1907,6 +1909,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2158,7 +2188,7 @@ and applies the additional payload conditions below.</p>
 </tr>
 <tr>
 <td><code>attention_heads</code></td>
-<td>Concatenated query-head outputs before the output projection; standard decoder MHA/GQA with one GPU worker.</td>
+<td>Concatenated query-head outputs before the output projection; standard decoder MHA/GQA, including ordinary tensor parallelism.</td>
 </tr>
 <tr>
 <td><code>router_logits</code></td>
@@ -2327,6 +2357,12 @@ schemas are loaded explicitly in the client and passed as <code>data</code>:</p>
 <td><code>load(path, format="pt_direction", layers=[10])</code></td>
 </tr>
 <tr>
+<td><code>training</code></td>
+<td>Native <code>steering_adapter.json</code></td>
+<td><code>DirectionVector</code> or <code>ReftIntervention</code></td>
+<td><code>load(path, format="training")</code></td>
+</tr>
+<tr>
 <td><code>pyreft</code></td>
 <td>One intervention <code>.bin</code> and its config in a directory</td>
 <td><code>DirectionVector</code> for bias, <code>ReftIntervention</code> for LoReFT</td>
@@ -2349,18 +2385,18 @@ schemas are loaded explicitly in the client and passed as <code>data</code>:</p>
 <p>A file suffix such as <code>.pt</code> does not identify the checkpoint schema. Choose
 <code>format</code> explicitly. A direction GGUF is also distinct from a quantized model
 GGUF: it contains steering tensors, not model weights.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer</span><span class="w"> </span><span class="kn">import</span> <span class="n">vectors</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vllm.steer_vectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApplySpec</span><span class="p">,</span> <span class="n">SteeringSpec</span><span class="p">,</span> <span class="n">VectorSpec</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">payload</span> <span class="o">=</span> <span class="n">vectors</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"checkpoints/loreft"</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">"pyreft"</span><span class="p">)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">SteeringSpec</span><span class="p">(</span><span class="n">vectors</span><span class="o">=</span><span class="p">[</span><span class="n">VectorSpec</span><span class="p">(</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">data</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">algorithm</span><span class="o">=</span><span class="s2">"loreft"</span><span class="p">,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">apply</span><span class="o">=</span><span class="n">ApplySpec</span><span class="p">(</span><span class="n">prompt_positions</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">generation</span><span class="o">=</span><span class="s2">"all"</span><span class="p">),</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">easysteer.training</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_checkpoint</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">checkpoint</span> <span class="o">=</span> <span class="n">load_checkpoint</span><span class="p">(</span><span class="s2">"checkpoints/loreft"</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="o">.</span><span class="n">to_spec</span><span class="p">()</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">outputs</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">prompts</span><span class="p">,</span> <span class="n">steering</span><span class="o">=</span><span class="n">spec</span><span class="p">)</span>
 </code></pre></div>
-<p>The pyreft adapter preserves the checkpoint's layer index. In general, when a
+<p>Native checkpoints preserve the algorithm, layer and training selection in the
+returned spec. For a historical PyReFT checkpoint, load its payload explicitly
+with <code>vectors.load(path, format="pyreft")</code> and supply the original training
+selection in <code>VectorSpec.apply</code>; the old file format does not record that policy.
+The PyReFT file adapter does not import or require PyReFT.</p>
+<p>The adapter preserves the checkpoint's layer index. In general, when a
 payload records layer IDs, <code>VectorSpec.layers</code> restricts that set; it does not
 relocate the weights. A payload without layer IDs, such as a <code>LinearMap</code> or
 <code>LowRankProjector</code>, requires an explicit target-layer list.</p>
@@ -2377,7 +2413,8 @@ first and use its local path.</p>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">payload</span> <span class="o">=</span> <span class="n">DirectionVector</span><span class="p">({</span><span class="mi">10</span><span class="p">:</span> <span class="n">direction</span><span class="p">})</span>
 </code></pre></div>
 <p>The width must match the selected model component. For attention, use the
-capture layout rather than the hidden-state width. Both NumPy and PyTorch
+capture layout's global query-head width, including with TP, rather than the
+hidden-state width. Both NumPy and PyTorch
 tensors are accepted. The <a href="../payloads/">payload class reference</a> gives constructor
 arguments and shapes; tensor payloads validate dimensions and finite values
 before workers materialize their tensors.</p>

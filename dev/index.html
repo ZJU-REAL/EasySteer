@@ -1020,7 +1020,7 @@
   <span class="md-ellipsis">
     
   
-    ReFT training
+    Training steering adapters
   
 
     
@@ -1815,6 +1815,8 @@
       
         
       
+        
+      
     
     
     
@@ -1875,6 +1877,34 @@
     
   
     Vector extraction and adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api-reference/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training
   
 
     
@@ -2069,8 +2099,8 @@ prefix caching, and CUDA graph support.</p>
 <td><a href="user-guide/attention/">Attention and ITI</a></td>
 </tr>
 <tr>
-<td>Train a ReFT intervention</td>
-<td><a href="user-guide/reft-training/">ReFT training</a></td>
+<td>Train a steering adapter</td>
+<td><a href="user-guide/reft-training/">Steering training</a></td>
 </tr>
 <tr>
 <td>Deploy an API or demo</td>
@@ -2100,11 +2130,11 @@ prefix caching, and CUDA graph support.</p>
 <td>vLLM fork exposing <code>vllm.steer_vectors</code> and <code>vllm.capture</code></td>
 </tr>
 <tr>
-<td><code>easysteer.hidden_states</code></td>
+<td><code>easysteer.capture</code></td>
 <td>Capture labelled hidden states, attention head outputs, and MoE router logits</td>
 </tr>
 <tr>
-<td><code>easysteer.steer</code></td>
+<td><code>easysteer.extraction</code></td>
 <td>Extract steering vectors from captured hidden states (analysis-based)</td>
 </tr>
 <tr>
@@ -2112,8 +2142,8 @@ prefix caching, and CUDA graph support.</p>
 <td>Convert files or extraction results into common inference payloads</td>
 </tr>
 <tr>
-<td><code>easysteer.reft</code></td>
-<td>Train parameterized interventions on frozen models (learning-based)</td>
+<td><code>easysteer.training</code></td>
+<td>Train native steering adapters on frozen models (learning-based)</td>
 </tr>
 <tr>
 <td><code>frontend/</code>, <code>hf-space/</code></td>
